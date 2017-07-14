@@ -249,10 +249,13 @@ class AppsBaptizer(CommonMixin):
                 .format(app, profile, se))
 
     @gen.coroutine
-    def adjust(self, ch, app, to_adjust):
+    def adjust(self, app, to_adjust):
         try:
             print('bless: control to {} {}'.format(app, to_adjust))
+
+            ch = yield self.node_service.control(app)
             yield ch.tx.write(to_adjust)
+
             print('bless: control to {} {} done'.format(app, to_adjust))
 
             self.info(
@@ -268,7 +271,7 @@ class AppsBaptizer(CommonMixin):
     def blessing_road(self):
 
         # TODO: method not implemented yet, using control_app as stub!
-        control_channel = yield self.node_service.control('Echo')
+        # control_channel = yield self.node_service.control('Echo')
 
         while True:
             new_state, to_run, do_adjust = yield self.adjust_queue.get()
@@ -281,7 +284,7 @@ class AppsBaptizer(CommonMixin):
 
                 if do_adjust:
                     yield [
-                        self.adjust(control_channel, app, to_adjust)
+                        self.adjust(app, to_adjust)
                         for app, to_adjust in new_state.iteritems()]
 
                     self.metrics['state_updates_count'] += 1
@@ -293,7 +296,7 @@ class AppsBaptizer(CommonMixin):
                 self.error('failed to exec command with error: {}'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
                 # TODO: can throw, do something?
-                control_channel = yield self.node_service.control('Echo')
+                # control_channel = yield self.node_service.control('Echo')
             finally:
                 self.adjust_queue.task_done()
 
@@ -316,8 +319,6 @@ class AppsSlayer(CommonMixin):
         try:
             yield self.node_service.pause_app(app)
             self.info('app {} stopped'.format(app))
-            # ch = yield self.node_service.pause_app(app)
-            # yield ch.rx.get()
             self.metrics['apps_slayed'] += 1
         except ServiceError as se:
             print('failed to stop app {}'.format(se))
