@@ -10,21 +10,23 @@ def send_state(path):
     unicorn = Service('unicorn')
 
     wrk = 0
+
+    ch = yield unicorn.get(path)
+    _, version = yield ch.rx.get()
+
     while True:
         try:
             wrk += 1
 
-            state = dict(Echo=wrk % 100)
-
-            ch = yield unicorn.get(path)
-            get_state, version = yield ch.rx.get()
+            state = dict(Echo=wrk % 100, ppn=(100 - wrk % 100))
 
             ch = yield unicorn.put(path, state, version)
             _, (result, _) = yield ch.rx.get()
 
+            version += 1
             print('send state: {}'.format(result))
 
-            yield gen.sleep(5)
+            yield gen.sleep(1)
 
         except Exception as e:
             print('error {}'.format(e))
