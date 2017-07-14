@@ -23,10 +23,10 @@ DEFAULT_RETRY_TIMEOUT_SEC = 5
 
 UNICORN_STATE_PREFIX = '/state/prefix'
 COCAINE_TEST_UUID = 'SOME_UUID'
-DEFAULT_RUN_PROFILE = 'DefaultProfile'
+DEFAULT_RUN_PROFILE = 'IsoProcess'
 DEFAULT_ORCA_PORT = 8877
 
-SELF_NAME = 'app/orca'
+SELF_NAME = 'app/orca' # aka Killer Whale
 
 def make_state_path(uuid):
     return UNICORN_STATE_PREFIX + '/' + uuid
@@ -48,6 +48,7 @@ class MetricsHandler(web.RequestHandler):
             }
         )
         self.write(metrics)
+        self.flush()
 
 
 class StateHandler(web.RequestHandler):
@@ -71,22 +72,36 @@ class StateUpdateMessage(object):
         return self.state
 
 
-class MetricsMixin(object):
+class CommonMixin(object):
 
-    def __init__(self):
+    def __init__(self, logger, name = SELF_NAME):
+        self.name = name
+        self.format = name + ' :: %s'
+        self.logger = logger
         self.metrics = defaultdict(int)
 
     def get_metrics(self):
         return self.metrics
 
-class StateAcquirer(MetricsMixin):
+    def debug(self, msg):
+        self.logger.debug(self.format, msg)
+
+    def info(self, msg):
+        self.logger.info(self.format, msg)
+
+    def warn(self, msg):
+        self.logger.warn(self.format, msg)
+
+    def error(self, msg):
+        self.logger.error(self.format, msg)
+
+
+class StateAcquirer(CommonMixin):
 
     def __init__(self, logger, node, unicorn, input_queue, state_path,
                  poll_interval_sec=APP_LIST_POLL_INTERVAL):
 
-        super(StateAcquirer, self).__init__()
-
-        self.logger = logger
+        super(StateAcquirer, self).__init__(logger)
 
         self.node_service = node
         self.unicorn_service = unicorn
@@ -103,14 +118,16 @@ class StateAcquirer(MetricsMixin):
                 ch = yield self.node_service.list()
                 app_list = yield ch.rx.get()
 
-                self.metrics['running_nodes'] = len(app_list)
+                self.metrics['polled_running_nodes_count'] = len(app_list)
 
+                self.info('getting application list {}'.format(app_list))
                 print('poll: got apps list {}'.format(app_list))
 
                 yield self.input_queue.put(RunningAppsMessage(app_list))
                 yield gen.sleep(self.poll_interval_sec)
             except Exception as e:
                 print('failed to get app list, error: {}'.format(e))
+                self.error('failed to poll apps list with {}'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
 
     @gen.coroutine
@@ -119,24 +136,28 @@ class StateAcquirer(MetricsMixin):
 
         while True:
             try:
-                result, version = yield ch.rx.get()
-                print('subscribe: got subscribed state {} {}'.format(result, version))
+                result, _ = yield ch.rx.get()
+                print('subscribe: got subscribed state {}'.format(result))
                 yield self.input_queue.put(StateUpdateMessage(result))
 
-                self.metrics['adjust_state_commands_count'] += len(result)
+                self.metrics['last_state_app_count'] = len(result)
             except Exception as e:
                 print(
                     'subscribe: failed to get unicorn subscription with {}'
                     .format(e))
+
+                self.error(
+                    'failed to get state subscription with {}'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
-                # TODO: remove previous subscription?
+
+                # TODO: can throw?
                 ch = yield self.unicorn_service.subscribe(self.state_path)
 
 
-class StateAggregator(MetricsMixin):
+class StateAggregator(CommonMixin):
 
     def __init__(self, logger, input_queue, adjust_queue, stop_queue):
-        super(StateAggregator, self).__init__()
+        super(StateAggregator, self).__init__(logger)
 
         self.logger = logger
 
@@ -160,14 +181,24 @@ class StateAggregator(MetricsMixin):
                     print(
                         'disp: got running apps list {}'
                         .format(self.running_apps_set))
+
+                    self.debug(
+                        'disp::got running apps list {}'
+                        .format(self.running_apps_set))
                 elif isinstance(msg, StateUpdateMessage):
                     self.state = msg.get_state()
                     is_state_updated = True
                     print('disp: got state update {}'.format(self.state))
+
+                    self.debug(
+                        'disp::got state update {}'.format(self.state))
                 else:
                     print('unknown message {}'.format(msg))
             except Exception as e:
                 print('input queue read error {}'.format(e))
+                self.error(
+                    'failed to get control message with {}'
+                    .format(e))
             finally:
                 self.input_queue.task_done()
 
@@ -179,21 +210,24 @@ class StateAggregator(MetricsMixin):
             print('to_run {}'.format(to_run))
             print('to_stop {}'.format(to_stop))
 
-            if to_stop:
+            self.info("'to_stop' apps list {}".format(to_stop))
+            self.info("'to_run' apps list {}".format(to_run))
+
+            # stop app only if it is a valid state here
+            if to_stop and self.state:
                 yield self.stop_queue.put(to_stop)
-                self.metrics['to_stop_commands'] += len(to_stop)
+                self.metrics['total_stop_app_commands'] += len(to_stop)
 
             if is_state_updated or to_run:
                 yield self.adjust_queue.put(
-                    (self.state, to_run, is_state_updated)
-                )
-                self.metrics['to_run_commands'] += len(to_run)
+                    (self.state, to_run, is_state_updated))
+                self.metrics['total_run_app_commands'] += len(to_run)
 
 
-class AppsBaptizer(MetricsMixin):
+class AppsBaptizer(CommonMixin):
 
     def __init__(self, logger, node, adjust_queue):
-        super(AppsBaptizer, self).__init__()
+        super(AppsBaptizer, self).__init__(logger)
 
         self.logger = logger
 
@@ -204,19 +238,30 @@ class AppsBaptizer(MetricsMixin):
     def bless(self, app, profile=DEFAULT_RUN_PROFILE):
         try:
             yield self.node_service.start_app(app, profile)
-            self.logger.info(SELF_NAME, 'starting app {} {}'.format(app, profile))
+            print('bless: started app {}'.format(app))
+            self.info(
+                'starting app {} with profile {}'.format(app, profile))
+            self.metrics['exec_run_app_commands'] += 1
         except ServiceError as se:
-            self.logger.warn(SELF_NAME, 'failed to start app {} {} with err: {}'
-                .format(app, profile, e))
+            print("error while starting app {} {}".format(app, se))
+            self.error(
+                'failed to start app {} {} with err: {}'
+                .format(app, profile, se))
 
     @gen.coroutine
     def adjust(self, ch, app, to_adjust):
         try:
-            print('bless: control {} {}'.format(app, to_adjust))
+            print('bless: control to {} {}'.format(app, to_adjust))
             yield ch.tx.write(to_adjust)
-            self.logger.info(SELF_NAME, 'ajusting workers count {} {}'.format(app, to_adjust))
+            print('bless: control to {} {} done'.format(app, to_adjust))
+
+            self.info(
+                'adjusting workers count for app {} to {}'
+                .format(app, to_adjust))
         except ServiceError as se:
-            self.logger.error(SELF_NAME, 'failed to adjust app {} workers count for {} with err: {}'
+            print("error while adjusting app {} {}".format(app, se))
+            self.error(
+                "failed to adjust app's {} workers count to {} with err: {}"
                 .format(app, to_adjust, se))
 
     @gen.coroutine
@@ -233,17 +278,21 @@ class AppsBaptizer(MetricsMixin):
 
             try:
                 yield [self.bless(app) for app in to_run]
-                self.metrics['to_run_requests'] += len(to_run)
 
                 if do_adjust:
-                    self.metrics['state_update'] += 1
-                    print('bless: got to adjust {}'.format(new_state))
                     yield [
                         self.adjust(control_channel, app, to_adjust)
                         for app, to_adjust in new_state.iteritems()]
+
+                    self.metrics['state_updates_count'] += 1
+
+                    self.info('state updated')
+                    print('bless: got to adjust {}'.format(new_state))
             except Exception as e:
                 print('bless: error while dispatching commands {}'.format(e))
+                self.error('failed to exec command with error: {}'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
+                # TODO: can throw, do something?
                 control_channel = yield self.node_service.control('Echo')
             finally:
                 self.adjust_queue.task_done()
@@ -251,10 +300,10 @@ class AppsBaptizer(MetricsMixin):
 
 # Actually should be 'App Sleeper'
 # TODO: look at tools for 'app stop' command sequence
-class AppsSlayer(MetricsMixin):
+class AppsSlayer(CommonMixin):
 
     def __init__(self, logger, node, stop_queue):
-        super(AppsSlayer, self).__init__()
+        super(AppsSlayer, self).__init__(logger)
 
         self.logger = logger
 
@@ -264,11 +313,16 @@ class AppsSlayer(MetricsMixin):
     @gen.coroutine
     def slay(self, app):
         print('slayer: stopping app {}'.format(app))
-        self.metrics['slay_requests'] += 1
-        yield self.node_service.pause_app(app)
-        # ch = yield self.node_service.pause_app(app)
-        # yield ch.rx.get()
-        self.metrics['slayed'] += 1
+        try:
+            yield self.node_service.pause_app(app)
+            self.info('app {} stopped'.format(app))
+            # ch = yield self.node_service.pause_app(app)
+            # yield ch.rx.get()
+            self.metrics['apps_slayed'] += 1
+        except ServiceError as se:
+            print('failed to stop app {}'.format(se))
+            self.error('failed to stop app {} with error: {}'.format(app, se))
+
 
     @gen.coroutine
     def topheth_road(self):
@@ -278,7 +332,7 @@ class AppsSlayer(MetricsMixin):
             try:
                 yield [self.slay(app) for app in to_stop]
             except Exception as e:
-                print('slayer: failed to stop one of the apps {}'.format(to_stop))
+                print('failed to stop one of the apps {}'.format(to_stop))
             finally:
                 self.stop_queue.task_done()
 
