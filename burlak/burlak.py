@@ -6,6 +6,7 @@
 #   - expose state to andle
 #
 import click
+import time
 
 from tornado import gen
 from tornado.ioloop import IOLoop
@@ -54,8 +55,13 @@ class MetricsHandler(web.RequestHandler):
 
 
 class StateHandler(web.RequestHandler):
+
+    def initialize(self, committed_state):
+        self.committed_state = committed_state
+
     def get(self):
-        self.write('<h3>not implemented</h3>')
+        self.write(self.committed_state.as_dict())
+        self.flush()
 
 
 class RunningAppsMessage(object):
@@ -73,16 +79,22 @@ class StateUpdateMessage(object):
     def get_state(self):
         return self.state
 
-#
-# class CommitedState(object):
-#
-#     def __init__(self):
-#         self.state = dict()
-#
-#     def as_dict(self):
-#         return self.state
-#
-#     def set_
+
+class CommittedState(object):
+
+    def __init__(self):
+        self.state = dict()
+
+    def as_dict(self):
+        return self.state
+
+    def mark_running(self, app, workers, tm=time.time()):
+        self.state.update({ app: ['RUNNING', workers, int(tm)]})
+
+    def mark_stopped(self, app, tm=time.time()):
+        _, workers = self.state.get(app, ['', 0])
+        self.state.update({ app: ['STOPPED', workers, int(tm)]})
+
 
 class CommonMixin(object):
 
@@ -243,10 +255,11 @@ class StateAggregator(CommonMixin):
 
 class AppsBaptizer(CommonMixin):
 
-    def __init__(self, logger, node, adjust_queue, default_profile):
+    def __init__(self, logger, ci_state, node, adjust_queue, default_profile):
         super(AppsBaptizer, self).__init__(logger)
 
         self.logger = logger
+        self.ci_state = ci_state
 
         self.node_service = node
         self.adjust_queue = adjust_queue
@@ -254,7 +267,7 @@ class AppsBaptizer(CommonMixin):
         self.def_profile = default_profile
 
     @gen.coroutine
-    def bless(self, app, profile):
+    def bless(self, app, profile, tm=time.time()):
         try:
             yield self.node_service.start_app(app, profile)
             print('bless: started app {}'.format(app))
@@ -268,18 +281,19 @@ class AppsBaptizer(CommonMixin):
                 .format(app, profile, se))
 
     @gen.coroutine
-    def adjust(self, app, to_adjust):
+    def adjust(self, app, to_adjust, tm=time.time()):
         try:
             print('bless: control to {} {}'.format(app, to_adjust))
 
             ch = yield self.node_service.control(app)
             yield ch.tx.write(to_adjust)
 
-            print('bless: control to {} {} done'.format(app, to_adjust))
-
+            self.ci_state.mark_running(app, to_adjust, tm)
             self.info(
                 'adjusting workers count for app {} to {}'
                 .format(app, to_adjust))
+
+            print('bless: control to {} {} done'.format(app, to_adjust))
         except ServiceError as se:
             print("error while adjusting app {} {}".format(app, se))
             self.error(
@@ -299,11 +313,12 @@ class AppsBaptizer(CommonMixin):
                 .format(new_state, to_run, do_adjust))
 
             try:
-                yield [self.bless(app, self.def_profile) for app in to_run]
+                tm = time.time()
+                yield [self.bless(app, self.def_profile, tm) for app in to_run]
 
                 if do_adjust:
                     yield [
-                        self.adjust(app, to_adjust)
+                        self.adjust(app, to_adjust, tm)
                         for app, to_adjust in new_state.iteritems()]
 
                     self.metrics['state_updates_count'] += 1
@@ -324,21 +339,25 @@ class AppsBaptizer(CommonMixin):
 # TODO: look at tools for 'app stop' command sequence
 class AppsSlayer(CommonMixin):
 
-    def __init__(self, logger, node, stop_queue):
+    def __init__(self, logger, ci_state, node, stop_queue):
         super(AppsSlayer, self).__init__(logger)
 
         self.logger = logger
+        self.ci_state = ci_state
 
         self.node_service = node
         self.stop_queue = stop_queue
 
     @gen.coroutine
-    def slay(self, app):
+    def slay(self, app, tm=time.time()):
         print('slayer: stopping app {}'.format(app))
         try:
             yield self.node_service.pause_app(app)
-            self.info('app {} stopped'.format(app))
+
+            self.ci_state.mark_stopped(app, tm)
             self.metrics['apps_slayed'] += 1
+
+            self.info('app {} has been stopped'.format(app))
         except ServiceError as se:
             print('failed to stop app {}'.format(se))
             self.error('failed to stop app {} with error: {}'.format(app, se))
@@ -349,7 +368,8 @@ class AppsSlayer(CommonMixin):
             to_stop = yield self.stop_queue.get()
 
             try:
-                yield [self.slay(app) for app in to_stop]
+                tm = time.time()
+                yield [self.slay(app, tm) for app in to_stop]
             except Exception as e:
                 print('failed to stop one of the apps {}'.format(to_stop))
             finally:
@@ -383,8 +403,11 @@ def main(uuid, default_profile, apps_poll_interval):
     state_processor = StateAggregator(
         logging, input_queue, adjust_queue, stop_queue)
 
-    apps_slayer = AppsSlayer(logging, node, stop_queue)
-    apps_baptizer = AppsBaptizer(logging, node, adjust_queue, default_profile)
+    committed_state = CommittedState()
+
+    apps_slayer = AppsSlayer(logging, committed_state, node, stop_queue)
+    apps_baptizer = AppsBaptizer(
+        logging, committed_state, node, adjust_queue, default_profile)
 
     # run async poll tasks in date flow reverse order, from sink to source
     IOLoop.current().spawn_callback(lambda: apps_slayer.topheth_road())
@@ -404,7 +427,7 @@ def main(uuid, default_profile, apps_poll_interval):
         baptizer=apps_baptizer)
 
     app = web.Application([
-        (r'/state', StateHandler, ),
+        (r'/state', StateHandler, dict(committed_state=committed_state)),
         (r'/metrics', MetricsHandler, dict(queues=qs, units=units))
     ])
 

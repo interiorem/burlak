@@ -28,7 +28,7 @@ def control():
 
     # yield control_channel.tx.close()
 
-    print('pausing app...')
+    # print('pausing app...')
     # ch = yield node.pause_app(APP_NAME)
     # result = yield ch.rx.get()
     #
