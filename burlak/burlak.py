@@ -21,15 +21,17 @@ from collections import defaultdict
 APP_LIST_POLL_INTERVAL = 5
 DEFAULT_RETRY_TIMEOUT_SEC = 5
 
-UNICORN_STATE_PREFIX = '/state/prefix'
+DEFAULT_UNICORN_PATH = '/state/prefix'
 COCAINE_TEST_UUID = 'SOME_UUID'
+
 DEFAULT_RUN_PROFILE = 'IsoProcess'
 DEFAULT_ORCA_PORT = 8877
 
-SELF_NAME = 'app/orca' # aka Killer Whale
+SELF_NAME = 'app/orca'  # aka Killer Whale
 
-def make_state_path(uuid):
-    return UNICORN_STATE_PREFIX + '/' + uuid
+
+def make_state_path(prefix, uuid):
+    return prefix + '/' + uuid
 
 
 class MetricsHandler(web.RequestHandler):
@@ -41,10 +43,10 @@ class MetricsHandler(web.RequestHandler):
     def get(self):
         metrics = dict(
             queues_fill={
-                k: v.qsize() for k,v in self.queues.iteritems()
+                k: v.qsize() for k, v in self.queues.iteritems()
             },
             metrics={
-                k: v.get_metrics() for k,v in self.units.iteritems()
+                k: v.get_metrics() for k, v in self.units.iteritems()
             }
         )
         self.write(metrics)
@@ -71,13 +73,24 @@ class StateUpdateMessage(object):
     def get_state(self):
         return self.state
 
+#
+# class CommitedState(object):
+#
+#     def __init__(self):
+#         self.state = dict()
+#
+#     def as_dict(self):
+#         return self.state
+#
+#     def set_
 
 class CommonMixin(object):
 
-    def __init__(self, logger, name = SELF_NAME):
+    def __init__(self, logger, name=SELF_NAME):
         self.name = name
         self.format = name + ' :: %s'
         self.logger = logger
+
         self.metrics = defaultdict(int)
 
     def get_metrics(self):
@@ -107,6 +120,7 @@ class StateAcquirer(CommonMixin):
         self.unicorn_service = unicorn
         self.input_queue = input_queue
         self.state_path = state_path
+
         self.poll_interval_sec = poll_interval_sec
 
     @gen.coroutine
@@ -165,35 +179,35 @@ class StateAggregator(CommonMixin):
         self.stop_queue = stop_queue
         self.adjust_queue = adjust_queue
 
-        self.running_apps_set = set()
-        self.state = dict()
-
     @gen.coroutine
     def process_loop(self):
-        while True:
-            msg = yield self.input_queue.get()
 
+        running_apps = set()
+        state = dict()
+
+        while True:
             is_state_updated = False
+            msg = yield self.input_queue.get()
 
             try:
                 if isinstance(msg, RunningAppsMessage):
-                    self.running_apps_set = msg.get_apps_set()
+                    running_apps = msg.get_apps_set()
                     print(
                         'disp: got running apps list {}'
-                        .format(self.running_apps_set))
+                        .format(running_apps))
 
                     self.debug(
                         'disp::got running apps list {}'
-                        .format(self.running_apps_set))
+                        .format(running_apps))
                 elif isinstance(msg, StateUpdateMessage):
-                    self.state = msg.get_state()
+                    state = msg.get_state()
                     is_state_updated = True
-                    print('disp: got state update {}'.format(self.state))
-
+                    print('disp: got state update {}'.format(state))
                     self.debug(
-                        'disp::got state update {}'.format(self.state))
+                        'disp::got state update {}'.format(state))
                 else:
-                    print('unknown message {}'.format(msg))
+                    self.error('unknown message type {}'.format(msg))
+                    print('unknown message type {}'.format(msg))
             except Exception as e:
                 print('input queue read error {}'.format(e))
                 self.error(
@@ -202,10 +216,14 @@ class StateAggregator(CommonMixin):
             finally:
                 self.input_queue.task_done()
 
-            update_state_apps_set = set(self.state.iterkeys())
+            if not state:
+                self.info("get running apps list, but don't have state yet")
+                continue
 
-            to_run = update_state_apps_set - self.running_apps_set
-            to_stop = self.running_apps_set - update_state_apps_set
+            update_state_apps_set = set(state.iterkeys())
+
+            to_run = update_state_apps_set - running_apps
+            to_stop = running_apps - update_state_apps_set
 
             print('to_run {}'.format(to_run))
             print('to_stop {}'.format(to_stop))
@@ -213,20 +231,19 @@ class StateAggregator(CommonMixin):
             self.info("'to_stop' apps list {}".format(to_stop))
             self.info("'to_run' apps list {}".format(to_run))
 
-            # stop app only if it is a valid state here
-            if to_stop and self.state:
+            if to_stop:
                 yield self.stop_queue.put(to_stop)
                 self.metrics['total_stop_app_commands'] += len(to_stop)
 
             if is_state_updated or to_run:
                 yield self.adjust_queue.put(
-                    (self.state, to_run, is_state_updated))
+                    (state, to_run, is_state_updated))
                 self.metrics['total_run_app_commands'] += len(to_run)
 
 
 class AppsBaptizer(CommonMixin):
 
-    def __init__(self, logger, node, adjust_queue):
+    def __init__(self, logger, node, adjust_queue, default_profile):
         super(AppsBaptizer, self).__init__(logger)
 
         self.logger = logger
@@ -234,8 +251,10 @@ class AppsBaptizer(CommonMixin):
         self.node_service = node
         self.adjust_queue = adjust_queue
 
+        self.def_profile = default_profile
+
     @gen.coroutine
-    def bless(self, app, profile=DEFAULT_RUN_PROFILE):
+    def bless(self, app, profile):
         try:
             yield self.node_service.start_app(app, profile)
             print('bless: started app {}'.format(app))
@@ -280,7 +299,7 @@ class AppsBaptizer(CommonMixin):
                 .format(new_state, to_run, do_adjust))
 
             try:
-                yield [self.bless(app) for app in to_run]
+                yield [self.bless(app, self.def_profile) for app in to_run]
 
                 if do_adjust:
                     yield [
@@ -290,7 +309,7 @@ class AppsBaptizer(CommonMixin):
                     self.metrics['state_updates_count'] += 1
 
                     self.info('state updated')
-                    print('bless: got to adjust {}'.format(new_state))
+                    print('bless: adjuste {}'.format(new_state))
             except Exception as e:
                 print('bless: error while dispatching commands {}'.format(e))
                 self.error('failed to exec command with error: {}'.format(e))
@@ -324,7 +343,6 @@ class AppsSlayer(CommonMixin):
             print('failed to stop app {}'.format(se))
             self.error('failed to stop app {} with error: {}'.format(app, se))
 
-
     @gen.coroutine
     def topheth_road(self):
         while True:
@@ -337,26 +355,36 @@ class AppsSlayer(CommonMixin):
             finally:
                 self.stop_queue.task_done()
 
+
 @click.command()
 @click.option(
     '--uuid',
-    default=make_state_path(COCAINE_TEST_UUID), help='runtime uuid')
-def main(uuid):
+    default=make_state_path(DEFAULT_UNICORN_PATH, COCAINE_TEST_UUID),
+    help='runtime uuid (with unicorn path)')
+@click.option(
+    '--default-profile',
+    default=DEFAULT_RUN_PROFILE, help='default profile for app running')
+@click.option(
+    '--apps-poll-interval',
+    default=APP_LIST_POLL_INTERVAL, help='default profile for app running')
+def main(uuid, default_profile, apps_poll_interval):
+
     input_queue = queues.Queue()
     adjust_queue = queues.Queue()
     stop_queue = queues.Queue()
 
     # TODO: names from config
-    node = Service('node')
-    # logging = Service('logging')
     logging = Logger()
+    node = Service('node')
     unicorn = Service('unicorn')
 
-    acquirer = StateAcquirer(logging, node, unicorn, input_queue, uuid)
-    state_processor = StateAggregator(logging, input_queue, adjust_queue, stop_queue)
+    acquirer = StateAcquirer(
+        logging, node, unicorn, input_queue, uuid, apps_poll_interval)
+    state_processor = StateAggregator(
+        logging, input_queue, adjust_queue, stop_queue)
 
     apps_slayer = AppsSlayer(logging, node, stop_queue)
-    apps_baptizer = AppsBaptizer(logging, node, adjust_queue)
+    apps_baptizer = AppsBaptizer(logging, node, adjust_queue, default_profile)
 
     # run async poll tasks in date flow reverse order, from sink to source
     IOLoop.current().spawn_callback(lambda: apps_slayer.topheth_road())
@@ -365,7 +393,8 @@ def main(uuid):
     IOLoop.current().spawn_callback(lambda: state_processor.process_loop())
 
     IOLoop.current().spawn_callback(lambda: acquirer.poll_running_apps_list())
-    IOLoop.current().spawn_callback(lambda: acquirer.subscribe_to_state_updates())
+    IOLoop.current().spawn_callback(
+        lambda: acquirer.subscribe_to_state_updates())
 
     qs = dict(input=input_queue, adjust=adjust_queue, stop=stop_queue)
     units = dict(
