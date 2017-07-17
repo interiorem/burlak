@@ -26,7 +26,7 @@ def send_state(path):
             version += 1
             print('send state: {}'.format(result))
 
-            yield gen.sleep(1)
+            yield gen.sleep(3)
 
         except Exception as e:
             print('error {}'.format(e))

@@ -81,7 +81,14 @@ class StateUpdateMessage(object):
 
 
 class CommittedState(object):
+    """
+        State record format:
 
+            [<STATE>, <WORKERS COUNT>, <TIMESTAMP>]
+
+        <STATE> - (RUNNING|STOPPED)
+        <TIMESTAMP> - last state update time
+    """
     def __init__(self):
         self.state = dict()
 
