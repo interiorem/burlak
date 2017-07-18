@@ -5,34 +5,18 @@
 #   - secure service for 'unicorn', maybe for 'node', 'logger'?
 #   - expose state to andle
 #
-import click
 import time
 
 from tornado import gen
-from tornado.ioloop import IOLoop
 from tornado import web
-from tornado import queues
 
-from cocaine.services import Service
 from cocaine.exceptions import ServiceError, DisconnectionError
-from cocaine.logger import Logger
 
 from collections import defaultdict
 
-APP_LIST_POLL_INTERVAL = 5
+
 DEFAULT_RETRY_TIMEOUT_SEC = 5
-
-DEFAULT_UNICORN_PATH = '/state/prefix'
-COCAINE_TEST_UUID = 'SOME_UUID'
-
-DEFAULT_RUN_PROFILE = 'IsoProcess'
-DEFAULT_ORCA_PORT = 8877
-
 SELF_NAME = 'app/orca'  # aka Killer Whale
-
-
-def make_state_path(prefix, uuid):
-    return prefix + '/' + uuid
 
 
 class MetricsHandler(web.RequestHandler):
@@ -131,7 +115,7 @@ class CommonMixin(object):
 class StateAcquirer(CommonMixin):
 
     def __init__(self, logger, node, unicorn, input_queue, state_path,
-                 poll_interval_sec=APP_LIST_POLL_INTERVAL):
+                 poll_interval_sec):
 
         super(StateAcquirer, self).__init__(logger)
 
@@ -325,7 +309,7 @@ class AppsBaptizer(CommonMixin):
 
                 if do_adjust:
                     yield [
-                        self.adjust(app, to_adjust, tm)
+                        self.adjust(app, int(to_adjust), tm)
                         for app, to_adjust in new_state.iteritems()]
 
                     self.metrics['state_updates_count'] += 1
@@ -381,65 +365,3 @@ class AppsSlayer(CommonMixin):
                 print('failed to stop one of the apps {}'.format(to_stop))
             finally:
                 self.stop_queue.task_done()
-
-
-@click.command()
-@click.option(
-    '--uuid',
-    default=make_state_path(DEFAULT_UNICORN_PATH, COCAINE_TEST_UUID),
-    help='runtime uuid (with unicorn path)')
-@click.option(
-    '--default-profile',
-    default=DEFAULT_RUN_PROFILE, help='default profile for app running')
-@click.option(
-    '--apps-poll-interval',
-    default=APP_LIST_POLL_INTERVAL, help='default profile for app running')
-def main(uuid, default_profile, apps_poll_interval):
-
-    input_queue = queues.Queue()
-    adjust_queue = queues.Queue()
-    stop_queue = queues.Queue()
-
-    # TODO: names from config
-    logging = Logger()
-    node = Service('node')
-    unicorn = Service('unicorn')
-
-    acquirer = StateAcquirer(
-        logging, node, unicorn, input_queue, uuid, apps_poll_interval)
-    state_processor = StateAggregator(
-        logging, input_queue, adjust_queue, stop_queue)
-
-    committed_state = CommittedState()
-
-    apps_slayer = AppsSlayer(logging, committed_state, node, stop_queue)
-    apps_baptizer = AppsBaptizer(
-        logging, committed_state, node, adjust_queue, default_profile)
-
-    # run async poll tasks in date flow reverse order, from sink to source
-    IOLoop.current().spawn_callback(lambda: apps_slayer.topheth_road())
-    IOLoop.current().spawn_callback(lambda: apps_baptizer.blessing_road())
-
-    IOLoop.current().spawn_callback(lambda: state_processor.process_loop())
-
-    IOLoop.current().spawn_callback(lambda: acquirer.poll_running_apps_list())
-    IOLoop.current().spawn_callback(
-        lambda: acquirer.subscribe_to_state_updates())
-
-    qs = dict(input=input_queue, adjust=adjust_queue, stop=stop_queue)
-    units = dict(
-        acquisition=acquirer,
-        state=state_processor,
-        slayer=apps_slayer,
-        baptizer=apps_baptizer)
-
-    app = web.Application([
-        (r'/state', StateHandler, dict(committed_state=committed_state)),
-        (r'/metrics', MetricsHandler, dict(queues=qs, units=units))
-    ])
-
-    app.listen(DEFAULT_ORCA_PORT)
-    IOLoop.current().start()
-
-if __name__ == '__main__':
-    main()
