@@ -26,14 +26,14 @@ class MetricsHandler(web.RequestHandler):
         self.units = units
 
     def get(self):
-        metrics = dict(
-            queues_fill={
+        metrics = {
+            'queues_fill' : {
                 k: v.qsize() for k, v in self.queues.iteritems()
             },
-            metrics={
+            'metrics' : {
                 k: v.get_metrics() for k, v in self.units.iteritems()
             }
-        )
+        }
         self.write(metrics)
         self.flush()
 
@@ -283,8 +283,6 @@ class AppsBaptizer(CommonMixin):
             self.info(
                 'adjusting workers count for app {} to {}'
                 .format(app, to_adjust))
-
-            print('bless: control to {} {} done'.format(app, to_adjust))
         except ServiceError as se:
             print("error while adjusting app {} {}".format(app, se))
             self.error(

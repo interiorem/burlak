@@ -7,10 +7,11 @@ from cocaine.logger import Logger
 from cocaine.services import Service
 
 from .burlak import *
+from .config import Config
 from .sec import WrapperFabric
 
 
-APP_LIST_POLL_INTERVAL = 5
+APP_LIST_POLL_INTERVAL = 10
 DEFAULT_UNICORN_PATH = '/state/prefix'
 COCAINE_TEST_UUID = 'SOME_UUID'
 
@@ -36,20 +37,19 @@ def make_state_path(prefix, uuid):
 @click.option(
     '--port',
     default=DEFAULT_ORCA_PORT, help='web iface port')
-@click.option(
-    '--security',
-    default='promisc', help='set security backend')
-def main(uuid, default_profile, apps_poll_interval, port, security):
+def main(uuid, default_profile, apps_poll_interval, port):
 
     input_queue = queues.Queue()
     adjust_queue = queues.Queue()
     stop_queue = queues.Queue()
 
+    config = Config()
+    config.update()
+
     # TODO: names from config
     logging = Logger()
     node = Service('node')
-    unicorn = WrapperFabric.make_secure_service(
-        'unicorn', security, client_id=0, client_secret='')
+    unicorn = WrapperFabric.make_secure_service('unicorn', *config.secure)
 
     acquirer = StateAcquirer(
         logging, node, unicorn, input_queue, uuid, apps_poll_interval)

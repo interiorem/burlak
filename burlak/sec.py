@@ -48,10 +48,10 @@ class TVM(BasicSecurity):
 class WrapperFabric(object):
 
     @staticmethod
-    def make_secure_service(name, sec_type, client_id, client_secret):
+    def make_secure_service(name, mod, client_id, client_secret):
         service = Service(name)
 
-        if sec_type == 'tvm':
+        if mod == 'TVM':
             return SecureService(service, TVM(client_id, client_secret))
 
         return SecureService(service, Promiscuous())
