@@ -7,8 +7,8 @@ from cocaine.logger import Logger
 from cocaine.services import Service
 
 from .burlak import *
-from .config import Config
-from .sec import WrapperFabric
+from .sec.config import Config
+from .sec.sec import WrapperFabric
 
 
 APP_LIST_POLL_INTERVAL = 10

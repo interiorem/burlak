@@ -2,6 +2,7 @@
 # Mostly compy-pasted from cocaine-tools
 #
 from tornado import gen
+
 from cocaine.services import Service
 from cocaine.exceptions import CocaineError
 
