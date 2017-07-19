@@ -6,6 +6,8 @@ from tornado import gen
 from cocaine.services import Service
 from cocaine.exceptions import CocaineError
 
+from tornado.ioloop import IOLoop
+
 
 class SecureServiceError(CocaineError):
     pass
@@ -46,23 +48,23 @@ class TVM(BasicSecurity):
         return '{} {}'.format(self.ty(), ticket)
 
 
-class WrapperFabric(object):
-
-    @staticmethod
-    def make_secure_service(name, mod, client_id, client_secret):
-        service = Service(name)
-
-        if mod == 'TVM':
-            return SecureService(service, TVM(client_id, client_secret))
-
-        return SecureService(service, Promiscuous())
-
-
 class SecureService(object):
 
-    def __init__(self, wrapped, secure):
+    def __init__(self, wrapped, secure, tok_update_sec, loop=IOLoop.current()):
         self._wrapped = wrapped
         self._secure = secure
+
+        self._tok_update_sec = tok_update_sec
+
+        loop.spawn_callback( lambda: self._refresh_token())
+
+    @gen.coroutine
+    def _refresh_token(self):
+        while True:
+            try:
+                self._token = yield self._secure.fetch_token()
+            finally:
+                yield gen.sleep(self._tok_update_sec)
 
     @gen.coroutine
     def connect(self, traceid=None):
@@ -75,8 +77,21 @@ class SecureService(object):
         @gen.coroutine
         def wrapper(*args, **kwargs):
             try:
-                kwargs['authorization'] = yield self._secure.fetch_token()
+                kwargs['authorization'] = self._token
             except Exception as err:
                 raise SecureServiceError('failed to fetch secure token: {}'.format(err))
             raise gen.Return((yield getattr(self._wrapped, name)(*args, **kwargs)))
         return wrapper
+
+
+class WrapperFabric(object):
+
+    @staticmethod
+    def make_secure_service(name, mod, client_id, client_secret, tok_update_to):
+        service = Service(name)
+
+        if mod == 'TVM':
+            return SecureService(
+                service, TVM(client_id, client_secret), tok_update_to)
+
+        return SecureService(service, Promiscuous(), tok_update_to)

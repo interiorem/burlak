@@ -8,7 +8,7 @@ from tornado.ioloop import IOLoop
 from math import sin, cos
 
 from ...sec.sec import WrapperFabric
-from ...sec.config import Config
+from ...config import Config
 
 
 UNICORN_STATE_PREFIX = '/state/prefix/SOME_UUID'

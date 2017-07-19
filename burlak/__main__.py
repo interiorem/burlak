@@ -7,7 +7,7 @@ from cocaine.logger import Logger
 from cocaine.services import Service
 
 from .burlak import *
-from .sec.config import Config
+from .config import Config
 from .sec.sec import WrapperFabric
 
 
