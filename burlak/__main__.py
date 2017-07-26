@@ -55,7 +55,7 @@ def main(uuid, default_profile, apps_poll_interval, port):
         Service('unicorn'), *config.secure)
 
     acquirer = burlak.StateAcquirer(
-        logging, node, unicorn, input_queue, uuid, apps_poll_interval)
+        logging, node, input_queue, uuid, apps_poll_interval)
     state_processor = burlak.StateAggregator(
         logging, input_queue, adjust_queue, stop_queue)
 
@@ -73,7 +73,7 @@ def main(uuid, default_profile, apps_poll_interval, port):
 
     IOLoop.current().spawn_callback(lambda: acquirer.poll_running_apps_list())
     IOLoop.current().spawn_callback(
-        lambda: acquirer.subscribe_to_state_updates())
+        lambda: acquirer.subscribe_to_state_updates(unicorn))
 
     qs = dict(input=input_queue, adjust=adjust_queue, stop=stop_queue)
     units = dict(

@@ -2,8 +2,10 @@
 # TODO:
 #   - use coxx logger
 #   - take start_app 'profile' from, emmm... state?
-#   - secure service for 'unicorn', maybe for 'node', 'logger'?
 #   - expose state to andle
+#
+# DONE:
+#   - secure service for 'unicorn'
 #
 import time
 
@@ -15,7 +17,7 @@ from tornado import gen
 from tornado import web
 
 
-DEFAULT_RETRY_TIMEOUT_SEC = 5
+DEFAULT_RETRY_TIMEOUT_SEC = 10
 SELF_NAME = 'app/orca'  # aka Killer Whale
 
 
@@ -66,9 +68,8 @@ class StateUpdateMessage(object):
 
 class CommittedState(object):
     """
-        State record format:
-
-            [<STATE>, <WORKERS COUNT>, <TIMESTAMP>]
+    State record format:
+        [<STATE>, <WORKERS COUNT>, <TIMESTAMP>]
 
         <STATE> - (RUNNING|STOPPED)
         <TIMESTAMP> - last state update time
@@ -79,21 +80,20 @@ class CommittedState(object):
     def as_dict(self):
         return self.state
 
-    def mark_running(self, app, workers, tm=time.time()):
-        self.state.update({app: ['RUNNING', workers, int(tm)]})
+    def mark_running(self, app, workers, tm):
+        self.state.update({app: ('RUNNING', workers, int(tm))})
 
-    def mark_stopped(self, app, tm=time.time()):
-        _, workers = self.state.get(app, ['', 0])
-        self.state.update({app: ['STOPPED', workers, int(tm)]})
+    def mark_stopped(self, app, tm):
+        _, workers = self.state.get(app, ['', 0, 0])
+        self.state.update({app: ('STOPPED', workers, int(tm))})
 
 
 class CommonMixin(object):
 
     def __init__(self, logger, name=SELF_NAME):
         self.name = name
-        self.format = name + ' :: %s'
         self.logger = logger
-
+        self.format = '{} :: %s'.format(name)
         self.metrics = defaultdict(int)
 
     def get_metrics(self):
@@ -118,13 +118,12 @@ class CommonMixin(object):
 
 class StateAcquirer(CommonMixin):
 
-    def __init__(self, logger, node, unicorn, input_queue, state_path,
+    def __init__(self, logger, node, input_queue, state_path,
                  poll_interval_sec):
 
         super(StateAcquirer, self).__init__(logger)
 
         self.node_service = node
-        self.unicorn_service = unicorn
         self.input_queue = input_queue
         self.state_path = state_path
 
@@ -145,31 +144,27 @@ class StateAcquirer(CommonMixin):
                 yield self.input_queue.put(RunningAppsMessage(app_list))
                 yield gen.sleep(self.poll_interval_sec)
             except Exception as e:
-                self.error('failed to poll apps list with {}'.format(e))
+                self.error('failed to poll apps list with "{}"'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
 
     @gen.coroutine
-    def subscribe_to_state_updates(self):
-        ch = yield self.unicorn_service.subscribe(self.state_path)
-
+    def subscribe_to_state_updates(self, unicorn):
         while True:
             try:
-                result, _ = yield ch.rx.get()
-                print('subscribe: got subscribed state {}'.format(result))
-                yield self.input_queue.put(StateUpdateMessage(result))
+                ch = yield unicorn.subscribe(self.state_path)
 
-                self.metrics['last_state_app_count'] = len(result)
+                while True:
+                    result, _ = yield ch.rx.get()
+                    self.debug(
+                        'subscribe: got subscribed state {}'.format(result))
+                    yield self.input_queue.put(StateUpdateMessage(result))
+
+                    self.metrics['last_state_app_count'] = len(result)
             except Exception as e:
-                print(
-                    'subscribe: failed to get unicorn subscription with {}'
-                    .format(e))
-
                 self.error(
-                    'failed to get state subscription with {}'.format(e))
-                yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
+                    'failed to get state subscription with "{}"'.format(e))
 
-                # TODO: can throw?
-                ch = yield self.unicorn_service.subscribe(self.state_path)
+                yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
 
 
 class StateAggregator(CommonMixin):
@@ -252,7 +247,7 @@ class AppsBaptizer(CommonMixin):
         self.def_profile = default_profile
 
     @gen.coroutine
-    def bless(self, app, profile, tm=time.time()):
+    def bless(self, app, profile, tm):
         try:
             yield self.node_service.start_app(app, profile)
             self.info(
@@ -264,7 +259,7 @@ class AppsBaptizer(CommonMixin):
                 .format(app, profile, se))
 
     @gen.coroutine
-    def adjust(self, app, to_adjust, tm=time.time()):
+    def adjust(self, app, to_adjust, tm):
         try:
             print('bless: control to {} {}'.format(app, to_adjust))
 
@@ -327,7 +322,7 @@ class AppsSlayer(CommonMixin):
         self.stop_queue = stop_queue
 
     @gen.coroutine
-    def slay(self, app, tm=time.time()):
+    def slay(self, app, tm):
         print('slayer: stopping app {}'.format(app))
         try:
             yield self.node_service.pause_app(app)
