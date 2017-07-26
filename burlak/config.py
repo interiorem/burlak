@@ -1,11 +1,16 @@
+import os
+
 import yaml
 
-
-CONFIG_GLOB = '/etc/cocaine/orca.yml'
-CONFIG_USER = '~/.cocaine/orca.yml'
-CONFIG_PATHS = [CONFIG_GLOB, CONFIG_USER]
+CONFIG_PATHS = [
+    '/etc/cocaine/.cocaiane/tool.yml',
+    '/etc/cocaine/orca.yml',
+    '~/cocaine/orca.yml',
+    '~/.cocaine/orca.yml',
+]
 
 DEFAULT_TOK_UPDATE_SEC = 10
+
 
 #
 # TODO: (cerberus) validator someday
@@ -19,13 +24,14 @@ class Config(object):
 
     def update(self, paths=CONFIG_PATHS):
         parsed = []
-        for fl in paths:
+        for conf in paths:
             try:
-                with open(fl) as fs:
-                    self.config.update(yaml.safe_load(fs.read()))
-                    parsed.append(fl)
+                with open(os.path.expanduser(conf)) as fl:
+                    print('Reading config from file {}', fl)
+                    self.config.update(yaml.safe_load(fl.read()))
+                    parsed.append(conf)
             except Exception as err:
-                print('failed to read config file {}'.format(fl))
+                print('failed to read config file {}, {}'.format(conf, err))
 
         if not parsed:
             print('no config to read was found in file(s), using defaults.')

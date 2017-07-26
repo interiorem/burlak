@@ -1,14 +1,16 @@
-import click
+import burlak
 
-from tornado.ioloop import IOLoop
-from tornado import queues
+import click
 
 from cocaine.logger import Logger
 from cocaine.services import Service
 
-from .burlak import *
+from tornado import queues
+from tornado import web
+from tornado.ioloop import IOLoop
+
 from .config import Config
-from .sec.sec import WrapperFabric
+from .sec.sec import SecureServiceFabric
 
 
 APP_LIST_POLL_INTERVAL = 10
@@ -49,17 +51,18 @@ def main(uuid, default_profile, apps_poll_interval, port):
     # TODO: names from config
     logging = Logger()
     node = Service('node')
-    unicorn = WrapperFabric.make_secure_service('unicorn', *config.secure)
+    unicorn = SecureServiceFabric.make_secure_adaptor(
+        Service('unicorn'), *config.secure)
 
-    acquirer = StateAcquirer(
+    acquirer = burlak.StateAcquirer(
         logging, node, unicorn, input_queue, uuid, apps_poll_interval)
-    state_processor = StateAggregator(
+    state_processor = burlak.StateAggregator(
         logging, input_queue, adjust_queue, stop_queue)
 
-    committed_state = CommittedState()
+    committed_state = burlak.CommittedState()
 
-    apps_slayer = AppsSlayer(logging, committed_state, node, stop_queue)
-    apps_baptizer = AppsBaptizer(
+    apps_slayer = burlak.AppsSlayer(logging, committed_state, node, stop_queue)
+    apps_baptizer = burlak.AppsBaptizer(
         logging, committed_state, node, adjust_queue, default_profile)
 
     # run async poll tasks in date flow reverse order, from sink to source
@@ -80,8 +83,9 @@ def main(uuid, default_profile, apps_poll_interval, port):
         baptizer=apps_baptizer)
 
     app = web.Application([
-        (r'/state', StateHandler, dict(committed_state=committed_state)),
-        (r'/metrics', MetricsHandler, dict(queues=qs, units=units))
+        (r'/state', burlak.StateHandler,
+            dict(committed_state=committed_state)),
+        (r'/metrics', burlak.MetricsHandler, dict(queues=qs, units=units))
     ])
 
     app.listen(port)

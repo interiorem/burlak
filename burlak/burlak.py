@@ -7,12 +7,12 @@
 #
 import time
 
+from collections import defaultdict
+
+from cocaine.exceptions import ServiceError
+
 from tornado import gen
 from tornado import web
-
-from cocaine.exceptions import ServiceError, DisconnectionError
-
-from collections import defaultdict
 
 
 DEFAULT_RETRY_TIMEOUT_SEC = 5
@@ -27,10 +27,10 @@ class MetricsHandler(web.RequestHandler):
 
     def get(self):
         metrics = {
-            'queues_fill' : {
+            'queues_fill': {
                 k: v.qsize() for k, v in self.queues.iteritems()
             },
-            'metrics' : {
+            'metrics': {
                 k: v.get_metrics() for k, v in self.units.iteritems()
             }
         }
@@ -80,11 +80,11 @@ class CommittedState(object):
         return self.state
 
     def mark_running(self, app, workers, tm=time.time()):
-        self.state.update({ app: ['RUNNING', workers, int(tm)]})
+        self.state.update({app: ['RUNNING', workers, int(tm)]})
 
     def mark_stopped(self, app, tm=time.time()):
         _, workers = self.state.get(app, ['', 0])
-        self.state.update({ app: ['STOPPED', workers, int(tm)]})
+        self.state.update({app: ['STOPPED', workers, int(tm)]})
 
 
 class CommonMixin(object):
@@ -100,15 +100,19 @@ class CommonMixin(object):
         return self.metrics
 
     def debug(self, msg):
+        print('dbg: {}'.format(msg))
         self.logger.debug(self.format, msg)
 
     def info(self, msg):
+        print('info: {}'.format(msg))
         self.logger.info(self.format, msg)
 
     def warn(self, msg):
+        print('warn: {}'.format(msg))
         self.logger.warn(self.format, msg)
 
     def error(self, msg):
+        print('error: {}'.format(msg))
         self.logger.error(self.format, msg)
 
 
@@ -136,14 +140,11 @@ class StateAcquirer(CommonMixin):
                 app_list = yield ch.rx.get()
 
                 self.metrics['polled_running_nodes_count'] = len(app_list)
-
                 self.info('getting application list {}'.format(app_list))
-                print('poll: got apps list {}'.format(app_list))
 
                 yield self.input_queue.put(RunningAppsMessage(app_list))
                 yield gen.sleep(self.poll_interval_sec)
             except Exception as e:
-                print('failed to get app list, error: {}'.format(e))
                 self.error('failed to poll apps list with {}'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
 
@@ -195,24 +196,17 @@ class StateAggregator(CommonMixin):
             try:
                 if isinstance(msg, RunningAppsMessage):
                     running_apps = msg.get_apps_set()
-                    print(
-                        'disp: got running apps list {}'
-                        .format(running_apps))
-
                     self.debug(
                         'disp::got running apps list {}'
                         .format(running_apps))
                 elif isinstance(msg, StateUpdateMessage):
                     state = msg.get_state()
                     is_state_updated = True
-                    print('disp: got state update {}'.format(state))
                     self.debug(
                         'disp::got state update {}'.format(state))
                 else:
                     self.error('unknown message type {}'.format(msg))
-                    print('unknown message type {}'.format(msg))
             except Exception as e:
-                print('input queue read error {}'.format(e))
                 self.error(
                     'failed to get control message with {}'
                     .format(e))
@@ -261,12 +255,10 @@ class AppsBaptizer(CommonMixin):
     def bless(self, app, profile, tm=time.time()):
         try:
             yield self.node_service.start_app(app, profile)
-            print('bless: started app {}'.format(app))
             self.info(
                 'starting app {} with profile {}'.format(app, profile))
             self.metrics['exec_run_app_commands'] += 1
         except ServiceError as se:
-            print("error while starting app {} {}".format(app, se))
             self.error(
                 'failed to start app {} {} with err: {}'
                 .format(app, profile, se))
@@ -311,11 +303,8 @@ class AppsBaptizer(CommonMixin):
                         for app, to_adjust in new_state.iteritems()]
 
                     self.metrics['state_updates_count'] += 1
-
                     self.info('state updated')
-                    print('bless: adjuste {}'.format(new_state))
             except Exception as e:
-                print('bless: error while dispatching commands {}'.format(e))
                 self.error('failed to exec command with error: {}'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
                 # TODO: can throw, do something?
@@ -348,7 +337,6 @@ class AppsSlayer(CommonMixin):
 
             self.info('app {} has been stopped'.format(app))
         except ServiceError as se:
-            print('failed to stop app {}'.format(se))
             self.error('failed to stop app {} with error: {}'.format(app, se))
 
     @gen.coroutine
@@ -359,7 +347,10 @@ class AppsSlayer(CommonMixin):
             try:
                 tm = time.time()
                 yield [self.slay(app, tm) for app in to_stop]
-            except Exception as e:
-                print('failed to stop one of the apps {}'.format(to_stop))
+            except ServiceError as e:
+                self.error(
+                    'failed to stop one of the apps {}, error: {}'
+                    .format(to_stop, e)
+                )
             finally:
                 self.stop_queue.task_done()

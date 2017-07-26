@@ -1,14 +1,18 @@
-from distutils.core import setup
-
 from debian import changelog
+from setuptools import setup
 
-__version__=str(changelog.Changelog(open('debian/changelog')).version)
-__desc__='Orchestrator next-gen prototype'
+__version__ = str(changelog.Changelog(open('debian/changelog')).version)
+__desc__ = 'Orchestrator next-gen prototype'
 
 setup(
     name='cocaine-orca',
     version=__version__,
-    packages=['burlak', 'burlak.sec', 'burlak.tests', 'burlak.tests.sched_load'],
+    packages=[
+        'burlak',
+        'burlak.sec',
+        'burlak.tests',
+        'burlak.tests.sched_load'
+    ],
     url='',
     license='',
     author='karapuz',

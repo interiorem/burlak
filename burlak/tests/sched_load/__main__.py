@@ -1,14 +1,12 @@
-import click
+from math import cos, sin
 
-from cocaine.services import Service
+import click
 
 from tornado import gen
 from tornado.ioloop import IOLoop
 
-from math import sin, cos
-
-from ...sec.sec import WrapperFabric
 from ...config import Config
+from ...sec.sec import SecureServiceAdaptor
 
 
 UNICORN_STATE_PREFIX = '/state/prefix/SOME_UUID'
@@ -66,7 +64,8 @@ def main(uuid_path, to_sleep):
     config = Config()
     config.update()
 
-    unicorn = WrapperFabric.make_secure_service('unicorn', *config.secure)
+    unicorn = SecureServiceAdaptor.make_secure_service(
+        'unicorn', *config.secure)
     IOLoop.current().run_sync(lambda: send_state(unicorn, uuid_path, to_sleep))
 
 

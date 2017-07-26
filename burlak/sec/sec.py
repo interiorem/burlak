@@ -1,70 +1,98 @@
-#
-# Mostly compy-pasted from cocaine-tools
-#
-from tornado import gen
+'''Secure service adaptor.
 
-from cocaine.services import Service
+Provides method for Service adaptor construction, capable to wrap Cocaine
+service and inject security token into the header of service request.
+
+Note: mostly copy-pasted from cocaine-tools `SecureService` implementation.
+'''
+import time
+
 from cocaine.exceptions import CocaineError
+from cocaine.services import Service
 
-from tornado.ioloop import IOLoop
+from tornado import gen
 
 
 class SecureServiceError(CocaineError):
     pass
 
 
-class BasicSecurity(object):
-    pass
+class Promiscuous(object):
+    '''Null token fetch interface implementation.
 
-
-class Promiscuous(BasicSecurity):
+    Used for fallback in case of unsupported (not set) secure module type
+    provided by user, access errors due empty token will be propagated
+    to caller code.
+    '''
     @gen.coroutine
     def fetch_token(self):
         raise gen.Return('')
 
 
-class TVM(BasicSecurity):
+class TVM(object):
+    '''Tokens fetch interface implementation.
+
+    Provides public `fetch_token` method, which should be common
+    among various token backends types.
+
+    Attributes:
+        TYPE (str): String representation of token fetcher type,
+            will be included in secure header.
+    '''
+    # Can be taken from class name in case of TVM, but could be inconvenient
+    # in less general name formatting rules.
+    TYPE = 'TVM'
 
     def __init__(self, client_id, client_secret, name='tvm'):
+        '''TVM
+
+        Args:
+            client_id (int): Integer client identificator.
+            client_secret (str): Client secret.
+            name (str): TVM service name, defaults to 'tvm'.
+        '''
         self._client_id = client_id
         self._client_secret = client_secret
 
         self._tvm = Service(name)
 
-    @classmethod
-    def ty(self):
-        return 'TVM'
-
     @gen.coroutine
     def fetch_token(self):
+        '''Gains token from secure backend service.
+        Returns:
+            token (str): formatted for cocaine protocol header token.
+        '''
         grant_type = 'client_credentials'
 
-        channel = yield self._tvm.ticket_full(self._client_id, self._client_secret, grant_type, {})
+        channel = yield self._tvm.ticket_full(
+            self._client_id, self._client_secret, grant_type, {})
         ticket = yield channel.rx.get()
 
-        raise gen.Return(self._make_header(ticket))
+        raise gen.Return(self._make_token(ticket))
 
-    def _make_header(self, ticket):
-        return '{} {}'.format(self.ty(), ticket)
+    def _make_token(self, ticket):
+        return '{} {}'.format(self.TYPE, ticket)
 
 
-class SecureService(object):
-
-    def __init__(self, wrapped, secure, tok_update_sec, loop=IOLoop.current()):
+class SecureServiceAdaptor(object):
+    '''Wrapper for injecting service method with secure token.
+    '''
+    def __init__(self, wrapped, secure, tok_update_sec=None):
+        '''
+        Args:
+            wrapped (cocaine.Service): Cocaine service.
+            secure: Tokens provider with `fetch_token` implementation.
+        '''
         self._wrapped = wrapped
         self._secure = secure
 
+        self._to_expire = None
         self._tok_update_sec = tok_update_sec
 
-        loop.spawn_callback( lambda: self._refresh_token())
+        if tok_update_sec:
+            self._to_expire = time.time() + tok_update_sec
 
-    @gen.coroutine
-    def _refresh_token(self):
-        while True:
-            try:
-                self._token = yield self._secure.fetch_token()
-            finally:
-                yield gen.sleep(self._tok_update_sec)
+        self._token = None
 
     @gen.coroutine
     def connect(self, traceid=None):
@@ -73,25 +101,52 @@ class SecureService(object):
     def disconnect(self):
         return self._wrapped.disconnect()
 
+    @gen.coroutine
+    def _get_token(self):
+        try:
+            # TODO: Seems too many branches with common ending.
+            if self._to_expire:
+                if time.time() > self._to_expire:
+                    # tok_update_sec should be set in __init__ when
+                    # self._to_expire is valid
+                    self._token = yield self._secure.fetch_token()
+                    self._to_expire = time.time() + self._tok_update_sec
+                elif not self._token:  # init state
+                    self._token = yield self._secure.fetch_token()
+            else:
+                    self._token = yield self._secure.fetch_token()
+        except Exception as err:
+            raise SecureServiceError(
+                'failed to fetch secure token: {}'.format(err))
+
+        raise gen.Return(self._token)
+
     def __getattr__(self, name):
         @gen.coroutine
         def wrapper(*args, **kwargs):
-            try:
-                kwargs['authorization'] = self._token
-            except Exception as err:
-                raise SecureServiceError('failed to fetch secure token: {}'.format(err))
-            raise gen.Return((yield getattr(self._wrapped, name)(*args, **kwargs)))
+            kwargs['authorization'] = yield self._get_token()
+            raise gen.Return(
+                (yield getattr(self._wrapped, name)(*args, **kwargs))
+            )
+
         return wrapper
 
 
-class WrapperFabric(object):
+class SecureServiceFabric(object):
 
     @staticmethod
-    def make_secure_service(name, mod, client_id, client_secret, tok_update_to):
-        service = Service(name)
-
+    def make_secure_adaptor(
+            service, mod, client_id, client_secret, tok_update_sec=None):
+        '''
+        Args:
+            service (cocaine.Service): Service to wrap in.
+            mod (str): Name (type) of token refresh backend.
+            client_id (int): Client identificator.
+            client_secret (str): Client secret.
+            tok_update_sec (int, optional): Token update interval in seconds.
+        '''
         if mod == 'TVM':
-            return SecureService(
-                service, TVM(client_id, client_secret), tok_update_to)
+            return SecureServiceAdaptor(
+                service, TVM(client_id, client_secret), tok_update_sec)
 
-        return SecureService(service, Promiscuous(), tok_update_to)
+        return SecureServiceAdaptor(service, Promiscuous(), tok_update_sec)

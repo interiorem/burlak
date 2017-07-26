@@ -1,9 +1,9 @@
 import click
 
+from cocaine.services import Service
+
 from tornado import gen
 from tornado.ioloop import IOLoop
-
-from cocaine.services import Service
 
 
 APP_NAME = 'Echo'
@@ -36,6 +36,7 @@ def control(times):
 def main(times):
     print('Starting control test...')
     IOLoop.current().run_sync(lambda: control(times))
+
 
 if __name__ == '__main__':
     main()
