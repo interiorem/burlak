@@ -4,3 +4,4 @@
 /.eggs
 MANIFEST
 /deb_dist
+/*.egg-info
