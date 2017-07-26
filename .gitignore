@@ -1,2 +1,6 @@
 **/*.pyc
 /.idea
+/.tox
+/.eggs
+MANIFEST
+/deb_dist
