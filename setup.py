@@ -8,10 +8,10 @@ setup(
     name='cocaine-orca',
     version=__version__,
     packages=[
-        'burlak',
-        'burlak.sec',
-        'burlak.tests',
-        'burlak.tests.sched_load'
+        'cocaine.burlak',
+        'cocaine.burlak.sec',
+        'cocaine.burlak.tests',
+        'cocaine.burlak.tests.sched_load'
     ],
     url='',
     license='',
@@ -24,3 +24,4 @@ setup(
     ],
     description=__desc__
 )
+
