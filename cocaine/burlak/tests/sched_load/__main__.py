@@ -11,7 +11,7 @@ from ...config import Config
 from ...sec.sec import SecureServiceFabric
 
 
-UNICORN_STATE_PREFIX = '/state/prefix/SOME_UUID'
+UNICORN_STATE_PREFIX = '/state/SOME_UUID'
 DEFAULT_SLEEP_TO_SEC = 3
 X_INC = 0.05
 AMPF = 50

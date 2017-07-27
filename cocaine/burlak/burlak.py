@@ -1,10 +1,11 @@
 #
 # TODO:
-#   - use coxx logger
 #   - take start_app 'profile' from, emmm... state?
-#   - expose state to andle
+#   - expose state to web handle
+#   - get uuid from 'uniresis'
 #
 # DONE:
+#   - use coxx logger
 #   - secure service for 'unicorn'
 #
 import time
@@ -17,37 +18,14 @@ from tornado import gen
 from tornado import web
 
 
+COCAINE_TEST_UUID = 'SOME_UUID'
+
 DEFAULT_RETRY_TIMEOUT_SEC = 10
 SELF_NAME = 'app/orca'  # aka Killer Whale
 
 
-class MetricsHandler(web.RequestHandler):
-
-    def initialize(self, queues, units):
-        self.queues = queues
-        self.units = units
-
-    def get(self):
-        metrics = {
-            'queues_fill': {
-                k: v.qsize() for k, v in self.queues.iteritems()
-            },
-            'metrics': {
-                k: v.get_metrics() for k, v in self.units.iteritems()
-            }
-        }
-        self.write(metrics)
-        self.flush()
-
-
-class StateHandler(web.RequestHandler):
-
-    def initialize(self, committed_state):
-        self.committed_state = committed_state
-
-    def get(self):
-        self.write(self.committed_state.as_dict())
-        self.flush()
+def make_state_path(prefix, uuid):
+    return prefix + '/' + uuid
 
 
 class RunningAppsMessage(object):
@@ -118,14 +96,12 @@ class CommonMixin(object):
 
 class StateAcquirer(CommonMixin):
 
-    def __init__(self, logger, node, input_queue, state_path,
-                 poll_interval_sec):
+    def __init__(self, logger, node, input_queue, poll_interval_sec):
 
         super(StateAcquirer, self).__init__(logger)
 
         self.node_service = node
         self.input_queue = input_queue
-        self.state_path = state_path
 
         self.poll_interval_sec = poll_interval_sec
 
@@ -148,17 +124,31 @@ class StateAcquirer(CommonMixin):
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
 
     @gen.coroutine
-    def subscribe_to_state_updates(self, unicorn):
+    def subscribe_to_state_updates(self, unicorn, state_pfx):
         while True:
             try:
-                ch = yield unicorn.subscribe(self.state_path)
+                # TODO: uniresis mockup
+                # ch = yield Service('uniresis').uuid()
+                # uuid = yield ch.rx.get()
+                uuid = COCAINE_TEST_UUID
+
+                print('subscription for path {}'.format(
+                    make_state_path(state_pfx, uuid)))
+
+                ch = yield unicorn.subscribe(make_state_path(state_pfx, uuid))
 
                 while True:
                     result, _ = yield ch.rx.get()
+
+                    if not isinstance(result, dict):
+                        self.error(
+                            'expected dictionary, got {}'.format(
+                                type(result).__name__))
+                        continue
+
                     self.debug(
                         'subscribe: got subscribed state {}'.format(result))
                     yield self.input_queue.put(StateUpdateMessage(result))
-
                     self.metrics['last_state_app_count'] = len(result)
             except Exception as e:
                 self.error(
@@ -323,7 +313,6 @@ class AppsSlayer(CommonMixin):
 
     @gen.coroutine
     def slay(self, app, tm):
-        print('slayer: stopping app {}'.format(app))
         try:
             yield self.node_service.pause_app(app)
 

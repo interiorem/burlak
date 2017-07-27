@@ -1,5 +1,7 @@
 import burlak
 
+from .web import StateHandler, MetricsHandler
+
 import click
 
 from cocaine.logger import Logger
@@ -14,22 +16,16 @@ from .sec.sec import SecureServiceFabric
 
 
 APP_LIST_POLL_INTERVAL = 10
-DEFAULT_UNICORN_PATH = '/state/prefix'
-COCAINE_TEST_UUID = 'SOME_UUID'
+DEFAULT_UNICORN_PATH = '/state'
 
 DEFAULT_RUN_PROFILE = 'IsoProcess'
 DEFAULT_ORCA_PORT = 8877
 
 
-def make_state_path(prefix, uuid):
-    return prefix + '/' + uuid
-
-
 @click.command()
 @click.option(
-    '--uuid',
-    default=make_state_path(DEFAULT_UNICORN_PATH, COCAINE_TEST_UUID),
-    help='runtime uuid (with unicorn path)')
+    '--uuid-prefix',
+    default=DEFAULT_UNICORN_PATH, help='state prefix (unicorn path)')
 @click.option(
     '--default-profile',
     default=DEFAULT_RUN_PROFILE, help='default profile for app running')
@@ -39,7 +35,7 @@ def make_state_path(prefix, uuid):
 @click.option(
     '--port',
     default=DEFAULT_ORCA_PORT, help='web iface port')
-def main(uuid, default_profile, apps_poll_interval, port):
+def main(uuid_prefix, default_profile, apps_poll_interval, port):
 
     input_queue = queues.Queue()
     adjust_queue = queues.Queue()
@@ -55,7 +51,7 @@ def main(uuid, default_profile, apps_poll_interval, port):
         Service('unicorn'), *config.secure)
 
     acquirer = burlak.StateAcquirer(
-        logging, node, input_queue, uuid, apps_poll_interval)
+        logging, node, input_queue, apps_poll_interval)
     state_processor = burlak.StateAggregator(
         logging, input_queue, adjust_queue, stop_queue)
 
@@ -73,7 +69,7 @@ def main(uuid, default_profile, apps_poll_interval, port):
 
     IOLoop.current().spawn_callback(lambda: acquirer.poll_running_apps_list())
     IOLoop.current().spawn_callback(
-        lambda: acquirer.subscribe_to_state_updates(unicorn))
+        lambda: acquirer.subscribe_to_state_updates(unicorn, uuid_prefix))
 
     qs = dict(input=input_queue, adjust=adjust_queue, stop=stop_queue)
     units = dict(
@@ -83,9 +79,9 @@ def main(uuid, default_profile, apps_poll_interval, port):
         baptizer=apps_baptizer)
 
     app = web.Application([
-        (r'/state', burlak.StateHandler,
+        (r'/state', StateHandler,
             dict(committed_state=committed_state)),
-        (r'/metrics', burlak.MetricsHandler, dict(queues=qs, units=units))
+        (r'/metrics', MetricsHandler, dict(queues=qs, units=units))
     ])
 
     app.listen(port)
