@@ -5,14 +5,13 @@ from .web import StateHandler, MetricsHandler
 import click
 
 from cocaine.logger import Logger
-from cocaine.services import Service
+from cocaine.services import SecureServiceFabric, Service
 
 from tornado import queues
 from tornado import web
 from tornado.ioloop import IOLoop
 
 from .config import Config
-from .sec.sec import SecureServiceFabric
 
 
 APP_LIST_POLL_INTERVAL = 10

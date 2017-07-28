@@ -47,7 +47,7 @@ class StateUpdateMessage(object):
 class CommittedState(object):
     """
     State record format:
-        [<STATE>, <WORKERS COUNT>, <TIMESTAMP>]
+        <app name> : (<STATE>, <WORKERS COUNT>, <TIMESTAMP>)
 
         <STATE> - (RUNNING|STOPPED)
         <TIMESTAMP> - last state update time
@@ -66,16 +66,22 @@ class CommittedState(object):
         self.state.update({app: ('STOPPED', workers, int(tm))})
 
 
-class CommonMixin(object):
+class MetricsMixin(object):
+    def __init__(self, **kwargs):
+        super(MetricsMixin, self).__init__(**kwargs)
+        self.metrics_cnt = defaultdict(int)
 
-    def __init__(self, logger, name=SELF_NAME):
+    def get_metrics(self):
+        return self.metrics_cnt
+
+
+class LoggerMixin(object):
+    def __init__(self, logger, name=SELF_NAME, **kwargs):
+        super(LoggerMixin, self).__init__(**kwargs)
+
         self.name = name
         self.logger = logger
         self.format = '{} :: %s'.format(name)
-        self.metrics = defaultdict(int)
-
-    def get_metrics(self):
-        return self.metrics
 
     def debug(self, msg):
         print('dbg: {}'.format(msg))
@@ -94,11 +100,9 @@ class CommonMixin(object):
         self.logger.error(self.format, msg)
 
 
-class StateAcquirer(CommonMixin):
-
-    def __init__(self, logger, node, input_queue, poll_interval_sec):
-
-        super(StateAcquirer, self).__init__(logger)
+class StateAcquirer(LoggerMixin, MetricsMixin):
+    def __init__(self, logger, node, input_queue, poll_interval_sec, **kwargs):
+        super(StateAcquirer, self).__init__(logger, **kwargs)
 
         self.node_service = node
         self.input_queue = input_queue
@@ -114,7 +118,7 @@ class StateAcquirer(CommonMixin):
                 ch = yield self.node_service.list()
                 app_list = yield ch.rx.get()
 
-                self.metrics['polled_running_nodes_count'] = len(app_list)
+                self.metrics_cnt['polled_running_nodes_count'] = len(app_list)
                 self.info('getting application list {}'.format(app_list))
 
                 yield self.input_queue.put(RunningAppsMessage(app_list))
@@ -149,7 +153,7 @@ class StateAcquirer(CommonMixin):
                     self.debug(
                         'subscribe: got subscribed state {}'.format(result))
                     yield self.input_queue.put(StateUpdateMessage(result))
-                    self.metrics['last_state_app_count'] = len(result)
+                    self.metrics_cnt['last_state_app_count'] = len(result)
             except Exception as e:
                 self.error(
                     'failed to get state subscription with "{}"'.format(e))
@@ -157,10 +161,10 @@ class StateAcquirer(CommonMixin):
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
 
 
-class StateAggregator(CommonMixin):
+class StateAggregator(LoggerMixin, MetricsMixin):
 
-    def __init__(self, logger, input_queue, adjust_queue, stop_queue):
-        super(StateAggregator, self).__init__(logger)
+    def __init__(self, logger, input_queue, adjust_queue, stop_queue, **kwargs):
+        super(StateAggregator, self).__init__(logger, **kwargs)
 
         self.logger = logger
 
@@ -215,18 +219,18 @@ class StateAggregator(CommonMixin):
 
             if to_stop:
                 yield self.stop_queue.put(to_stop)
-                self.metrics['total_stop_app_commands'] += len(to_stop)
+                self.metrics_cnt['total_stop_app_commands'] += len(to_stop)
 
             if is_state_updated or to_run:
                 yield self.adjust_queue.put(
                     (state, to_run, is_state_updated))
-                self.metrics['total_run_app_commands'] += len(to_run)
+                self.metrics_cnt['total_run_app_commands'] += len(to_run)
 
 
-class AppsBaptizer(CommonMixin):
+class AppsBaptizer(LoggerMixin, MetricsMixin):
 
-    def __init__(self, logger, ci_state, node, adjust_queue, default_profile):
-        super(AppsBaptizer, self).__init__(logger)
+    def __init__(self, logger, ci_state, node, adjust_queue, default_profile, **kwargs):
+        super(AppsBaptizer, self).__init__(logger, **kwargs)
 
         self.logger = logger
         self.ci_state = ci_state
@@ -242,7 +246,7 @@ class AppsBaptizer(CommonMixin):
             yield self.node_service.start_app(app, profile)
             self.info(
                 'starting app {} with profile {}'.format(app, profile))
-            self.metrics['exec_run_app_commands'] += 1
+            self.metrics_cnt['exec_run_app_commands'] += 1
         except ServiceError as se:
             self.error(
                 'failed to start app {} {} with err: {}'
@@ -287,7 +291,7 @@ class AppsBaptizer(CommonMixin):
                         self.adjust(app, int(to_adjust), tm)
                         for app, to_adjust in new_state.iteritems()]
 
-                    self.metrics['state_updates_count'] += 1
+                    self.metrics_cnt['state_updates_count'] += 1
                     self.info('state updated')
             except Exception as e:
                 self.error('failed to exec command with error: {}'.format(e))
@@ -300,10 +304,10 @@ class AppsBaptizer(CommonMixin):
 
 # Actually should be 'App Sleeper'
 # TODO: look at tools for 'app stop' command sequence
-class AppsSlayer(CommonMixin):
+class AppsSlayer(LoggerMixin, MetricsMixin):
 
-    def __init__(self, logger, ci_state, node, stop_queue):
-        super(AppsSlayer, self).__init__(logger)
+    def __init__(self, logger, ci_state, node, stop_queue, **kwargs):
+        super(AppsSlayer, self).__init__(logger, **kwargs)
 
         self.logger = logger
         self.ci_state = ci_state
@@ -317,7 +321,7 @@ class AppsSlayer(CommonMixin):
             yield self.node_service.pause_app(app)
 
             self.ci_state.mark_stopped(app, tm)
-            self.metrics['apps_slayed'] += 1
+            self.metrics_cnt['apps_slayed'] += 1
 
             self.info('app {} has been stopped'.format(app))
         except ServiceError as se:

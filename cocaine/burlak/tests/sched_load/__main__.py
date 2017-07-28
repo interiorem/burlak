@@ -2,13 +2,12 @@ from math import cos, sin
 
 import click
 
-from cocaine.services import Service
+from cocaine.services import SecureServiceFabric, Service
 
 from tornado import gen
 from tornado.ioloop import IOLoop
 
 from ...config import Config
-from ...sec.sec import SecureServiceFabric
 
 
 UNICORN_STATE_PREFIX = '/state/SOME_UUID'
