@@ -1,7 +1,7 @@
 from tornado import web
 
-class MetricsHandler(web.RequestHandler):
 
+class MetricsHandler(web.RequestHandler):
     def initialize(self, queues, units):
         self.queues = queues
         self.units = units
@@ -20,7 +20,6 @@ class MetricsHandler(web.RequestHandler):
 
 
 class StateHandler(web.RequestHandler):
-
     def initialize(self, committed_state):
         self.committed_state = committed_state
 

@@ -1,7 +1,5 @@
 import burlak
 
-from .web import StateHandler, MetricsHandler
-
 import click
 
 from cocaine.logger import Logger
@@ -12,6 +10,8 @@ from tornado import web
 from tornado.ioloop import IOLoop
 
 from .config import Config
+
+from .web import MetricsHandler, StateHandler
 
 
 APP_LIST_POLL_INTERVAL = 10
@@ -36,12 +36,12 @@ DEFAULT_ORCA_PORT = 8877
     default=DEFAULT_ORCA_PORT, help='web iface port')
 def main(uuid_prefix, default_profile, apps_poll_interval, port):
 
+    config = Config()
+    config.update()
+
     input_queue = queues.Queue()
     adjust_queue = queues.Queue()
     stop_queue = queues.Queue()
-
-    config = Config()
-    config.update()
 
     # TODO: names from config
     logging = Logger()
@@ -80,10 +80,12 @@ def main(uuid_prefix, default_profile, apps_poll_interval, port):
     app = web.Application([
         (r'/state', StateHandler,
             dict(committed_state=committed_state)),
-        (r'/metrics', MetricsHandler, dict(queues=qs, units=units))
+        (r'/metrics', MetricsHandler,
+            dict(queues=qs, units=units))
     ])
 
     app.listen(port)
+    click.secho('burlak online', fg='red')
     IOLoop.current().start()
 
 

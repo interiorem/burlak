@@ -9,13 +9,12 @@ setup(
     version=__version__,
     packages=[
         'cocaine.burlak',
-        'cocaine.burlak.sec',
         'cocaine.burlak.tests',
         'cocaine.burlak.tests.sched_load'
     ],
     url='',
     license='',
-    author='karapuz',
+    author='Alex Karev',
     author_email='karapuz@yandex-team.ru',
     install_requires=[
         'tornado>=4.3',
@@ -24,4 +23,3 @@ setup(
     ],
     description=__desc__
 )
-

@@ -15,7 +15,6 @@ from collections import defaultdict
 from cocaine.exceptions import ServiceError
 
 from tornado import gen
-from tornado import web
 
 
 COCAINE_TEST_UUID = 'SOME_UUID'
@@ -40,6 +39,9 @@ class StateUpdateMessage(object):
     def __init__(self, state={}):
         self.state = state
 
+    def as_dict(self):
+        return self.state
+
     def get_state(self):
         return self.state
 
@@ -54,9 +56,6 @@ class CommittedState(object):
     """
     def __init__(self):
         self.state = dict()
-
-    def as_dict(self):
-        return self.state
 
     def mark_running(self, app, workers, tm):
         self.state.update({app: ('RUNNING', workers, int(tm))})
@@ -162,8 +161,9 @@ class StateAcquirer(LoggerMixin, MetricsMixin):
 
 
 class StateAggregator(LoggerMixin, MetricsMixin):
+    def __init__(
+            self, logger, input_queue, adjust_queue, stop_queue, **kwargs):
 
-    def __init__(self, logger, input_queue, adjust_queue, stop_queue, **kwargs):
         super(StateAggregator, self).__init__(logger, **kwargs)
 
         self.logger = logger
@@ -228,8 +228,10 @@ class StateAggregator(LoggerMixin, MetricsMixin):
 
 
 class AppsBaptizer(LoggerMixin, MetricsMixin):
+    def __init__(
+            self, logger, ci_state, node, adjust_queue, default_profile,
+            **kwargs):
 
-    def __init__(self, logger, ci_state, node, adjust_queue, default_profile, **kwargs):
         super(AppsBaptizer, self).__init__(logger, **kwargs)
 
         self.logger = logger
