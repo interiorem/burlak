@@ -1,5 +1,7 @@
-pytest
+cocaine
 coverage
 mock
 python-coveralls
+tornado>=4.2
+pytest
 pytest-tornado

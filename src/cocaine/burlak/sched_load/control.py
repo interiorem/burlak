@@ -1,4 +1,4 @@
-'''node:control test 
+'''node:control test
 '''
 import click
 
