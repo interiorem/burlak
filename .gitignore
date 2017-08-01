@@ -5,3 +5,9 @@
 MANIFEST
 /deb_dist
 /*.egg-info
+/src/*.egg-info
+/dist
+/build
+/.cache
+/*.egg
+/.*.swp
