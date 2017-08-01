@@ -85,7 +85,7 @@ def main(uuid_prefix, default_profile, apps_poll_interval, port):
     ])
 
     app.listen(port)
-    click.secho('burlak online', fg='red')
+    click.secho('Burlak is rising!', fg='red')
     IOLoop.current().start()
 
 
