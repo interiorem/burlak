@@ -36,6 +36,8 @@ class Config(object):
         if not parsed:
             print('no config to read was found in file(s), using defaults.')
 
+        return len(parsed)
+
     @property
     def config(self):
         return self._config
