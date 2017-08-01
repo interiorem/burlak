@@ -1,5 +1,5 @@
-from debian import changelog
-from setuptools import setup
+from setuptools import find_packages, setup
+
 
 __version__ = str(changelog.Changelog(open('debian/changelog')).version)
 __desc__ = 'Orchestrator next-gen prototype'
@@ -7,11 +7,7 @@ __desc__ = 'Orchestrator next-gen prototype'
 setup(
     name='cocaine-orca',
     version=__version__,
-    packages=[
-        'cocaine.burlak',
-        'cocaine.burlak.tests',
-        'cocaine.burlak.tests.sched_load'
-    ],
+    packages=find_packages('src'),
     url='',
     license='',
     author='Alex Karev',
@@ -21,5 +17,8 @@ setup(
         'click>=5.0',
         'PyYAML>=3.0',
     ],
+    setup_requires=['pytest-runner', 'python-debian'],
+    tests_require=['pytest'],
+    package_dir={'': 'src'},
     description=__desc__
 )
