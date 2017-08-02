@@ -39,9 +39,6 @@ class StateUpdateMessage(object):
     def __init__(self, state={}):
         self.state = state
 
-    def as_dict(self):
-        return self.state
-
     def get_state(self):
         return self.state
 
@@ -56,6 +53,9 @@ class CommittedState(object):
     """
     def __init__(self):
         self.state = dict()
+
+    def as_dict(self):
+        return self.state
 
     def mark_running(self, app, workers, tm):
         self.state.update({app: ('RUNNING', workers, int(tm))})

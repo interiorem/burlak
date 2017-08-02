@@ -9,8 +9,6 @@ CONFIG_PATHS = [
     '~/.cocaine/orca.yml',
 ]
 
-DEFAULT_TOK_UPDATE_SEC = 10
-
 
 #
 # TODO: (cerberus) validator someday
@@ -18,6 +16,8 @@ DEFAULT_TOK_UPDATE_SEC = 10
 # Should be compatible with tools secure section
 #
 class Config(object):
+
+    DEFAULT_TOK_UPDATE_SEC = 10
 
     def __init__(self):
         self._config = dict()
@@ -50,7 +50,8 @@ class Config(object):
 
         client_id = secure_conf.get('client_id', 0)
         client_secret = secure_conf.get('client_secret', '')
-
-        tok_update = secure_conf.get('tok_update_sec', DEFAULT_TOK_UPDATE_SEC)
+        tok_update = secure_conf.get(
+            'tok_update_sec',
+            self.DEFAULT_TOK_UPDATE_SEC)
 
         return mod, client_id, client_secret, tok_update

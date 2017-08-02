@@ -5,18 +5,20 @@ import pytest
 DEFAULT_UPDATE_SEC = Config.DEFAULT_TOK_UPDATE_SEC
 
 good_secret_conf = [
-    ('assets/conf1.yaml', 'BOO_MOD', 100500, 'top secret', DEFAULT_UPDATE_SEC),
-    ('assets/conf2.yaml', 'Classified', 42, 'client_secret', 600),
+    ('tests/assets/conf1.yaml',
+        'BOO_MOD', 100500, 'top secret', DEFAULT_UPDATE_SEC),
+    ('tests/assets/conf2.yaml',
+        'Classified', 42, 'not as secret at all', 600),
 ]
 
-broken_conf = 'assets/broken.conf.yaml'
+broken_conf = 'tests/assets/broken.conf.yaml'
 
 
 @pytest.mark.parametrize(
     'config_file,mod,cid,secret,update', good_secret_conf)
 def test_secure_config(config_file, mod, cid, secret, update):
     cfg = Config()
-    cnt = cfg.update(paths=[config_file])
+    cnt = cfg.update([config_file])
 
     assert cfg.secure == \
         (mod, cid, secret, update)
