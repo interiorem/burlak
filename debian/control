@@ -2,17 +2,18 @@ Source: cocaine-orca
 Maintainer: Alex Karev <karapuz@yandex-team.ru>
 Section: python
 Priority: optional
-Build-Depends: python-setuptools (>= 0.6b3), python-all (>= 2.6.6-3), debhelper (>= 7)
+Build-Depends: python-setuptools (>= 0.6b3), python-all (>= 2.6.6-3), debhelper (>= 7), python-debian
 Standards-Version: 3.9.5
 
 Package: cocaine-orca
 Architecture: all
 Depends: ${misc:Depends}, ${python:Depends},
-  cocaine-framework-python (>= 0.12.13.2),                                                                                               
-  python-tornado (>= 4.3),                                                                                                               
-  python-click (>= 5.0),                                                                                                                 
-  python (>= 2.7),                                                                                                                       
-  python-yaml (>= 3.0),                                                                                                                  
-  ubic,              
+  cocaine-framework-python (>= 0.12.13.2),
+  python-tornado (>= 4.3),
+  python-click (>= 5.0),
+  python (>= 2.7),
+  python-yaml (>= 3.0),
+  ubic,
 Description: Orchestrator next-gen prototype
-
+ Runtime state updater. Listens updates from Scheduler, tries to update
+ runtime state.

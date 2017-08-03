@@ -11,7 +11,7 @@ setup(
     version=__version__,
     packages=find_packages('src'),
     url='https://github.com/karitra/burlak',
-    license='MIT',
+    license='Copyleft',
     author='Alex Karev',
     author_email='karapuz@yandex-team.ru',
     install_requires=[
@@ -25,6 +25,6 @@ setup(
     tests_require=['pytest'],
     package_dir={'': 'src'},
     description=__desc__,
-    include_package_data=True,
-    data_files=[("debian", ["debian/changelog"])]
+    package_data={'': ["debian/changelog"]},
+    include_package_data=True
 )
