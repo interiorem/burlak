@@ -5,3 +5,4 @@ python-coveralls
 tornado>=4.2
 pytest
 pytest-tornado
+python-debian
