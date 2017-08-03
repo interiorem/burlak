@@ -24,5 +24,6 @@ setup(
     setup_requires=['pytest-runner', 'python-debian'],
     tests_require=['pytest'],
     package_dir={'': 'src'},
-    description=__desc__
+    description=__desc__,
+    include_package_data=True
 )
