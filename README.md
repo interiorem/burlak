@@ -1,4 +1,5 @@
 ## БурлакѢ
+![commit-stat](https://travis-ci.org/karitra/burlak.svg?branch=master)
 
 > А как по Волге ходит одинокий бурлак,  
 > Ходит бечевой небесных равнин.  

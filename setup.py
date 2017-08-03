@@ -11,7 +11,7 @@ setup(
     version=__version__,
     packages=find_packages('src'),
     url='https://github.com/karitra/burlak',
-    license='',
+    license='MIT',
     author='Alex Karev',
     author_email='karapuz@yandex-team.ru',
     install_requires=[
