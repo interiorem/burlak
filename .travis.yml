@@ -1,0 +1,6 @@
+sudo: false
+language: python
+dist: trusty
+python: "2.7"
+install: pip install tox-travis
+script: tox
