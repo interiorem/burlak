@@ -25,5 +25,6 @@ setup(
     tests_require=['pytest'],
     package_dir={'': 'src'},
     description=__desc__,
-    include_package_data=True
+    include_package_data=True,
+    data_files=[("debian", ["debian/changelog"])]
 )
