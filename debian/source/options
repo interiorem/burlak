@@ -1,1 +1,3 @@
 extend-diff-ignore="\.egg-info"
+tar-ignore=".git"
+tar-ignore=".tox"

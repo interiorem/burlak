@@ -1,5 +1,12 @@
-orca (0.1.0) unstable; urgency=medium
+cocaine-orca (0.1.1) unstable; urgency=medium
+
+  * travis support
+  * tests
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Thu, 03 Aug 2017 16:49:13 +0300
+
+cocaine-orca (0.1.0) unstable; urgency=medium
 
   * Initial release.
 
- -- karapuz <karapuz@yandex-team.ru>  Wed, 19 Jul 2017 17:18:29 +0300
+ -- Alex Karev <karapuz@yandex-team.ru>  Wed, 19 Jul 2017 17:18:29 +0300
