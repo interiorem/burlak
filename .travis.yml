@@ -2,5 +2,5 @@ sudo: false
 language: python
 dist: trusty
 python: "2.7"
-install: pip install tox-travis
+install: pip install tox-travis python-debian
 script: tox
