@@ -61,7 +61,7 @@ class CommittedState(object):
         self.state.update({app: ('RUNNING', workers, int(tm))})
 
     def mark_stopped(self, app, tm):
-        _, workers = self.state.get(app, ['', 0, 0])
+        _, workers, _ = self.state.get(app, ['', 0, 0])
         self.state.update({app: ('STOPPED', workers, int(tm))})
 
 
