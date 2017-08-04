@@ -2,16 +2,17 @@ from cocaine.burlak import Config
 
 import pytest
 
-DEFAULT_UPDATE_SEC = Config.DEFAULT_TOK_UPDATE_SEC
 
 good_secret_conf = [
     ('tests/assets/conf1.yaml',
-        'BOO_MOD', 100500, 'top secret', DEFAULT_UPDATE_SEC),
+        'BOO_MOD', 100500, 'top secret', Config.DEFAULT_TOK_UPDATE_SEC),
     ('tests/assets/conf2.yaml',
         'Classified', 42, 'not as secret at all', 600),
 ]
 
 broken_conf = 'tests/assets/broken.conf.yaml'
+
+default_secure = ('promisc', 0, '', Config.DEFAULT_TOK_UPDATE_SEC)
 
 
 @pytest.mark.parametrize(
@@ -60,4 +61,9 @@ def test_config_group_with_broken_and_noexist():
     cnt = cfg.update(conf_files)
 
     assert cnt == 0
-    assert cfg.secure == ('promisc', 0, '', DEFAULT_UPDATE_SEC)
+    assert cfg.secure == default_secure
+
+
+def test_empty_config():
+    cfg = Config()
+    assert cfg.secure == default_secure
