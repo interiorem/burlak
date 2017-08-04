@@ -12,7 +12,7 @@ import time
 
 from collections import defaultdict
 
-from cocaine.exceptions import ServiceError
+from cocaine.exceptions import CocaineError
 
 from tornado import gen
 
@@ -112,7 +112,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin):
     def poll_running_apps_list(self):
         while True:
             try:
-                print('poll: getting apps list')
+                self.debug('poll: getting apps list')
 
                 ch = yield self.node_service.list()
                 app_list = yield ch.rx.get()
@@ -133,9 +133,10 @@ class StateAcquirer(LoggerMixin, MetricsMixin):
                 # TODO: uniresis mockup
                 # ch = yield Service('uniresis').uuid()
                 # uuid = yield ch.rx.get()
+
                 uuid = COCAINE_TEST_UUID
 
-                print('subscription for path {}'.format(
+                self.debug('subscription for path {}'.format(
                     make_state_path(state_pfx, uuid)))
 
                 ch = yield unicorn.subscribe(make_state_path(state_pfx, uuid))
@@ -147,23 +148,23 @@ class StateAcquirer(LoggerMixin, MetricsMixin):
                         self.error(
                             'expected dictionary, got {}'.format(
                                 type(result).__name__))
+                        self.metrics_cnt['got_broken_sate'] += 1
                         continue
 
                     self.debug(
                         'subscribe: got subscribed state {}'.format(result))
+
                     yield self.input_queue.put(StateUpdateMessage(result))
                     self.metrics_cnt['last_state_app_count'] = len(result)
             except Exception as e:
                 self.error(
                     'failed to get state subscription with "{}"'.format(e))
-
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
 
 
 class StateAggregator(LoggerMixin, MetricsMixin):
     def __init__(
             self, logger, input_queue, adjust_queue, stop_queue, **kwargs):
-
         super(StateAggregator, self).__init__(logger, **kwargs)
 
         self.logger = logger
@@ -211,9 +212,6 @@ class StateAggregator(LoggerMixin, MetricsMixin):
             to_run = update_state_apps_set - running_apps
             to_stop = running_apps - update_state_apps_set
 
-            print('to_run {}'.format(to_run))
-            print('to_stop {}'.format(to_stop))
-
             self.info("'to_stop' apps list {}".format(to_stop))
             self.info("'to_run' apps list {}".format(to_run))
 
@@ -231,7 +229,6 @@ class AppsBaptizer(LoggerMixin, MetricsMixin):
     def __init__(
             self, logger, ci_state, node, adjust_queue, default_profile,
             **kwargs):
-
         super(AppsBaptizer, self).__init__(logger, **kwargs)
 
         self.logger = logger
@@ -249,10 +246,10 @@ class AppsBaptizer(LoggerMixin, MetricsMixin):
             self.info(
                 'starting app {} with profile {}'.format(app, profile))
             self.metrics_cnt['exec_run_app_commands'] += 1
-        except ServiceError as se:
+        except CocaineError as ce:
             self.error(
                 'failed to start app {} {} with err: {}'
-                .format(app, profile, se))
+                .format(app, profile, ce))
 
     @gen.coroutine
     def adjust(self, app, to_adjust, tm):
@@ -266,7 +263,7 @@ class AppsBaptizer(LoggerMixin, MetricsMixin):
             self.info(
                 'adjusting workers count for app {} to {}'
                 .format(app, to_adjust))
-        except ServiceError as se:
+        except CocaineError as se:
             print("error while adjusting app {} {}".format(app, se))
             self.error(
                 "failed to adjust app's {} workers count to {} with err: {}"
@@ -307,7 +304,6 @@ class AppsBaptizer(LoggerMixin, MetricsMixin):
 # Actually should be 'App Sleeper'
 # TODO: look at tools for 'app stop' command sequence
 class AppsSlayer(LoggerMixin, MetricsMixin):
-
     def __init__(self, logger, ci_state, node, stop_queue, **kwargs):
         super(AppsSlayer, self).__init__(logger, **kwargs)
 
@@ -326,21 +322,15 @@ class AppsSlayer(LoggerMixin, MetricsMixin):
             self.metrics_cnt['apps_slayed'] += 1
 
             self.info('app {} has been stopped'.format(app))
-        except ServiceError as se:
-            self.error('failed to stop app {} with error: {}'.format(app, se))
+        except Exception as e:
+            self.error('failed to stop app {} with error: {}'.format(app, e))
 
     @gen.coroutine
     def topheth_road(self):
         while True:
             to_stop = yield self.stop_queue.get()
 
-            try:
-                tm = time.time()
-                yield [self.slay(app, tm) for app in to_stop]
-            except ServiceError as e:
-                self.error(
-                    'failed to stop one of the apps {}, error: {}'
-                    .format(to_stop, e)
-                )
-            finally:
-                self.stop_queue.task_done()
+            tm = time.time()
+            yield [self.slay(app, tm) for app in to_stop]
+
+            self.stop_queue.task_done()
