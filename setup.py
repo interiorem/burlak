@@ -15,7 +15,7 @@ setup(
     author='Alex Karev',
     author_email='karapuz@yandex-team.ru',
     install_requires=[
-        'cocaine',
+        # 'cocaine',
         'tornado>=4.3',
         'click>=5.0',
         'PyYAML>=3.0',
