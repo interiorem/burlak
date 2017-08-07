@@ -19,6 +19,11 @@ class Config(object):
 
     DEFAULT_TOK_UPDATE_SEC = 10
 
+    DEFAULT_WEB_PORT = 8877
+    DEFAULT_WEB_PATH = ''
+
+    DEFAULT_UUID_PATH = '/state'
+
     def __init__(self):
         self._config = dict()
 
@@ -55,3 +60,14 @@ class Config(object):
             self.DEFAULT_TOK_UPDATE_SEC)
 
         return mod, client_id, client_secret, tok_update
+
+    @property
+    def endpoint(self):
+        port = self._config.get('port', self.DEFAULT_WEB_PORT)
+        path = self._config.get('web_path', self.DEFAULT_WEB_PATH)
+
+        return port, path
+
+    @property
+    def uuid_path(self):
+        return self._config.get('uuid_path', self.DEFAULT_UUID_PATH)

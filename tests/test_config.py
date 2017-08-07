@@ -67,3 +67,18 @@ def test_config_group_with_broken_and_noexist():
 def test_empty_config():
     cfg = Config()
     assert cfg.secure == default_secure
+
+
+@pytest.mark.parametrize(
+    'config,expect_port,expect_web_path,expect_uuid_path',
+    [
+        ('tests/assets/conf1.yaml', 100500, '', '/state'),
+        ('tests/assets/conf2.yaml', 8877, '/to-heaven', '/some/deep/location'),
+    ]
+)
+def test_misc_options(config, expect_port, expect_web_path, expect_uuid_path):
+    cfg = Config()
+    cfg.update([config])
+
+    assert (expect_port, expect_web_path) == cfg.endpoint
+    assert expect_uuid_path == cfg.uuid_path

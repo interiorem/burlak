@@ -15,16 +15,12 @@ from .web import MetricsHandler, StateHandler
 
 
 APP_LIST_POLL_INTERVAL = 10
-DEFAULT_UNICORN_PATH = '/state'
-
 DEFAULT_RUN_PROFILE = 'IsoProcess'
-DEFAULT_ORCA_PORT = 8877
 
 
 @click.command()
 @click.option(
-    '--uuid-prefix',
-    default=DEFAULT_UNICORN_PATH, help='state prefix (unicorn path)')
+    '--uuid-prefix', help='state prefix (unicorn path)')
 @click.option(
     '--default-profile',
     default=DEFAULT_RUN_PROFILE, help='default profile for app running')
@@ -32,8 +28,7 @@ DEFAULT_ORCA_PORT = 8877
     '--apps-poll-interval',
     default=APP_LIST_POLL_INTERVAL, help='default profile for app running')
 @click.option(
-    '--port',
-    default=DEFAULT_ORCA_PORT, help='web iface port')
+    '--port', help='web iface port')
 def main(uuid_prefix, default_profile, apps_poll_interval, port):
 
     config = Config()
@@ -60,6 +55,9 @@ def main(uuid_prefix, default_profile, apps_poll_interval, port):
     apps_baptizer = burlak.AppsBaptizer(
         logging, committed_state, node, adjust_queue, default_profile)
 
+    if not uuid_prefix:
+        uuid_prefix = config.uuid_path
+
     # run async poll tasks in date flow reverse order, from sink to source
     IOLoop.current().spawn_callback(lambda: apps_slayer.topheth_road())
     IOLoop.current().spawn_callback(lambda: apps_baptizer.blessing_road())
@@ -77,15 +75,20 @@ def main(uuid_prefix, default_profile, apps_poll_interval, port):
         slayer=apps_slayer,
         baptizer=apps_baptizer)
 
+    cfg_port, prefix = config.endpoint
+
+    if not port:
+        port = cfg_port
+
     app = web.Application([
-        (r'/state', StateHandler,
+        (prefix + r'/state', StateHandler,
             dict(committed_state=committed_state)),
-        (r'/metrics', MetricsHandler,
+        (prefix + r'/metrics', MetricsHandler,
             dict(queues=qs, units=units))
     ])
 
     app.listen(port)
-    click.secho('Burlak is rising!', fg='red')
+    click.secho('orca is starting...', fg='green')
     IOLoop.current().start()
 
 

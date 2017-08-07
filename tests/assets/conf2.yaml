@@ -3,3 +3,6 @@ secure:
   client_id: 42
   client_secret: not as secret at all
   tok_update_sec: 600
+
+web_path: '/to-heaven'
+uuid_path: '/some/deep/location'
