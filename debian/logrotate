@@ -1,0 +1,11 @@
+/var/log/ubic/cocaine-orca/*.log
+{
+        weekly
+        maxsize 100M
+        compress
+        dateext
+        dateformat -%Y%m%d-%s
+        missingok
+        copytruncate
+        rotate 15
+}

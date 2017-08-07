@@ -15,5 +15,5 @@ Depends: ${misc:Depends}, ${python:Depends},
   python-yaml (>= 3.0),
   ubic,
 Description: Orchestrator next-gen prototype
- Runtime state updater. Listens updates from Scheduler, tries to update
- runtime state.
+ Runtime state updater, listens for Scheduler updates command and tries to
+ update runtime state.

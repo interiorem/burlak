@@ -1,0 +1,10 @@
+use Ubic::Service::SimpleDaemon;
+
+my $service = Ubic::Service::SimpleDaemon->new(
+    name => 'cocaine-orca',
+    bin => 'python -m cocaine.burlak',
+    auto_start => 1,
+    ubic_log => '/var/log/ubic/cocaine-orca/ubic.log',
+    stdout => '/var/log/ubic/cocaine-orca/stdout.log',
+    stderr => '/var/log/ubic/cocaine-orca/stderr.log',
+);
