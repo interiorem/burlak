@@ -1,0 +1,5 @@
+App start/stop:
+    ☐ find out when app is really started, it would be an exception if
+    'control' is applied to started but not yet running app (spooled state).
+    ☐ what to do in case of WORKER count == 0?
+    ☐ where to get app profile to start with?
