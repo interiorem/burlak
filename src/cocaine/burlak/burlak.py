@@ -13,6 +13,7 @@ import time
 from collections import defaultdict
 
 from cocaine.exceptions import CocaineError
+from cocaine.services import Service
 
 from tornado import gen
 
@@ -25,6 +26,20 @@ SELF_NAME = 'app/orca'  # aka Killer Whale
 
 def make_state_path(prefix, uuid):
     return prefix + '/' + uuid
+
+
+class UniresisProxy(object):
+    def __init__(self, use_uniresis_stub=False):
+        self.use_uniresis_stub = use_uniresis_stub
+
+    @gen.coroutine
+    def uuid(self):
+        if self.use_uniresis_stub:
+            raise gen.Return(COCAINE_TEST_UUID)
+        else:
+            ch = yield Service('uniresis').uuid()
+            uuid = yield ch.rx.get()
+            raise gen.Return(uuid)
 
 
 class RunningAppsMessage(object):
@@ -100,13 +115,20 @@ class LoggerMixin(object):
 
 
 class StateAcquirer(LoggerMixin, MetricsMixin):
-    def __init__(self, logger, node, input_queue, poll_interval_sec, **kwargs):
+    def __init__(
+            self,
+            logger, node,
+            input_queue, poll_interval_sec,
+            use_uniresis_stub=False,
+            **kwargs):
+
         super(StateAcquirer, self).__init__(logger, **kwargs)
 
         self.node_service = node
         self.input_queue = input_queue
 
         self.poll_interval_sec = poll_interval_sec
+        self.use_uniresis_stub = use_uniresis_stub
 
     @gen.coroutine
     def poll_running_apps_list(self):
@@ -128,13 +150,15 @@ class StateAcquirer(LoggerMixin, MetricsMixin):
 
     @gen.coroutine
     def subscribe_to_state_updates(self, unicorn, state_pfx):
+
+        uniresis = UniresisProxy(self.use_uniresis_stub)
+
         while True:
             try:
-                # TODO: uniresis mockup
-                # ch = yield Service('uniresis').uuid()
-                # uuid = yield ch.rx.get()
-
-                uuid = COCAINE_TEST_UUID
+                uuid = yield uniresis.uuid()
+                if not uuid:
+                    self.error('got broken uuid')
+                    continue
 
                 self.debug('subscription for path {}'.format(
                     make_state_path(state_pfx, uuid)))
@@ -254,7 +278,7 @@ class AppsBaptizer(LoggerMixin, MetricsMixin):
     @gen.coroutine
     def adjust(self, app, to_adjust, tm):
         try:
-            print('bless: control to {} {}'.format(app, to_adjust))
+            self.debug('bless: control to {} {}'.format(app, to_adjust))
 
             ch = yield self.node_service.control(app)
             yield ch.tx.write(to_adjust)
@@ -264,7 +288,6 @@ class AppsBaptizer(LoggerMixin, MetricsMixin):
                 'adjusting workers count for app {} to {}'
                 .format(app, to_adjust))
         except CocaineError as se:
-            print("error while adjusting app {} {}".format(app, se))
             self.error(
                 "failed to adjust app's {} workers count to {} with err: {}"
                 .format(app, to_adjust, se))
@@ -277,13 +300,17 @@ class AppsBaptizer(LoggerMixin, MetricsMixin):
 
         while True:
             new_state, to_run, do_adjust = yield self.adjust_queue.get()
-            print(
+            self.debug(
                 'bless: new_state {}, to_run {}, do_adjust {}'
                 .format(new_state, to_run, do_adjust))
 
             try:
                 tm = time.time()
                 yield [self.bless(app, self.def_profile, tm) for app in to_run]
+
+                # TODO: apps startup tooks some time, should find some way
+                #       to notify about start sequence completion before
+                #       sending control instruction.
 
                 if do_adjust:
                     yield [

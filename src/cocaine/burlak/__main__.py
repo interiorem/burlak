@@ -27,9 +27,16 @@ DEFAULT_RUN_PROFILE = 'IsoProcess'
 @click.option(
     '--apps-poll-interval',
     default=APP_LIST_POLL_INTERVAL, help='default profile for app running')
+@click.option('--port', help='web iface port')
 @click.option(
-    '--port', help='web iface port')
-def main(uuid_prefix, default_profile, apps_poll_interval, port):
+    '--uniresis-stub',
+    is_flag=True, default=False, help='use stub for uniresis uuid')
+def main(
+        uuid_prefix,
+        default_profile,
+        apps_poll_interval,
+        port,
+        uniresis_stub):
 
     config = Config()
     config.update()
@@ -45,7 +52,7 @@ def main(uuid_prefix, default_profile, apps_poll_interval, port):
         Service('unicorn'), *config.secure)
 
     acquirer = burlak.StateAcquirer(
-        logging, node, input_queue, apps_poll_interval)
+        logging, node, input_queue, apps_poll_interval, uniresis_stub)
     state_processor = burlak.StateAggregator(
         logging, input_queue, adjust_queue, stop_queue)
 
