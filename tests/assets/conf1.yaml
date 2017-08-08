@@ -3,4 +3,5 @@ secure:
   client_id: 100500
   client_secret: top secret
 
+node_service_name: some_other_node
 port: 100500

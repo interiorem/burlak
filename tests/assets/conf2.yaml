@@ -4,5 +4,7 @@ secure:
   client_secret: not as secret at all
   tok_update_sec: 600
 
+unicorn_service_name: big_unicorn
+
 web_path: '/to-heaven'
 uuid_path: '/some/deep/location'

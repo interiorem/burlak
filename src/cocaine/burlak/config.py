@@ -24,6 +24,9 @@ class Config(object):
 
     DEFAULT_UUID_PATH = '/state'
 
+    DEFAULT_NODE_SERVICE_NAME = 'node'
+    DEFAULT_UNICORN_SERVICE_NAME = 'unicorn'
+
     def __init__(self):
         self._config = dict()
 
@@ -71,3 +74,13 @@ class Config(object):
     @property
     def uuid_path(self):
         return self._config.get('uuid_path', self.DEFAULT_UUID_PATH)
+
+    @property
+    def node_name(self):
+        return self._config.get(
+            'node_service_name', self.DEFAULT_NODE_SERVICE_NAME)
+
+    @property
+    def unicorn_name(self):
+        return self._config.get(
+            'unicorn_service_name', self.DEFAULT_UNICORN_SERVICE_NAME)

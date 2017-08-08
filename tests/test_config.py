@@ -82,3 +82,18 @@ def test_misc_options(config, expect_port, expect_web_path, expect_uuid_path):
 
     assert (expect_port, expect_web_path) == cfg.endpoint
     assert expect_uuid_path == cfg.uuid_path
+
+
+@pytest.mark.parametrize(
+    'config,expect_unicorn_name,expect_node_name',
+    [
+        ('tests/assets/conf1.yaml', 'unicorn', 'some_other_node'),
+        ('tests/assets/conf2.yaml', 'big_unicorn', 'node'),
+    ]
+)
+def test_service_names(config, expect_unicorn_name, expect_node_name):
+    cfg = Config()
+    cfg.update([config])
+
+    assert expect_unicorn_name == cfg.unicorn_name
+    assert expect_node_name == cfg.node_name
