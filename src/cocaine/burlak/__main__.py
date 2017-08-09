@@ -66,13 +66,15 @@ def main(
         uuid_prefix = config.uuid_path
 
     # run async poll tasks in date flow reverse order, from sink to source
-    IOLoop.current().spawn_callback(lambda: apps_slayer.topheth_road())
-    IOLoop.current().spawn_callback(lambda: apps_baptizer.blessing_road())
+    io_loop = IOLoop.current()
 
-    IOLoop.current().spawn_callback(lambda: state_processor.process_loop())
+    io_loop.spawn_callback(apps_slayer.topheth_road)
+    io_loop.spawn_callback(apps_baptizer.blessing_road)
 
-    IOLoop.current().spawn_callback(lambda: acquirer.poll_running_apps_list())
-    IOLoop.current().spawn_callback(
+    io_loop.spawn_callback(state_processor.process_loop)
+
+    io_loop.spawn_callback(acquirer.poll_running_apps_list)
+    io_loop.spawn_callback(
         lambda: acquirer.subscribe_to_state_updates(unicorn, uuid_prefix))
 
     qs = dict(input=input_queue, adjust=adjust_queue, stop=stop_queue)

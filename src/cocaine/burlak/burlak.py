@@ -198,12 +198,16 @@ class StateAggregator(LoggerMixin, MetricsMixin):
             try:
                 if isinstance(msg, RunningAppsMessage):
                     running_apps = msg.get_apps_set()
+
+                    assert isinstance(running_apps, set)
                     self.debug(
                         'disp::got running apps list {}'
                         .format(running_apps))
                 elif isinstance(msg, StateUpdateMessage):
                     state = msg.get_state()
                     is_state_updated = True
+
+                    assert isinstance(state, dict)
                     self.debug(
                         'disp::got state update {}'.format(state))
                 else:
