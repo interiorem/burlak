@@ -1,10 +1,10 @@
 #
 # TODO:
 #   - take start_app 'profile' from, emmm... state?
-#   - expose state to web handle
-#   - get uuid from 'uniresis'
 #
 # DONE:
+#   - get uuid from 'uniresis' (temporary proxy)
+#   - expose state to web handle (partly implemented)
 #   - use coxx logger
 #   - secure service for 'unicorn'
 #
@@ -20,7 +20,7 @@ from .uniresis import catchup_an_uniresis
 
 
 DEFAULT_RETRY_TIMEOUT_SEC = 10
-SELF_NAME = 'app/orca'  # aka Killer Whale
+SELF_NAME = 'app/orca'  # aka 'Killer Whale'
 
 
 def make_state_path(prefix, uuid):
@@ -74,7 +74,8 @@ class MetricsMixin(object):
         return self.metrics_cnt
 
 
-class LoggerMixin(object):
+class LoggerMixin(object):  # pragma nocover
+
     def __init__(self, logger, name=SELF_NAME, **kwargs):
         super(LoggerMixin, self).__init__(**kwargs)
 
@@ -141,6 +142,8 @@ class StateAcquirer(LoggerMixin, MetricsMixin):
         while True:
             try:
                 uuid = yield uniresis.uuid()
+
+                # TODO: validate uuid
                 if not uuid:
                     self.error('got broken uuid')
                     continue
@@ -292,10 +295,6 @@ class AppsBaptizer(LoggerMixin, MetricsMixin):
             try:
                 tm = time.time()
                 yield [self.bless(app, self.def_profile, tm) for app in to_run]
-
-                # TODO: apps startup tooks some time, should find some way
-                #       to notify about start sequence completion before
-                #       sending control instruction.
 
                 if do_adjust:
                     yield [
