@@ -13,12 +13,11 @@ import time
 from collections import defaultdict
 
 from cocaine.exceptions import CocaineError
-from cocaine.services import Service
 
 from tornado import gen
 
+from .uniresis import catchup_an_uniresis
 
-COCAINE_TEST_UUID = 'SOME_UUID'
 
 DEFAULT_RETRY_TIMEOUT_SEC = 10
 SELF_NAME = 'app/orca'  # aka Killer Whale
@@ -26,20 +25,6 @@ SELF_NAME = 'app/orca'  # aka Killer Whale
 
 def make_state_path(prefix, uuid):
     return prefix + '/' + uuid
-
-
-class UniresisProxy(object):
-    def __init__(self, use_uniresis_stub=False):
-        self.use_uniresis_stub = use_uniresis_stub
-
-    @gen.coroutine
-    def uuid(self):
-        if self.use_uniresis_stub:
-            raise gen.Return(COCAINE_TEST_UUID)
-        else:
-            ch = yield Service('uniresis').uuid()
-            uuid = yield ch.rx.get()
-            raise gen.Return(uuid)
 
 
 class RunningAppsMessage(object):
@@ -151,7 +136,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin):
     @gen.coroutine
     def subscribe_to_state_updates(self, unicorn, state_pfx):
 
-        uniresis = UniresisProxy(self.use_uniresis_stub)
+        uniresis = catchup_an_uniresis(self.use_uniresis_stub)
 
         while True:
             try:
