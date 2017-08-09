@@ -76,7 +76,9 @@ def test_empty_config():
         ('tests/assets/conf2.yaml', 8877, '/to-heaven', '/some/deep/location'),
     ]
 )
-def test_misc_options(config, expect_port, expect_web_path, expect_uuid_path):
+def test_endpoints_options(
+        config, expect_port, expect_web_path, expect_uuid_path):
+
     cfg = Config()
     cfg.update([config])
 
@@ -97,3 +99,17 @@ def test_service_names(config, expect_unicorn_name, expect_node_name):
 
     assert expect_unicorn_name == cfg.unicorn_name
     assert expect_node_name == cfg.node_name
+
+
+@pytest.mark.parametrize(
+    'config,expect_profile',
+    [
+        ('tests/assets/conf1.yaml', 'default'),
+        ('tests/assets/conf2.yaml', 'isolate_profile'),
+    ]
+)
+def test_misc_options(config, expect_profile):
+    cfg = Config()
+    cfg.update([config])
+
+    assert cfg.default_profile == expect_profile

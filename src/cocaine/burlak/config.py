@@ -27,6 +27,8 @@ class Config(object):
     DEFAULT_NODE_SERVICE_NAME = 'node'
     DEFAULT_UNICORN_SERVICE_NAME = 'unicorn'
 
+    DEFAULT_PROFILE_NAME = 'default'
+
     def __init__(self):
         self._config = dict()
 
@@ -84,3 +86,8 @@ class Config(object):
     def unicorn_name(self):
         return self._config.get(
             'unicorn_service_name', self.DEFAULT_UNICORN_SERVICE_NAME)
+
+    @property
+    def default_profile(self):
+        return self._config.get(
+            'default_profile', self.DEFAULT_PROFILE_NAME)

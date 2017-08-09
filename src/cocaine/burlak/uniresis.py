@@ -13,7 +13,7 @@ from tornado import gen
 
 class ResoursesProxy(object):
     @gen.coroutine
-    def uuid(self):
+    def uuid(self):  # pragma: no cover
         raise NotImplementedError(
             'uuid method sould be defined in derived classes')
 
