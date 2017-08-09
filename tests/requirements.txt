@@ -4,5 +4,6 @@ mock
 python-coveralls
 tornado>=4.2
 pytest
+pytest-mock
 pytest-tornado
 python-debian
