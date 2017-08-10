@@ -19,6 +19,8 @@ DEFAULT_SLEEP_TO_SEC = 3
 X_INC = 0.05
 AMPF = 50
 
+DEFAULT_PROFILE = 'IsoProcess'
+
 
 def sample_sin(a, x):
     return a * sin(x) * sin(x)
@@ -40,8 +42,8 @@ def send_state(unicorn, path, to_sleep):
             x += X_INC
 
             state = dict(
-                Echo=int(sample_sin(AMPF, x)),
-                ppn=int(sample_cos(AMPF, x)))
+                Echo=(int(sample_sin(AMPF, x)), DEFAULT_PROFILE),
+                ppn=(int(sample_cos(AMPF, x)), DEFAULT_PROFILE))
 
             ch = yield unicorn.put(path, state, version)
             _, (result, _) = yield ch.rx.get()

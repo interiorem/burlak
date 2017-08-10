@@ -36,11 +36,12 @@ class RunningAppsMessage(object):
 
 
 class StateUpdateMessage(object):
-    def __init__(self, state={}):
+    def __init__(self, state={}, version=-1):
         self.state = state
+        self.version = version
 
     def get_state(self):
-        return self.state
+        return self.state, self.version
 
 
 class CommittedState(object):
@@ -57,12 +58,12 @@ class CommittedState(object):
     def as_dict(self):
         return self.state
 
-    def mark_running(self, app, workers, tm):
-        self.state.update({app: ('RUNNING', workers, int(tm))})
+    def mark_running(self, app, workers, state_version, tm):
+        self.state.update({app: ('RUNNING', workers, state_version, int(tm))})
 
-    def mark_stopped(self, app, tm):
-        _, workers, _ = self.state.get(app, ['', 0, 0])
-        self.state.update({app: ('STOPPED', workers, int(tm))})
+    def mark_stopped(self, app, state_version, tm):
+        _, workers, _, _ = self.state.get(app, ['', 0, 0, 0])
+        self.state.update({app: ('STOPPED', workers, state_version, int(tm))})
 
 
 class MetricsMixin(object):
@@ -154,20 +155,25 @@ class StateAcquirer(LoggerMixin, MetricsMixin):
                 ch = yield unicorn.subscribe(make_state_path(state_pfx, uuid))
 
                 while True:
-                    result, _ = yield ch.rx.get()
+                    incoming_state, state_version = yield ch.rx.get()
 
-                    if not isinstance(result, dict):
+                    if not isinstance(incoming_state, dict):
                         self.error(
                             'expected dictionary, got {}'.format(
-                                type(result).__name__))
+                                type(incoming_state).__name__))
                         self.metrics_cnt['got_broken_sate'] += 1
                         continue
 
-                    self.debug(
-                        'subscribe: got subscribed state {}'.format(result))
+                    assert isinstance(state_version, int)
 
-                    yield self.input_queue.put(StateUpdateMessage(result))
-                    self.metrics_cnt['last_state_app_count'] = len(result)
+                    self.debug(
+                        'subscribe: got subscribed state {}'
+                        .format(incoming_state))
+
+                    yield self.input_queue.put(StateUpdateMessage(
+                        incoming_state, state_version))
+                    self.metrics_cnt['last_state_app_count'] = \
+                        len(incoming_state)
             except Exception as e:
                 self.error(
                     'failed to get state subscription with "{}"'.format(e))
@@ -189,7 +195,7 @@ class StateAggregator(LoggerMixin, MetricsMixin):
     def process_loop(self):
 
         running_apps = set()
-        state = dict()
+        state, state_version = dict(), -1
 
         while True:
             is_state_updated = False
@@ -204,12 +210,12 @@ class StateAggregator(LoggerMixin, MetricsMixin):
                         'disp::got running apps list {}'
                         .format(running_apps))
                 elif isinstance(msg, StateUpdateMessage):
-                    state = msg.get_state()
+                    state, state_version = msg.get_state()
                     is_state_updated = True
 
-                    assert isinstance(state, dict)
                     self.debug(
-                        'disp::got state update {}'.format(state))
+                        'disp::got state update with version {}: {}'
+                        .format(state_version, state))
                 else:
                     self.error('unknown message type {}'.format(msg))
             except Exception as e:
@@ -220,7 +226,9 @@ class StateAggregator(LoggerMixin, MetricsMixin):
                 self.input_queue.task_done()
 
             if not state:
-                self.info("get running apps list, but don't have state yet")
+                self.info(
+                    'state not known yet, '
+                    'skipping control iteration')
                 continue
 
             update_state_apps_set = set(state.iterkeys())
@@ -237,7 +245,7 @@ class StateAggregator(LoggerMixin, MetricsMixin):
 
             if is_state_updated or to_run:
                 yield self.adjust_queue.put(
-                    (state, to_run, is_state_updated))
+                    (state, state_version, to_run, is_state_updated))
                 self.metrics_cnt['total_run_app_commands'] += len(to_run)
 
 
@@ -268,14 +276,14 @@ class AppsBaptizer(LoggerMixin, MetricsMixin):
                 .format(app, profile, ce))
 
     @gen.coroutine
-    def adjust(self, app, to_adjust, tm):
+    def adjust(self, app, to_adjust, state_version, tm):
         try:
             self.debug('bless: control to {} {}'.format(app, to_adjust))
 
             ch = yield self.node_service.control(app)
             yield ch.tx.write(to_adjust)
 
-            self.ci_state.mark_running(app, to_adjust, tm)
+            self.ci_state.mark_running(app, to_adjust, state_version, tm)
             self.info(
                 'adjusting workers count for app {} to {}'
                 .format(app, to_adjust))
@@ -285,25 +293,43 @@ class AppsBaptizer(LoggerMixin, MetricsMixin):
                 .format(app, to_adjust, se))
 
     @gen.coroutine
+    def bless_new_life(self, state, to_run):
+        '''Prepare and execute run tasks
+        '''
+        run_task = [
+            (app, state.get(app))
+            for app in to_run if state.get(app)
+        ]
+
+        tm = time.time()
+        yield [
+            self.bless(app, profile, tm)
+            for app, (_, profile) in run_task
+        ]
+
+    @gen.coroutine
     def blessing_road(self):
 
         # TODO: method not implemented yet, using control_app as stub!
         # control_channel = yield self.node_service.control('Echo')
 
         while True:
-            new_state, to_run, do_adjust = yield self.adjust_queue.get()
+            state, state_version, to_run, do_adjust = \
+                yield self.adjust_queue.get()
+
             self.debug(
-                'bless: new_state {}, to_run {}, do_adjust {}'
-                .format(new_state, to_run, do_adjust))
+                'bless: state {}, state_ver {}, to_run {}, do_adjust {}'
+                .format(state, state_version, to_run, do_adjust))
 
             try:
-                tm = time.time()
-                yield [self.bless(app, self.def_profile, tm) for app in to_run]
+                yield self.bless_new_life(state, to_run)
 
+                tm = time.time()
                 if do_adjust:
                     yield [
-                        self.adjust(app, int(to_adjust), tm)
-                        for app, to_adjust in new_state.iteritems()]
+                        self.adjust(app, int(to_adjust), state_version, tm)
+                        for app, (to_adjust, _) in state.iteritems()
+                    ]
 
                     self.metrics_cnt['state_updates_count'] += 1
                     self.info('state updated')
