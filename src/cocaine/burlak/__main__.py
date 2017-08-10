@@ -52,7 +52,7 @@ def main(
         Service('unicorn'), *config.secure)
 
     acquirer = burlak.StateAcquirer(
-        logging, node, input_queue, apps_poll_interval, uniresis_stub)
+        logging, input_queue, apps_poll_interval, uniresis_stub)
     state_processor = burlak.StateAggregator(
         logging, input_queue, adjust_queue, stop_queue)
 
@@ -73,7 +73,8 @@ def main(
 
     io_loop.spawn_callback(state_processor.process_loop)
 
-    io_loop.spawn_callback(acquirer.poll_running_apps_list)
+    io_loop.spawn_callback(
+        lambda: acquirer.poll_running_apps_list(node))
     io_loop.spawn_callback(
         lambda: acquirer.subscribe_to_state_updates(unicorn, uuid_prefix))
 

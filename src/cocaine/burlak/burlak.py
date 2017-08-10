@@ -20,10 +20,12 @@ from .uniresis import catchup_an_uniresis
 
 
 DEFAULT_RETRY_TIMEOUT_SEC = 10
+DEFAULT_UNKNOWN_VERSIONS = 1
+
 SELF_NAME = 'app/orca'  # aka 'Killer Whale'
 
 
-def make_state_path(prefix, uuid):
+def make_state_path(prefix, uuid):  # pragma nocover
     return prefix + '/' + uuid
 
 
@@ -66,6 +68,18 @@ class CommittedState(object):
         self.state.update({app: ('STOPPED', workers, state_version, int(tm))})
 
 
+class LoopSentry(object):
+    def __init__(self, **kwargs):
+        super(LoopSentry, self).__init__(**kwargs)
+        self.run = True
+
+    def should_run(self):
+        return self.run
+
+    def must_stop(self):  # pragma nocover
+        self.run = False
+
+
 class MetricsMixin(object):
     def __init__(self, **kwargs):
         super(MetricsMixin, self).__init__(**kwargs)
@@ -101,29 +115,28 @@ class LoggerMixin(object):  # pragma nocover
         self.logger.error(self.format, msg)
 
 
-class StateAcquirer(LoggerMixin, MetricsMixin):
+class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
     def __init__(
             self,
-            logger, node,
+            logger,
             input_queue, poll_interval_sec,
             use_uniresis_stub=False,
             **kwargs):
 
         super(StateAcquirer, self).__init__(logger, **kwargs)
 
-        self.node_service = node
         self.input_queue = input_queue
 
         self.poll_interval_sec = poll_interval_sec
         self.use_uniresis_stub = use_uniresis_stub
 
     @gen.coroutine
-    def poll_running_apps_list(self):
-        while True:
+    def poll_running_apps_list(self, node_service):
+        while self.should_run():
             try:
                 self.debug('poll: getting apps list')
 
-                ch = yield self.node_service.list()
+                ch = yield node_service.list()
                 app_list = yield ch.rx.get()
 
                 self.metrics_cnt['polled_running_nodes_count'] = len(app_list)
@@ -140,7 +153,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin):
 
         uniresis = catchup_an_uniresis(self.use_uniresis_stub)
 
-        while True:
+        while self.should_run():
             try:
                 uuid = yield uniresis.uuid()
 
@@ -154,33 +167,32 @@ class StateAcquirer(LoggerMixin, MetricsMixin):
 
                 ch = yield unicorn.subscribe(make_state_path(state_pfx, uuid))
 
-                while True:
-                    incoming_state, state_version = yield ch.rx.get()
+                while self.should_run():
+                    state, version = yield ch.rx.get()
 
-                    if not isinstance(incoming_state, dict):
+                    assert isinstance(version, int)
+                    if not isinstance(state, dict):
                         self.error(
                             'expected dictionary, got {}'.format(
-                                type(incoming_state).__name__))
+                                type(state).__name__))
                         self.metrics_cnt['got_broken_sate'] += 1
                         continue
 
-                    assert isinstance(state_version, int)
-
                     self.debug(
                         'subscribe: got subscribed state {}'
-                        .format(incoming_state))
+                        .format(state))
 
                     yield self.input_queue.put(StateUpdateMessage(
-                        incoming_state, state_version))
-                    self.metrics_cnt['last_state_app_count'] = \
-                        len(incoming_state)
+                        state, version))
+                    self.metrics_cnt['last_state_app_count'] = len(state)
+
             except Exception as e:
                 self.error(
                     'failed to get state subscription with "{}"'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
 
 
-class StateAggregator(LoggerMixin, MetricsMixin):
+class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
     def __init__(
             self, logger, input_queue, adjust_queue, stop_queue, **kwargs):
         super(StateAggregator, self).__init__(logger, **kwargs)
@@ -195,9 +207,9 @@ class StateAggregator(LoggerMixin, MetricsMixin):
     def process_loop(self):
 
         running_apps = set()
-        state, state_version = dict(), -1
+        state, state_version = dict(), DEFAULT_UNKNOWN_VERSIONS
 
-        while True:
+        while self.should_run():
             is_state_updated = False
             msg = yield self.input_queue.get()
 
@@ -249,7 +261,7 @@ class StateAggregator(LoggerMixin, MetricsMixin):
                 self.metrics_cnt['total_run_app_commands'] += len(to_run)
 
 
-class AppsBaptizer(LoggerMixin, MetricsMixin):
+class AppsBaptizer(LoggerMixin, MetricsMixin, LoopSentry):
     def __init__(
             self, logger, ci_state, node, adjust_queue, default_profile,
             **kwargs):
@@ -313,7 +325,7 @@ class AppsBaptizer(LoggerMixin, MetricsMixin):
         # TODO: method not implemented yet, using control_app as stub!
         # control_channel = yield self.node_service.control('Echo')
 
-        while True:
+        while self.should_run():
             state, state_version, to_run, do_adjust = \
                 yield self.adjust_queue.get()
 
@@ -344,7 +356,7 @@ class AppsBaptizer(LoggerMixin, MetricsMixin):
 
 # Actually should be 'App Sleeper'
 # TODO: look at tools for 'app stop' command sequence
-class AppsSlayer(LoggerMixin, MetricsMixin):
+class AppsSlayer(LoggerMixin, MetricsMixin, LoopSentry):
     def __init__(self, logger, ci_state, node, stop_queue, **kwargs):
         super(AppsSlayer, self).__init__(logger, **kwargs)
 
@@ -368,7 +380,7 @@ class AppsSlayer(LoggerMixin, MetricsMixin):
 
     @gen.coroutine
     def topheth_road(self):
-        while True:
+        while self.should_run():
             to_stop = yield self.stop_queue.get()
 
             tm = time.time()
