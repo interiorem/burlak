@@ -39,11 +39,16 @@ class RunningAppsMessage(object):
 
 class StateUpdateMessage(object):
     def __init__(self, state={}, version=-1):
-        self.state = state
-        self.version = version
+        self.st = state
+        self.ver = version
 
-    def get_state(self):
-        return self.state, self.version
+    @property
+    def state(self):
+        return self.st
+
+    @property
+    def version(self):
+        return self.ver
 
 
 class CommittedState(object):
@@ -222,7 +227,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                         'disp::got running apps list {}'
                         .format(running_apps))
                 elif isinstance(msg, StateUpdateMessage):
-                    state, state_version = msg.get_state()
+                    state, state_version = msg.state, msg.version
                     is_state_updated = True
 
                     self.debug(
