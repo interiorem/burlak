@@ -5,7 +5,8 @@ import pytest
 
 from tornado import queues
 
-from .common import make_mock_channel_with
+from .common import ASYNC_TESTS_TIMEOUT
+from .common import make_logger_mock, make_mock_channel_with
 
 
 TEST_UUID_PFX = '/test_uuid_prefix'
@@ -30,17 +31,6 @@ states_list = [
 ]
 
 
-def make_logger_mock(mocker):
-    logger = mocker.Mock()
-
-    logger.debug = mocker.Mock()
-    logger.error = mocker.Mock()
-    logger.info = mocker.Mock()
-    logger.warn = mocker.Mock()
-
-    return logger
-
-
 @pytest.fixture
 def acq(mocker):
     logger = make_logger_mock(mocker)
@@ -53,7 +43,7 @@ def acq(mocker):
         use_uniresis_stub=True)
 
 
-@pytest.mark.gen_test(timeout=10)
+@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_app_list_input(acq, mocker):
     node = mocker.Mock()
     node.list = mock.Mock(
@@ -79,7 +69,7 @@ def test_app_list_input(acq, mocker):
         assert inp.get_apps_set() == set(tsk)
 
 
-@pytest.mark.gen_test(timeout=10)
+@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_state_subscribe_input(acq, mocker):
 
     stop_side_effect = [True for _ in states_list]

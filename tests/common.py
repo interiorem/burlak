@@ -1,8 +1,11 @@
 '''Service mock object
-Mostly compy-pasted from darkvoice/tests/common.py
+Mostly copy-pasted from darkvoice/tests/common.py
 '''
 import mock
 from tornado.concurrent import Future
+
+
+ASYNC_TESTS_TIMEOUT = 10
 
 
 def make_future(v):
@@ -16,6 +19,17 @@ def make_future(v):
 
 def make_mock_channel_with(*v):
     return make_future(MockChannel(*v))
+
+
+def make_logger_mock(mocker):
+    logger = mocker.Mock()
+
+    logger.debug = mocker.Mock()
+    logger.error = mocker.Mock()
+    logger.info = mocker.Mock()
+    logger.warn = mocker.Mock()
+
+    return logger
 
 
 class MockChannel(object):
