@@ -1,6 +1,7 @@
 #
 # TODO:
-#   -
+#   - TBD
+#   - use cerberus validator on inputed state
 #
 # DONE:
 #   - take start_app 'profile' from, emmm... state?
@@ -30,35 +31,6 @@ def make_state_path(prefix, uuid):  # pragma nocover
     return prefix + '/' + uuid
 
 
-class RunningAppsMessage(object):
-    def __init__(self, run_list=[]):
-        self.running_apps = set(run_list)
-
-    def get_apps_set(self):
-        return self.running_apps
-
-
-class StateUpdateMessage(object):
-    def __init__(self, state={}, version=-1):
-
-        print('state is {}'.format(state))
-
-        self.state = {
-            app: StateRecord(workers, profile)
-            for app, (workers, profile) in state.iteritems()
-        }
-
-        print('state formating is done')
-
-        self.version = version
-
-    def get_state(self):
-        return self.state
-
-    def get_version(self):
-        return self.version
-
-
 DispatchMessage = namedtuple('DispatchMessage', [
     'state',
     'state_version',
@@ -72,6 +44,29 @@ StateRecord = namedtuple('StateRecord', [
     'workers',
     'profile'
 ])
+
+
+class RunningAppsMessage(object):
+    def __init__(self, run_list=[]):
+        self.running_apps = set(run_list)
+
+    def get_apps_set(self):
+        return self.running_apps
+
+
+class StateUpdateMessage(object):
+    def __init__(self, state={}, version=-1):
+        self.state = {
+            app: StateRecord(workers, profile)
+            for app, (workers, profile) in state.iteritems()
+        }
+        self.version = version
+
+    def get_state(self):
+        return self.state
+
+    def get_version(self):
+        return self.version
 
 
 class CommittedState(object):
@@ -323,7 +318,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         self.node_service = node
         self.control_queue = control_queue
 
-        self.def_profile = default_profile
+        # TODO: unused, remove someday.
+        self.default_profile = default_profile
 
     @gen.coroutine
     def bless(self, app, profile, tm):
@@ -355,11 +351,11 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 .format(app, to_adjust, se))
 
     @gen.coroutine
-    def slay(self, app, tm):
+    def slay(self, app, state_version, tm):
         try:
             yield self.node_service.pause_app(app)
 
-            self.ci_state.mark_stopped(app, tm)
+            self.ci_state.mark_stopped(app, state_version, tm)
             self.metrics_cnt['apps_slayed'] += 1
 
             self.info('app {} has been stopped'.format(app))
@@ -389,7 +385,10 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
             try:
                 tm = time.time()
-                yield [self.slay(app, tm) for app in command.to_stop]
+                yield [
+                    self.slay(app, command.state_version, tm)
+                    for app in command.to_stop
+                ]
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.
@@ -403,8 +402,9 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     tm = time.time()
                     yield [
                         self.adjust(
-                            app, int(to_adjust), command.state_version, tm)
-                        for app, (to_adjust, _) in command.state.iteritems()
+                            app, int(state_record.workers),
+                            command.state_version, tm)
+                        for app, state_record in command.state.iteritems()
                     ]
 
                     self.metrics_cnt['state_updates_count'] += 1

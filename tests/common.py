@@ -34,6 +34,8 @@ def make_logger_mock(mocker):
 
 class MockChannel(object):
     def __init__(self, *values):
-        print('len of values {}'.format(len(values)))
         self.rx = mock.Mock()
         self.rx.get = mock.Mock(side_effect=[make_future(v) for v in values])
+
+        self.tx = mock.Mock()
+        self.tx.write = mock.Mock(return_value=make_future(0))
