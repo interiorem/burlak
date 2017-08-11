@@ -102,5 +102,5 @@ def test_state_subscribe_input(acq, mocker):
 
         assert isinstance(inp, burlak.StateUpdateMessage)
 
-        assert inp.state == state
-        assert inp.version == ver
+        assert inp.get_state() == state
+        assert inp.get_version() == ver

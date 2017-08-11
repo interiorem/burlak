@@ -42,8 +42,7 @@ def main(
     config.update()
 
     input_queue = queues.Queue()
-    adjust_queue = queues.Queue()
-    stop_queue = queues.Queue()
+    control_queue = queues.Queue()
 
     # TODO: names from config
     logging = Logger()
@@ -54,22 +53,19 @@ def main(
     acquirer = burlak.StateAcquirer(
         logging, input_queue, apps_poll_interval, uniresis_stub)
     state_processor = burlak.StateAggregator(
-        logging, input_queue, adjust_queue, stop_queue)
+        logging, input_queue, control_queue)
 
     committed_state = burlak.CommittedState()
 
-    apps_slayer = burlak.AppsSlayer(logging, committed_state, node, stop_queue)
-    apps_baptizer = burlak.AppsBaptizer(
-        logging, committed_state, node, adjust_queue, default_profile)
+    apps_elysium = burlak.AppsElysium(
+        logging, committed_state, node, control_queue, default_profile)
 
     if not uuid_prefix:
         uuid_prefix = config.uuid_path
 
     # run async poll tasks in date flow reverse order, from sink to source
     io_loop = IOLoop.current()
-
-    io_loop.spawn_callback(apps_slayer.topheth_road)
-    io_loop.spawn_callback(apps_baptizer.blessing_road)
+    io_loop.spawn_callback(apps_elysium.blessing_road)
 
     io_loop.spawn_callback(state_processor.process_loop)
 
@@ -78,12 +74,11 @@ def main(
     io_loop.spawn_callback(
         lambda: acquirer.subscribe_to_state_updates(unicorn, uuid_prefix))
 
-    qs = dict(input=input_queue, adjust=adjust_queue, stop=stop_queue)
+    qs = dict(input=input_queue, adjust=control_queue)
     units = dict(
         acquisition=acquirer,
         state=state_processor,
-        slayer=apps_slayer,
-        baptizer=apps_baptizer)
+        elysium=apps_elysium)
 
     cfg_port, prefix = config.endpoint
 
