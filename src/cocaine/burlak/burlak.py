@@ -364,6 +364,17 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.error('failed to stop app {} with error: {}'.format(app, e))
 
     @gen.coroutine
+    def filtered_control_apps(self, should_control_app, command):
+        tm = time.time()
+        yield [
+            self.adjust(
+                app, int(state_record.workers),
+                command.state_version, tm)
+            for app, state_record in command.state.iteritems()
+            if should_control_app(app, command)
+        ]
+
+    @gen.coroutine
     def blessing_road(self):
 
         # TODO: method not implemented yet, using control_app as stub!
@@ -400,16 +411,23 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 ]
 
                 if command.is_state_updated:
-                    tm = time.time()
-                    yield [
-                        self.adjust(
-                            app, int(state_record.workers),
-                            command.state_version, tm)
-                        for app, state_record in command.state.iteritems()
-                    ]
+                    # Send control to every app in state.
+                    yield self.filtered_control_apps(
+                        lambda *_: True,
+                        command)
 
                     self.metrics_cnt['state_updates_count'] += 1
                     self.info('state updated')
+                elif command.to_run:
+                    # If app was stopped (crushed), but state wasn't updated
+                    # yet, just relaunch app and push last control to it.
+                    yield self.filtered_control_apps(
+                        lambda app, cmd: app in cmd.to_run,
+                        command)
+
+                    self.metrics_cnt['rerun_apps_count'] += len(command.to_run)
+                    self.info('stopped apps rerunned')
+
             except Exception as e:
                 self.error('failed to exec command with error: {}'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)

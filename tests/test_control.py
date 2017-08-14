@@ -93,7 +93,8 @@ def test_run(elysium, mocker):
         elysium.node_service.start_app.call_count == \
         sum(map(len, to_run_apps))
 
-    assert elysium.node_service.control.call_count == 0
+    assert elysium.node_service.control.call_count == \
+        sum(map(len, to_run_apps))
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
