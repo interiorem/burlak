@@ -91,7 +91,7 @@ class CommittedState(object):
         self.state.update({app: ('STOPPED', workers, state_version, int(tm))})
 
 
-class LoopSentry(object):
+class LoopSentry(object):  # pragma nocover
     def __init__(self, **kwargs):
         super(LoopSentry, self).__init__(**kwargs)
         self.run = True
@@ -99,7 +99,7 @@ class LoopSentry(object):
     def should_run(self):
         return self.run
 
-    def must_stop(self):  # pragma nocover
+    def halt(self):
         self.run = False
 
 
@@ -108,7 +108,7 @@ class MetricsMixin(object):
         super(MetricsMixin, self).__init__(**kwargs)
         self.metrics_cnt = defaultdict(int)
 
-    def get_metrics(self):
+    def get_count_metrics(self):
         return self.metrics_cnt
 
 
@@ -181,8 +181,9 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                 uuid = yield uniresis.uuid()
 
                 # TODO: validate uuid
-                if not uuid:
+                if not uuid:  # pragma nocover
                     self.error('got broken uuid')
+                    yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
                     continue
 
                 self.debug('subscription for path {}'.format(

@@ -11,8 +11,8 @@ class MetricsHandler(web.RequestHandler):
             'queues_fill': {
                 k: v.qsize() for k, v in self.queues.iteritems()
             },
-            'metrics': {
-                k: v.get_metrics() for k, v in self.units.iteritems()
+            'counters': {
+                k: v.get_count_metrics() for k, v in self.units.iteritems()
             }
         }
         self.write(metrics)

@@ -3,3 +3,6 @@ App start/stop:
     'control' is applied to started but not yet running app (spooled state).
     ☐ what to do in case of WORKER count == 0?
     ☐ where to get app profile to start with?
+
+Tests:
+    ☐ tests for exceptions cases.

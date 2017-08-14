@@ -1,6 +1,6 @@
 import json
 
-from cocaine.burlak import CommittedState
+from cocaine.burlak import burlak
 from cocaine.burlak.web import MetricsHandler, StateHandler
 
 import mock
@@ -17,15 +17,19 @@ test_state = {
 }
 
 
-class MetricsMock(object):
-    def __init__(self, init):
+class MetricsMock(burlak.MetricsMixin):
+    def __init__(self, init, **kwargs):
+        super(MetricsMock, self).__init__(**kwargs)
         self.init = init
 
-    def get_metrics(self):
-        return dict(
+    def get_count_metrics(self):
+        self.metrics_cnt = dict(
             a_cnt=self.init + 1,
             b_cnt=self.init + 2,
-            c_cnt=self.init + 3)
+            c_cnt=self.init + 3
+        )
+
+        return super(MetricsMock, self).get_count_metrics()
 
 
 @pytest.fixture
@@ -38,7 +42,7 @@ def app():
     adjust_queue.qsize = mock.MagicMock(return_value=2)
     stop_queue.qsize = mock.MagicMock(return_value=3)
 
-    committed_state = CommittedState()
+    committed_state = burlak.CommittedState()
     committed_state.as_dict = mock.MagicMock(
         return_value=test_state
     )
@@ -59,11 +63,11 @@ def app():
 @pytest.mark.gen_test
 def test_get_metrics(http_client, base_url):
     response = yield http_client.fetch(base_url + '/metrics')
-    print(response.body)
+
     assert response.code == 200
     assert json.loads(response.body) == dict(
         queues_fill=dict(input=1, adjust=2, stop=3),
-        metrics=dict(
+        counters=dict(
             acquisition=dict(a_cnt=2, b_cnt=3, c_cnt=4),
             state=dict(a_cnt=3, b_cnt=4, c_cnt=5),
             slayer=dict(a_cnt=4, b_cnt=5, c_cnt=6),
@@ -75,6 +79,6 @@ def test_get_metrics(http_client, base_url):
 @pytest.mark.gen_test
 def test_get_state(http_client, base_url):
     response = yield http_client.fetch(base_url + '/state')
-    print(response.body)
+
     assert response.code == 200
     assert json.loads(response.body) == test_state
