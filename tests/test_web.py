@@ -61,9 +61,11 @@ def app():
 
 
 @pytest.mark.gen_test
-def test_get_metrics(http_client, base_url):
-    response = yield http_client.fetch(base_url + '/metrics')
+def test_get_metrics(http_client, base_url, mocker):
 
+    mocker.patch('os.getloadavg', return_value=[1, 2, 3])
+
+    response = yield http_client.fetch(base_url + '/metrics')
     assert response.code == 200
     assert json.loads(response.body) == dict(
         queues_fill=dict(input=1, adjust=2, stop=3),
@@ -72,7 +74,8 @@ def test_get_metrics(http_client, base_url):
             state=dict(a_cnt=3, b_cnt=4, c_cnt=5),
             slayer=dict(a_cnt=4, b_cnt=5, c_cnt=6),
             resurrecter=dict(a_cnt=5, b_cnt=6, c_cnt=7),
-        )
+        ),
+        system=dict(load_avg=[1, 2, 3])
     )
 
 

@@ -1,3 +1,5 @@
+import os
+
 from tornado import web
 
 
@@ -13,6 +15,9 @@ class MetricsHandler(web.RequestHandler):
             },
             'counters': {
                 k: v.get_count_metrics() for k, v in self.units.iteritems()
+            },
+            'system': {
+                'load_avg': os.getloadavg(),
             }
         }
         self.write(metrics)
