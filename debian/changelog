@@ -1,3 +1,13 @@
+cocaine-orca (0.1.4) unstable; urgency=medium
+
+  * sleep on incorrect uuid before retry.
+  * basic system metrics.
+  * control apps from to_run list if no state changes occurred.
+  * state verification for sched payload emulator. 
+  * use separate node Service instance within every app unit.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Tue, 15 Aug 2017 13:12:50 +0300
+
 cocaine-orca (0.1.3) unstable; urgency=medium
 
   * uniresis proxy.
