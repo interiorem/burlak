@@ -1,0 +1,8 @@
+ppn:
+  - ['IsoProcess', 10]
+Echo:
+  - ['IsoProcess', 50]
+  - ['IsoProcess2', 5]
+EchoWeb:
+  - ['IsoProcess', 50]
+  - ['IsoProcess2', 5]
