@@ -77,18 +77,25 @@ class CommittedState(object):
         <STATE> - (RUNNING|STOPPED)
         <TIMESTAMP> - last state update time
     """
+
+    NA_PROFILE_LABEL = 'n/a'
+
     def __init__(self):
         self.state = dict()
 
     def as_dict(self):
         return self.state
 
-    def mark_running(self, app, workers, state_version, tm):
-        self.state.update({app: ('RUNNING', workers, state_version, int(tm))})
+    def mark_running(self, app, workers, profile, state_version, tm):
+        self.state.update(
+            {app: ('RUNNING', workers, profile, state_version, int(tm))})
 
     def mark_stopped(self, app, state_version, tm):
-        _, workers, _, _ = self.state.get(app, ['', 0, 0, 0])
-        self.state.update({app: ('STOPPED', workers, state_version, int(tm))})
+        _, workers, profile, _, _ = self.state.get(
+            app, ['', 0, self.NA_PROFILE_LABEL, 0, 0])
+
+        self.state.update(
+            {app: ('STOPPED', workers, profile, state_version, int(tm))})
 
 
 class LoopSentry(object):  # pragma nocover
@@ -335,14 +342,16 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 .format(app, profile, ce))
 
     @gen.coroutine
-    def adjust(self, app, to_adjust, state_version, tm):
+    def adjust(self, app, to_adjust, profile, state_version, tm):
         try:
             self.debug('bless: control to {} {}'.format(app, to_adjust))
 
             ch = yield self.node_service.control(app)
             yield ch.tx.write(to_adjust)
 
-            self.ci_state.mark_running(app, to_adjust, state_version, tm)
+            self.ci_state.mark_running(
+                app, to_adjust, profile, state_version, tm)
+
             self.info(
                 'adjusting workers count for app {} to {}'
                 .format(app, to_adjust))
@@ -368,7 +377,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         tm = time.time()
         yield [
             self.adjust(
-                app, int(state_record.workers),
+                app, int(state_record.workers), state_record.profile,
                 command.state_version, tm)
             for app, state_record in command.state.iteritems()
             if should_control_app(app, command)
