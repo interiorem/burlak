@@ -46,7 +46,6 @@ def main(
 
     # TODO: names from config
     logging = Logger()
-    node = Service('node')
     unicorn = SecureServiceFabric.make_secure_adaptor(
         Service('unicorn'), *config.secure)
 
@@ -58,7 +57,8 @@ def main(
     committed_state = burlak.CommittedState()
 
     apps_elysium = burlak.AppsElysium(
-        logging, committed_state, node, control_queue, default_profile)
+        logging, committed_state, Service('node'),
+        control_queue, default_profile)
 
     if not uuid_prefix:
         uuid_prefix = config.uuid_path
@@ -70,7 +70,7 @@ def main(
     io_loop.spawn_callback(state_processor.process_loop)
 
     io_loop.spawn_callback(
-        lambda: acquirer.poll_running_apps_list(node))
+        lambda: acquirer.poll_running_apps_list(Service('node')))
     io_loop.spawn_callback(
         lambda: acquirer.subscribe_to_state_updates(unicorn, uuid_prefix))
 

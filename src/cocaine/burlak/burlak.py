@@ -2,6 +2,7 @@
 # TODO:
 #   - TBD
 #   - use cerberus validator on inputed state
+#   - console logger wrapper
 #
 # DONE:
 #   - take start_app 'profile' from, emmm... state?
@@ -344,7 +345,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     @gen.coroutine
     def adjust(self, app, to_adjust, profile, state_version, tm):
         try:
-            self.debug('bless: control to {} {}'.format(app, to_adjust))
+            # TODO: exception not handled here, but propagated to caller
+            self.debug('control command to {} with {}'.format(app, to_adjust))
 
             ch = yield self.node_service.control(app)
             yield ch.tx.write(to_adjust)
@@ -352,8 +354,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.ci_state.mark_running(
                 app, to_adjust, profile, state_version, tm)
 
-            self.info(
-                'adjusting workers count for app {} to {}'
+            self.debug(
+                'have adjusted workers count for app {} to {}'
                 .format(app, to_adjust))
         except CocaineError as se:
             self.error(

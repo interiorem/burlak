@@ -5,19 +5,19 @@ Use within functional tests.
 TODO: verify send state by /state handlers
 
 '''
+import json
 import random
+import time
 
 from math import cos, sin
 
 import click
-import json
 
 from cocaine.services import SecureServiceFabric, Service
 
 from tornado import gen, httpclient
 from tornado.ioloop import IOLoop
 
-import time
 import yaml
 
 from ..config import Config
