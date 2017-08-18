@@ -9,7 +9,7 @@ import json
 import random
 import time
 
-from math import cos, sin
+from math import ceil, cos, sin
 
 import click
 
@@ -27,6 +27,7 @@ UNICORN_STATE_PREFIX = '/state/SOME_UUID'
 DEFAULT_SLEEP_TO_SEC = 4
 X_INC = 0.05
 AMPF = 20
+DEFAULT_DISABLE_PROPORTION = 0.3
 
 DEFAULT_PROFILE1 = 'IsoProcess'
 DEFAULT_PROFILE2 = 'IsoProcess2'
@@ -53,12 +54,13 @@ def verify_state(input_state, result_state):
                 'wrong profile for app {}, input {}, remote {}'
                 .format(app, prof, orca_state[2]))
 
-    print('state verified at {}'.format(time.time()))
+    print('state verified at {}'.format(int(time.time())))
 
 
 @gen.coroutine
-def send_state(
-        unicorn, path, working_state, max_workers, to_sleep, verify_url):
+def state_pusher(
+        unicorn, path, working_state,
+        max_workers, to_sleep, verify_url, stop_proportion):
 
     ch = yield unicorn.get(path)
     _, version = yield ch.rx.get()
@@ -83,6 +85,13 @@ def send_state(
                 )
                 for i, (app, profiles) in enumerate(working_state.iteritems())
             }
+
+            count_to_stop = int(ceil(stop_proportion * len(state)))
+
+            to_stop = random.sample(
+                state.keys(), min(count_to_stop, len(state)))
+            for stop_app in to_stop:
+                del state[stop_app]
 
             ch = yield unicorn.put(path, state, version)
             _, (result, _) = yield ch.rx.get()
@@ -122,7 +131,12 @@ def send_state(
     default=AMPF,
     help='upper limit of workers to spawn'
 )
-def main(uuid_path, to_sleep, state_file, verify_url, max_workers):
+@click.option(
+    '--proportion',
+    default=DEFAULT_DISABLE_PROPORTION,
+    help='randomly stop specified proportion of application'
+)
+def main(uuid_path, to_sleep, state_file, verify_url, max_workers, proportion):
     config = Config()
     config.update()
 
@@ -137,15 +151,15 @@ def main(uuid_path, to_sleep, state_file, verify_url, max_workers):
         EchoWeb=[(DEFAULT_PROFILE1, 50), (DEFAULT_PROFILE2, 10)],
     )
 
-    # TODO: not implemented (released yet) in framework!
+    # TODO: not implemented (released actually) in framework!
     unicorn = SecureServiceFabric.make_secure_adaptor(
         Service('unicorn'), *config.secure)
 
     IOLoop.current().run_sync(
         lambda:
-            send_state(
+            state_pusher(
                 unicorn, uuid_path, emul_state, max_workers,
-                to_sleep, verify_url))
+                to_sleep, verify_url, proportion))
 
 
 if __name__ == '__main__':
