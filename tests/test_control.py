@@ -40,7 +40,7 @@ def elysium(mocker):
 
     return burlak.AppsElysium(
         make_logger_mock(mocker), burlak.CommittedState(), node,
-        queues.Queue(), 'none')
+        queues.Queue())
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)

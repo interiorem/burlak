@@ -14,16 +14,12 @@ from .config import Config
 from .web import MetricsHandler, StateHandler
 
 
-APP_LIST_POLL_INTERVAL = 10
-DEFAULT_RUN_PROFILE = 'IsoProcess'
+APP_LIST_POLL_INTERVAL = 8
 
 
 @click.command()
 @click.option(
     '--uuid-prefix', help='state prefix (unicorn path)')
-@click.option(
-    '--default-profile',
-    default=DEFAULT_RUN_PROFILE, help='default profile for app running')
 @click.option(
     '--apps-poll-interval',
     default=APP_LIST_POLL_INTERVAL, help='default profile for app running')
@@ -33,7 +29,6 @@ DEFAULT_RUN_PROFILE = 'IsoProcess'
     is_flag=True, default=False, help='use stub for uniresis uuid')
 def main(
         uuid_prefix,
-        default_profile,
         apps_poll_interval,
         port,
         uniresis_stub):
@@ -58,7 +53,7 @@ def main(
 
     apps_elysium = burlak.AppsElysium(
         logging, committed_state, Service('node'),
-        control_queue, default_profile)
+        control_queue)
 
     if not uuid_prefix:
         uuid_prefix = config.uuid_path

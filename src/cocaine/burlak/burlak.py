@@ -18,12 +18,17 @@ from collections import defaultdict, namedtuple
 from cocaine.exceptions import CocaineError
 
 from tornado import gen
+from tornado.iostream import StreamClosedError
 
 from .uniresis import catchup_an_uniresis
 
 
 DEFAULT_RETRY_TIMEOUT_SEC = 10
 DEFAULT_UNKNOWN_VERSIONS = 1
+
+DEFAULT_RETRY_ATTEMPTS = 4
+DEFAULT_RETRY_EXP_BASE_SEC = 2
+
 
 SELF_NAME = 'app/orca'  # aka 'Killer Whale'
 
@@ -121,7 +126,6 @@ class MetricsMixin(object):
 
 
 class LoggerMixin(object):  # pragma nocover
-
     def __init__(self, logger, name=SELF_NAME, **kwargs):
         super(LoggerMixin, self).__init__(**kwargs)
 
@@ -316,9 +320,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
 
 class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
-    def __init__(
-            self, logger, ci_state, node, control_queue, default_profile,
-            **kwargs):
+    def __init__(self, logger, ci_state, node, control_queue, **kwargs):
         super(AppsElysium, self).__init__(logger, **kwargs)
 
         self.logger = logger
@@ -326,9 +328,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
         self.node_service = node
         self.control_queue = control_queue
-
-        # TODO: unused, remove someday.
-        self.default_profile = default_profile
 
     @gen.coroutine
     def bless(self, app, profile, tm):
@@ -344,23 +343,40 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def adjust(self, app, to_adjust, profile, state_version, tm):
-        try:
-            # TODO: exception not handled here, but propagated to caller
-            self.debug('control command to {} with {}'.format(app, to_adjust))
 
-            ch = yield self.node_service.control(app)
-            yield ch.tx.write(to_adjust)
+        attempts = DEFAULT_RETRY_ATTEMPTS
+        to_sleep = DEFAULT_RETRY_EXP_BASE_SEC
 
-            self.ci_state.mark_running(
-                app, to_adjust, profile, state_version, tm)
+        while attempts:
+            try:
+                self.debug(
+                    'control command to {} with {}'
+                    .format(app, to_adjust))
 
-            self.debug(
-                'have adjusted workers count for app {} to {}'
-                .format(app, to_adjust))
-        except CocaineError as se:
-            self.error(
-                "failed to adjust app's {} workers count to {} with err: {}"
-                .format(app, to_adjust, se))
+                ch = yield self.node_service.control(app)
+                yield ch.tx.write(to_adjust)
+
+                self.ci_state.mark_running(
+                    app, to_adjust, profile, state_version, tm)
+
+                self.debug(
+                    'have adjusted workers count for app {} to {}'
+                    .format(app, to_adjust))
+            except (StreamClosedError, CocaineError) as se:
+                attempts -= 1
+
+                self.error(
+                    "failed to adjust app's {} workers "
+                    "count to {} with err: {}, "
+                    "attempts left {} "
+                    .format(app, to_adjust, se, attempts))
+
+                yield gen.sleep(to_sleep)
+                to_sleep *= DEFAULT_RETRY_EXP_BASE_SEC
+
+                assert attempts >= 0
+            else:
+                break
 
     @gen.coroutine
     def slay(self, app, state_version, tm):
@@ -440,7 +456,10 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     self.info('stopped apps rerunned')
 
             except Exception as e:
-                self.error('failed to exec command with error: {}'.format(e))
+                self.error(
+                    'failed to exec command with error {}: {}'
+                    .format(type(e).__name__, e))
+
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
                 # TODO: can throw, do something?
                 # control_channel = yield self.node_service.control('Echo')
