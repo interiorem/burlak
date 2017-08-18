@@ -1,12 +1,15 @@
 App start/stop:
-    ☐ find out when app is really started, it would be an exception if
+    ✔ find out when app is really started, it would be an exception if @done(2017-08-18 13:43) @project(App start/stop)
     'control' is applied to started but not yet running app (spooled state).
-    ☐ what to do in case of WORKER count == 0?
-    ☐ where to get app profile to start with?
-    ☐ Read initial apps profiles somewhere in sync(atomic) way.
+    ✔ what to do in case of WORKER count == 0? (not our business) @done(2017-08-18 13:43) @project(App start/stop)
+    ✔ where to get app profile to start with? (sched deal) @done(2017-08-18 13:44) @project(App start/stop)
+    ☐ Read initial apps profiles somewhere in sync(atomic) way (seems can't be done yet).
 
 Tests:
     ☐ tests for exceptions cases.
 
 Metrics:
     ☐ system metrics.
+
+Cluster:
+    ☐ ways to identify cluster name/type, e.g. testing, production.
