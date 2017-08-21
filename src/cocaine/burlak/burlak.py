@@ -210,7 +210,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                 app_list = yield ch.rx.get()
 
                 self.metrics_cnt['polled_running_nodes_count'] = len(app_list)
-                self.info('getting application list {}'.format(app_list))
+                self.info('getting apps list {}'.format(app_list))
 
                 yield self.input_queue.put(RunningAppsMessage(app_list))
                 yield gen.sleep(self.poll_interval_sec)
@@ -448,7 +448,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 app, int(state_record.workers), state_record.profile,
                 command.state_version, tm)
             for app, state_record in command.state.iteritems()
-            if should_control_app(app, command)
+            if should_control_app(app)
         ]
 
     @gen.coroutine
@@ -490,7 +490,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 if command.is_state_updated:
                     # Send control to every app in state.
                     yield self.filtered_control_apps(
-                        lambda *_: True,
+                        lambda _: True,
                         command)
 
                     self.metrics_cnt['state_updates_count'] += 1
@@ -499,7 +499,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     # If app was stopped (crushed), but state wasn't updated
                     # yet, just relaunch app and push last control to it.
                     yield self.filtered_control_apps(
-                        lambda app, cmd: app in cmd.to_run,
+                        lambda app: app in common.to_run,
                         command)
 
                     self.metrics_cnt['rerun_apps_count'] += len(command.to_run)

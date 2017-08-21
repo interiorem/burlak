@@ -7,7 +7,7 @@
 > Ему господин кажет с неба кулак,  
 > А ему все смешно - в кулаке [cocaine](https://github.com/cocaine).  
 
-Note that those app also known as __Cocaine Orca__.
+Those app also known as __Cocaine Orca__.
 
 ## Install
 `sudo apt-get install cocaine-orca`
