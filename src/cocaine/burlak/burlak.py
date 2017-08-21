@@ -52,6 +52,12 @@ StateRecord = namedtuple('StateRecord', [
 ])
 
 
+LoggerSetup = namedtuple('LoggerSetup', [
+    'logger',
+    'dup_to_console'
+])
+
+
 class RunningAppsMessage(object):
     def __init__(self, run_list=[]):
         self.running_apps = set(run_list)
@@ -140,7 +146,7 @@ class VoidLogger(object):  # pragme nocover
 
 
 class ConsoleLogger(VoidLogger):  # pragma nocover
-    def debug(self,msg):
+    def debug(self, msg):
         print('dbg: {}'.format(msg))
 
     def info(self, msg):
@@ -154,12 +160,13 @@ class ConsoleLogger(VoidLogger):  # pragma nocover
 
 
 class LoggerMixin(object):  # pragma nocover
-    def __init__(self, logger, dup_to_console=False, name=SELF_NAME, **kwargs):
+    def __init__(self, logger_setup, name=SELF_NAME, **kwargs):
         super(LoggerMixin, self).__init__(**kwargs)
 
-        self.logger = logger
+        self.logger = logger_setup.logger
         self.format = '{} :: %s'.format(name)
-        self.console = ConsoleLogger() if dup_to_console else VoidLogger()
+        self.console = ConsoleLogger() if logger_setup.dup_to_console \
+            else VoidLogger()
 
     def debug(self, msg):
         self.console.debug(msg)
@@ -181,13 +188,12 @@ class LoggerMixin(object):  # pragma nocover
 class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
     def __init__(
             self,
-            logger,
-            dup_to_console,
+            logger_setup,
             input_queue, poll_interval_sec,
             use_uniresis_stub=False,
             **kwargs):
         super(StateAcquirer, self).__init__(
-            logger, dup_to_console, **kwargs)
+            logger_setup, **kwargs)
 
         self.input_queue = input_queue
 
@@ -259,9 +265,9 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
 class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
     def __init__(
-            self, logger, dup_to_console, input_queue, control_queue, **kwargs):
-        super(StateAggregator, self).__init__(
-            logger, dup_to_console, **kwargs)
+            self, logger_setup,
+            input_queue, control_queue, **kwargs):
+        super(StateAggregator, self).__init__(logger_setup, **kwargs)
 
         self.input_queue = input_queue
         self.control_queue = control_queue
@@ -352,14 +358,12 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     '''
     def __init__(
             self,
-            logger,
-            dup_to_console,
+            logger_setup,
             ci_state,
             node,
             control_queue,
             **kwargs):
-        super(AppsElysium, self).__init__(
-            logger, dup_to_console, **kwargs)
+        super(AppsElysium, self).__init__(logger_setup, **kwargs)
 
         self.ci_state = ci_state
 

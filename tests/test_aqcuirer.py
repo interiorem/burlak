@@ -37,7 +37,7 @@ def acq(mocker):
     input_queue = queues.Queue()
 
     return burlak.StateAcquirer(
-        logger,
+        burlak.LoggerSetup(logger, False),
         input_queue,
         0.01,
         use_uniresis_stub=True)

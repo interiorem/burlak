@@ -35,7 +35,8 @@ state_input = [
 @pytest.fixture
 def disp(mocker):
     return burlak.StateAggregator(
-        make_logger_mock(mocker), queues.Queue(), queues.Queue())
+        burlak.LoggerSetup(make_logger_mock(mocker), False),
+        queues.Queue(), queues.Queue())
 
 
 @pytest.fixture

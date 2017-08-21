@@ -51,16 +51,17 @@ def main(
     unicorn = SecureServiceFabric.make_secure_adaptor(
         Service('unicorn'), *config.secure)
 
+    logger_setup = burlak.LoggerSetup(logging, dup_to_console)
+
     acquirer = burlak.StateAcquirer(
-        logging, dup_to_console,
-        input_queue, apps_poll_interval, uniresis_stub)
+        logger_setup, input_queue, apps_poll_interval, uniresis_stub)
     state_processor = burlak.StateAggregator(
-        logging, dup_to_console, input_queue, control_queue)
+        logger_setup, input_queue, control_queue)
 
     committed_state = burlak.CommittedState()
 
     apps_elysium = burlak.AppsElysium(
-        logging, dup_to_console,
+        logger_setup,
         committed_state, Service('node'), control_queue)
 
     if not uuid_prefix:
