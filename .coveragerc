@@ -1,0 +1,5 @@
+[run]
+omit =
+    src/cocaine/burlak/__main__.py
+    src/cocaine/burlak/helpers/*
+    src/cocaine/burlak/sched_load/*
