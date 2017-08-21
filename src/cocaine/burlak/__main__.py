@@ -3,13 +3,16 @@ import burlak
 import click
 
 from cocaine.logger import Logger
-from cocaine.services import SecureServiceFabric, Service
+# TODO: not released yet!
+# from cocaine.services import SecureServiceFabric, Service
+from cocaine.services import Service
 
 from tornado import queues
 from tornado import web
 from tornado.ioloop import IOLoop
 
 from .config import Config
+from .helpers import SecureServiceFabric
 
 from .web import MetricsHandler, StateHandler
 
