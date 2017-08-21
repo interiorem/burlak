@@ -30,11 +30,15 @@ APP_LIST_POLL_INTERVAL = 8
 @click.option(
     '--uniresis-stub',
     is_flag=True, default=False, help='use stub for uniresis uuid')
+@click.option(
+    '--dup-to-console',
+    is_flag=True, default=False, help='copy logger output to console')
 def main(
         uuid_prefix,
         apps_poll_interval,
         port,
-        uniresis_stub):
+        uniresis_stub,
+        dup_to_console):
 
     config = Config()
     config.update()
@@ -48,15 +52,16 @@ def main(
         Service('unicorn'), *config.secure)
 
     acquirer = burlak.StateAcquirer(
-        logging, input_queue, apps_poll_interval, uniresis_stub)
+        logging, dup_to_console,
+        input_queue, apps_poll_interval, uniresis_stub)
     state_processor = burlak.StateAggregator(
-        logging, input_queue, control_queue)
+        logging, dup_to_console, input_queue, control_queue)
 
     committed_state = burlak.CommittedState()
 
     apps_elysium = burlak.AppsElysium(
-        logging, committed_state, Service('node'),
-        control_queue)
+        logging, dup_to_console,
+        committed_state, Service('node'), control_queue)
 
     if not uuid_prefix:
         uuid_prefix = config.uuid_path

@@ -125,28 +125,56 @@ class MetricsMixin(object):
         return self.metrics_cnt
 
 
-class LoggerMixin(object):  # pragma nocover
-    def __init__(self, logger, name=SELF_NAME, **kwargs):
-        super(LoggerMixin, self).__init__(**kwargs)
-
-        self.name = name
-        self.logger = logger
-        self.format = '{} :: %s'.format(name)
-
+class VoidLogger(object):  # pragme nocover
     def debug(self, msg):
+        pass
+
+    def info(self, msg):
+        pass
+
+    def warn(self, msg):
+        pass
+
+    def error(self, msg):
+        pass
+
+
+class ConsoleLogger(VoidLogger):  # pragma nocover
+    def debug(self,msg):
         print('dbg: {}'.format(msg))
-        self.logger.debug(self.format, msg)
 
     def info(self, msg):
         print('info: {}'.format(msg))
-        self.logger.info(self.format, msg)
 
     def warn(self, msg):
         print('warn: {}'.format(msg))
-        self.logger.warn(self.format, msg)
 
     def error(self, msg):
         print('error: {}'.format(msg))
+
+
+class LoggerMixin(object):  # pragma nocover
+    def __init__(self, logger, dup_to_console=False, name=SELF_NAME, **kwargs):
+        super(LoggerMixin, self).__init__(**kwargs)
+
+        self.logger = logger
+        self.format = '{} :: %s'.format(name)
+        self.console = ConsoleLogger() if dup_to_console else VoidLogger()
+
+    def debug(self, msg):
+        self.console.debug(msg)
+        self.logger.debug(self.format, msg)
+
+    def info(self, msg):
+        self.console.info(msg)
+        self.logger.info(self.format, msg)
+
+    def warn(self, msg):
+        self.console.warn(msg)
+        self.logger.warn(self.format, msg)
+
+    def error(self, msg):
+        self.console.error(msg)
         self.logger.error(self.format, msg)
 
 
@@ -154,11 +182,12 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
     def __init__(
             self,
             logger,
+            dup_to_console,
             input_queue, poll_interval_sec,
             use_uniresis_stub=False,
             **kwargs):
-
-        super(StateAcquirer, self).__init__(logger, **kwargs)
+        super(StateAcquirer, self).__init__(
+            logger, dup_to_console, **kwargs)
 
         self.input_queue = input_queue
 
@@ -230,10 +259,9 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
 class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
     def __init__(
-            self, logger, input_queue, control_queue, **kwargs):
-        super(StateAggregator, self).__init__(logger, **kwargs)
-
-        self.logger = logger
+            self, logger, dup_to_console, input_queue, control_queue, **kwargs):
+        super(StateAggregator, self).__init__(
+            logger, dup_to_console, **kwargs)
 
         self.input_queue = input_queue
         self.control_queue = control_queue
@@ -322,10 +350,17 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     '''Controls life-time of applications based on supplied state
     '''
-    def __init__(self, logger, ci_state, node, control_queue, **kwargs):
-        super(AppsElysium, self).__init__(logger, **kwargs)
+    def __init__(
+            self,
+            logger,
+            dup_to_console,
+            ci_state,
+            node,
+            control_queue,
+            **kwargs):
+        super(AppsElysium, self).__init__(
+            logger, dup_to_console, **kwargs)
 
-        self.logger = logger
         self.ci_state = ci_state
 
         self.node_service = node
