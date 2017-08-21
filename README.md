@@ -1,6 +1,6 @@
 ## БурлакѢ
 ![commit-stat](https://travis-ci.org/karitra/burlak.svg?branch=master)
-[![Coverage Status](https://coveralls.io/repos/github/karitra/burlak/badge.svg)](https://coveralls.io/github/karitra/burlak)
+[![CoverageStatus](https://coveralls.io/repos/github/karitra/burlak/badge.svg)](https://coveralls.io/github/karitra/burlak)
 
 > А как по Волге ходит одинокий бурлак,  
 > Ходит бечевой небесных равнин.  
@@ -9,22 +9,16 @@
 
 Note that those app also known as __Cocaine Orca__.
 
-## To install
+## Install
 `sudo apt-get install cocaine-orca`
-
-Remove:
+## Remove
 `sudo apt-get remove cocaine-orca`
 
 ## To run
-1. From console:
-`python -m cocaine.burlak`
-2. ubic:
+#### Command line
+`python -m cocaine.burlak <options>`
+#### Ubic
+Probably you should need admin access to run it.
 
-Probably you should need admin rights to run it. 
-
-To start:
-`ubic start cocaine-orca`
-
-To stop:
-`ubic stop cocaine-orca`
-
+ - to start: `ubic start cocaine-orca`
+ - to stop: `ubic stop cocaine-orca`
