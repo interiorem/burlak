@@ -131,6 +131,48 @@ def test_control(elysium, mocker):
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
+def test_control_exceptions(elysium, mocker):
+    stop_side_effect = [True for _ in to_run_apps]
+    stop_side_effect.append(False)
+
+    mocker.patch.object(
+        burlak.LoopSentry, 'should_run', side_effect=stop_side_effect)
+
+    for run_apps in to_run_apps:
+        yield elysium.control_queue.put(
+            burlak.DispatchMessage(
+                run_apps, -1, True, set(), set(run_apps.iterkeys()))
+        )
+
+    elysium.node_service.control = mocker.Mock(
+        return_value=make_mock_channel_with(
+            0,
+            Exception('boken', 'connect1'),
+            Exception('boken', 'connect2'),
+            0,
+        )
+    )
+
+    yield elysium.blessing_road()
+
+    for apps_list in to_run_apps:
+        for app, record in apps_list.iteritems():
+            assert elysium.node_service.start_app.called_with(
+                app,
+                record.profile
+            )
+
+            assert elysium.node_service.control.called_with(app)
+
+    assert \
+        elysium.node_service.start_app.call_count == \
+        sum(map(len, to_run_apps))
+    assert \
+        elysium.node_service.control.call_count == \
+        sum(map(len, to_run_apps))
+
+
+@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_gapped_control(elysium, mocker):
     '''Test for malformed state and to_run list combination'''
     stop_side_effect = [True for _ in to_run_apps]

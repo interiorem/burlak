@@ -13,7 +13,11 @@ def make_future(v):
     TODO: exceptions cases
     '''
     fut = Future()
-    fut.set_result(v)
+    if isinstance(v, Exception):
+        fut.set_exception(v)
+    else:
+        fut.set_result(v)
+
     return fut
 
 

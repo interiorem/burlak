@@ -320,6 +320,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
 
 class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
+    '''Controls life-time of applications based on supplied state
+    '''
     def __init__(self, logger, ci_state, node, control_queue, **kwargs):
         super(AppsElysium, self).__init__(logger, **kwargs)
 
@@ -331,6 +333,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def bless(self, app, profile, tm):
+        '''Trying to start application with specified profile
+        '''
         try:
             yield self.node_service.start_app(app, profile)
             self.info(
@@ -343,7 +347,10 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def adjust(self, app, to_adjust, profile, state_version, tm):
+        '''Control application workers count
 
+        TODO: seen a pattern here, move attempts retry to external patch
+        '''
         attempts = DEFAULT_RETRY_ATTEMPTS
         to_sleep = DEFAULT_RETRY_EXP_BASE_SEC
 
@@ -380,6 +387,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def slay(self, app, state_version, tm):
+        '''Stop/pause application
+        '''
         try:
             yield self.node_service.pause_app(app)
 
@@ -392,6 +401,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def filtered_control_apps(self, should_control_app, command):
+        '''Control applications from filtered command.to_run list
+        '''
         tm = time.time()
         yield [
             self.adjust(
