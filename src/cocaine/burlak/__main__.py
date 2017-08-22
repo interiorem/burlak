@@ -50,6 +50,7 @@ def main(
     logging = Logger()
     unicorn = SecureServiceFabric.make_secure_adaptor(
         Service('unicorn'), *config.secure)
+    node = Service('node')
 
     logger_setup = burlak.LoggerSetup(logging, dup_to_console)
 
@@ -62,7 +63,7 @@ def main(
 
     apps_elysium = burlak.AppsElysium(
         logger_setup,
-        committed_state, Service('node'), control_queue)
+        committed_state, node, control_queue)
 
     if not uuid_prefix:
         uuid_prefix = config.uuid_path
@@ -74,9 +75,10 @@ def main(
     io_loop.spawn_callback(state_processor.process_loop)
 
     io_loop.spawn_callback(
-        lambda: acquirer.poll_running_apps_list(Service('node')))
+        lambda: acquirer.poll_running_apps_list(node))
     io_loop.spawn_callback(
-        lambda: acquirer.subscribe_to_state_updates(unicorn, uuid_prefix))
+        lambda: acquirer.subscribe_to_state_updates(
+            unicorn, node, uuid_prefix))
 
     qs = dict(input=input_queue, adjust=control_queue)
     units = dict(

@@ -26,7 +26,7 @@ from .uniresis import catchup_an_uniresis
 DEFAULT_RETRY_TIMEOUT_SEC = 10
 DEFAULT_UNKNOWN_VERSIONS = 1
 
-DEFAULT_RETRY_ATTEMPTS = 4
+DEFAULT_RETRY_ATTEMPTS = 3
 DEFAULT_RETRY_EXP_BASE_SEC = 2
 
 
@@ -67,18 +67,27 @@ class RunningAppsMessage(object):
 
 
 class StateUpdateMessage(object):
-    def __init__(self, state={}, version=-1):
+    def __init__(self, state, running_apps, version=-1):
         self.state = {
             app: StateRecord(workers, profile)
             for app, (workers, profile) in state.iteritems()
         }
+
+        self.running_apps = running_apps
         self.version = version
 
     def get_state(self):
         return self.state
 
+    def get_running_apps_set(self):
+        return set(self.running_apps)
+
     def get_version(self):
         return self.version
+
+    def get_all(self):
+        return \
+            self.get_state(), self.get_running_apps_set(), self.get_version()
 
 
 class CommittedState(object):
@@ -131,7 +140,7 @@ class MetricsMixin(object):
         return self.metrics_cnt
 
 
-class VoidLogger(object):  # pragme nocover
+class VoidLogger(object):  # pragma nocover
     def debug(self, msg):
         pass
 
@@ -219,7 +228,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
 
     @gen.coroutine
-    def subscribe_to_state_updates(self, unicorn, state_pfx):
+    def subscribe_to_state_updates(self, unicorn, node, state_pfx):
 
         uniresis = catchup_an_uniresis(self.use_uniresis_stub)
 
@@ -253,8 +262,15 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                         'subscribe: got subscribed state {}'
                         .format(state))
 
+                    node_ch = yield node.list()
+                    app_list = yield node_ch.rx.get()
+
+                    self.debug(
+                        'got running apps on state update {}'
+                        .format(app_list))
+
                     yield self.input_queue.put(
-                        StateUpdateMessage(state, version))
+                        StateUpdateMessage(state, app_list, version))
                     self.metrics_cnt['last_state_app_count'] = len(state)
 
             except Exception as e:
@@ -272,7 +288,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         self.input_queue = input_queue
         self.control_queue = control_queue
 
-    def make_to_update_set(self, prev_state, state):
+    def make_prof_update_set(self, prev_state, state):
         to_update = []
         # Detect apps profile change
         for app, state_record in state.iteritems():
@@ -306,12 +322,13 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                         'disp::got running apps list {}'
                         .format(running_apps))
                 elif isinstance(msg, StateUpdateMessage):
-                    state, state_version = msg.get_state(), msg.get_version()
+                    state, running_apps, state_version = msg.get_all()
                     is_state_updated = True
 
                     self.debug(
-                        'disp::got state update with version {}: {}'
-                        .format(state_version, state))
+                        'disp::got state update with version {}: {} and '
+                        'running apps {}'
+                        .format(state_version, state, running_apps))
                 else:
                     self.error('unknown message type {}'.format(msg))
             except Exception as e:
@@ -333,15 +350,17 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             to_stop = running_apps - update_state_apps_set
 
             if is_state_updated:
-                to_update = self.make_to_update_set(prev_state, state)
+                to_update = self.make_prof_update_set(prev_state, state)
 
                 to_run.update(to_update)
                 to_stop.update(to_update)
 
                 prev_state = state
 
-            self.info("'to_stop' apps list {}".format(to_stop))
-            self.info("'to_run' apps list {}".format(to_run))
+                self.debug('profile update list {}'.format(to_update))
+
+            self.info("to_stop apps list {}".format(to_stop))
+            self.info("to_run apps list {}".format(to_run))
 
             if is_state_updated or to_run or to_stop:
                 yield self.control_queue.put(
@@ -499,7 +518,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     # If app was stopped (crushed), but state wasn't updated
                     # yet, just relaunch app and push last control to it.
                     yield self.filtered_control_apps(
-                        lambda app: app in common.to_run,
+                        lambda app: app in command.to_run,
                         command)
 
                     self.metrics_cnt['rerun_apps_count'] += len(command.to_run)
