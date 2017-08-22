@@ -84,8 +84,16 @@ def test_state_subscribe_input(acq, mocker):
         side_effect=[make_mock_channel_with(*states_list)]
     )
 
+    node = mocker.Mock()
+    node.list = mock.Mock(
+        side_effect=[
+            make_mock_channel_with(*[k for k in state.iterkeys()])
+            for (state, _) in states_list
+        ]
+    )
+
     for state, ver in states_list:
-        yield acq.subscribe_to_state_updates(unicorn, TEST_UUID_PFX)
+        yield acq.subscribe_to_state_updates(unicorn, node, TEST_UUID_PFX)
 
         inp = yield acq.input_queue.get()
         acq.input_queue.task_done()

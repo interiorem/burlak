@@ -1,3 +1,6 @@
+#
+# TODO: more test for StateUpdateMessage
+#
 from cocaine.burlak import burlak
 
 import pytest
@@ -15,20 +18,32 @@ running_app_lists = [
 ]
 
 state_input = [
-    (dict(
-        app1=(1, 'TestProfile1'),
-        app2=(2, 'TestProfile2'),
-        app3=(3, 'TestProfile1'),
-        app4=(4, 'TestProfile2'),
-        app5=(5, 'TestProfile1'),
-    ), 0),
-    (dict(
-        app1=(1, 'TestProfile1'),
-    ), 1),
-    (dict(
-        app6=(1, 'TestProfile1'),
-    ), 1),
-    (dict(), 0)
+    (
+        dict(
+            app1=(1, 'TestProfile1'),
+            app2=(2, 'TestProfile2'),
+            app3=(3, 'TestProfile1'),
+            app4=(4, 'TestProfile2'),
+            app5=(5, 'TestProfile1'),
+        ),
+        ['app1', 'app2'],
+        0,
+    ),
+    (
+        dict(
+            app1=(1, 'TestProfile1'),
+        ),
+        ['app2'],
+        1,
+    ),
+    (
+        dict(
+            app6=(1, 'TestProfile1'),
+        ),
+        ['app6'],
+        1,
+    ),
+    (dict(), [], 0)
 ]
 
 
@@ -45,13 +60,10 @@ def init_state():
         dict(
             app1=(10, 'TestProfile1'),
             app4=(5, 'TestProfile2'),
-        ), 1
+        ),
+        [],
+        1
     )
-
-
-@pytest.fixture
-def init_running_state():
-    return burlak.RunningAppsMessage(['app' + str(i) for i in xrange(0, 4)])
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
@@ -73,6 +85,7 @@ def test_apps_list_input(disp, mocker, init_state):
     yield disp.process_loop()
 
     init_running_set = set(init_state.get_state().iterkeys())
+
     init_command = yield disp.control_queue.get()
 
     assert init_running_set == init_command.to_run
@@ -91,9 +104,8 @@ def test_apps_list_input(disp, mocker, init_state):
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
-def test_state_input(disp, mocker, init_running_state):
+def test_state_input(disp, mocker):
     stop_side_effect = [True for _ in state_input]
-    stop_side_effect.append(True)  # init running apps state
     stop_side_effect.append(False)
 
     mocker.patch.object(
@@ -101,20 +113,21 @@ def test_state_input(disp, mocker, init_running_state):
 
     assert state_input
 
-    yield disp.input_queue.put(init_running_state)
-    for state, version in state_input:
-        yield disp.input_queue.put(burlak.StateUpdateMessage(state, version))
+    for state, running_list, version in state_input:
+        yield disp.input_queue.put(
+            burlak.StateUpdateMessage(state, running_list, version))
 
     yield disp.process_loop()
 
-    for state, version in state_input:
+    for state, running_list, version in state_input:
         if not state:
             continue
 
         command = yield disp.control_queue.get()
         state_apps = set(state.iterkeys())
 
-        init_state = init_running_state.get_apps_set()
+        running_list_set = set(running_list)
 
-        assert command.to_stop == init_state - state_apps
-        assert command.to_run == state_apps - init_state
+        assert command.to_stop == running_list_set - state_apps
+        assert command.to_run == state_apps - running_list_set
+        assert command.state == state
