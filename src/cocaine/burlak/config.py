@@ -37,8 +37,12 @@ class Config(object):
         for conf in paths:
             try:
                 with open(os.path.expanduser(conf)) as fl:
-                    print('Reading config from file {}', fl)
-                    self.config.update(yaml.safe_load(fl.read()))
+                    print('Reading config from file {}'.format(conf))
+
+                    config = yaml.safe_load(fl.read())
+                    if config:
+                        self._config.update(config)
+
                     parsed.append(conf)
             except Exception as err:
                 print('failed to read config file {}, {}'.format(conf, err))

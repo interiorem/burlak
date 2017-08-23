@@ -48,13 +48,13 @@ DispatchMessage = namedtuple('DispatchMessage', [
 
 StateRecord = namedtuple('StateRecord', [
     'workers',
-    'profile'
+    'profile',
 ])
 
 
 LoggerSetup = namedtuple('LoggerSetup', [
     'logger',
-    'dup_to_console'
+    'dup_to_console',
 ])
 
 

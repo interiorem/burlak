@@ -10,7 +10,7 @@ good_secret_conf = [
         'Classified', 42, 'not as secret at all', 600),
 ]
 
-broken_conf = 'tests/assets/broken.conf.yaml'
+empty_conf = 'tests/assets/empty.conf.yaml'
 
 default_secure = ('promisc', 0, '', Config.DEFAULT_TOK_UPDATE_SEC)
 
@@ -21,8 +21,7 @@ def test_secure_config(config_file, mod, cid, secret, update):
     cfg = Config()
     cnt = cfg.update([config_file])
 
-    assert cfg.secure == \
-        (mod, cid, secret, update)
+    assert cfg.secure == (mod, cid, secret, update)
     assert cnt == 1
 
 
@@ -36,31 +35,29 @@ def test_config_group():
 
 def test_broken_conf():
     cfg = Config()
-    cnt = cfg.update([broken_conf])
+    cnt = cfg.update([empty_conf])
 
-    assert cnt == 0
+    assert cnt == 1
 
 
 def test_config_group_with_broken():
     conf_files = [conf for conf, _, _, _, _ in good_secret_conf]
-    conf_files.append(broken_conf)
-
-    print(conf_files)
+    conf_files.append(empty_conf)
 
     cfg = Config()
     cnt = cfg.update(conf_files)
 
     assert cfg.secure == (good_secret_conf[-1][1:])
-    assert cnt == len(good_secret_conf)
+    assert cnt == len(good_secret_conf) + 1
 
 
 def test_config_group_with_broken_and_noexist():
-    conf_files = [broken_conf, 'boo/foo.yml']
+    conf_files = [empty_conf, 'boo/foo.yml']
 
     cfg = Config()
     cnt = cfg.update(conf_files)
 
-    assert cnt == 0
+    assert cnt == 1
     assert cfg.secure == default_secure
 
 
