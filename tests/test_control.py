@@ -28,6 +28,7 @@ to_run_apps = [
         run6=burlak.StateRecord(6, 't6'),
         run7=burlak.StateRecord(7, 't7')
     ),
+    dict(),
 ]
 
 
@@ -131,6 +132,9 @@ def test_control(elysium, mocker):
         sum(map(len, to_run_apps))
 
 
+#
+# TODO: exceptions count!
+#
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_control_exceptions(elysium, mocker):
     stop_side_effect = [True for _ in to_run_apps]
@@ -145,13 +149,17 @@ def test_control_exceptions(elysium, mocker):
                 run_apps, -1, True, set(), set(run_apps.iterkeys()))
         )
 
+    excpt_sequence = [
+        0,
+        Exception('boken', 'connect1'),
+        0,
+        Exception('boken', 'connect2'),
+        Exception('boken', 'connect3'),
+        0,
+    ]
+
     elysium.node_service.control = mocker.Mock(
-        return_value=make_mock_channel_with(
-            0,
-            Exception('boken', 'connect1'),
-            Exception('boken', 'connect2'),
-            0,
-        )
+        side_effect=[make_mock_channel_with(r) for r in excpt_sequence]
     )
 
     yield elysium.blessing_road()
