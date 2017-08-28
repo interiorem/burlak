@@ -6,7 +6,7 @@ import pytest
 from tornado import queues
 
 from .common import ASYNC_TESTS_TIMEOUT
-from .common import make_logger_mock, make_mock_channel_with
+from .common import make_future, make_logger_mock, make_mock_channel_with
 
 
 TEST_UUID_PFX = '/test_uuid_prefix'
@@ -16,6 +16,15 @@ apps_lists = [
     ('app3', 'app4', 'app5'),
     ('app5', 'app6'),
 ]
+
+apps_lists_ecxpt = [
+    Exception('some', 'error0'),
+    ('app2', 'app3'),
+    Exception('some', 'error1'),
+    ('app3', 'app4'),
+    Exception('some', 'error2'),
+]
+
 
 states_list = [
     (dict(
@@ -67,6 +76,36 @@ def test_app_list_input(acq, mocker):
 
         assert isinstance(inp, burlak.RunningAppsMessage)
         assert inp.get_apps_set() == set(tsk)
+
+
+@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
+def test_app_list_exception(acq, mocker):
+
+    node = mocker.Mock()
+    node.list = mock.Mock(
+        side_effect=[
+            make_mock_channel_with(app_excp_list)
+            for app_excp_list in apps_lists_ecxpt
+        ]
+    )
+
+    stop_side_effect = [True for _ in apps_lists_ecxpt]
+    stop_side_effect.append(False)
+
+    mocker.patch.object(
+        burlak.LoopSentry, 'should_run', side_effect=stop_side_effect)
+
+    mocker.patch('tornado.gen.sleep', return_value=make_future(0))
+
+    for tsk in apps_lists_ecxpt:
+        yield acq.poll_running_apps_list(node)
+
+        if not isinstance(tsk, Exception):
+            inp = yield acq.input_queue.get()
+            acq.input_queue.task_done()
+
+            assert isinstance(inp, burlak.RunningAppsMessage)
+            assert inp.get_apps_set() == set(tsk)
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
