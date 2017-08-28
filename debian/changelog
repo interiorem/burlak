@@ -1,3 +1,13 @@
+cocaine-orca (0.1.5) unstable; urgency=medium
+
+  * preliminary docs and code comments.
+  * fix for broken state on frequent subscription update. 
+  * retries for crusial async poll methods. 
+  * backport of SecureServiceAdapotor. 
+  * +plead of tiny changes, refacts and fixes.
+
+ -- karapuz <karapuz@karapuz-ub14>  Mon, 28 Aug 2017 13:51:25 +0300
+
 cocaine-orca (0.1.4) unstable; urgency=medium
 
   * sleep on incorrect uuid before retry.
