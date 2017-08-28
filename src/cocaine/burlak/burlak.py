@@ -454,7 +454,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.metrics_cnt['apps_slayed'] += 1
 
             self.info('app {} has been stopped'.format(app))
-        except Exception as e:
+        except Exception as e:  # pragma nocover
             self.error('failed to stop app {} with error: {}'.format(app, e))
 
     @gen.coroutine

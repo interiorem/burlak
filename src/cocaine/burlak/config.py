@@ -2,6 +2,7 @@ import os
 
 import yaml
 
+
 CONFIG_PATHS = [
     '/etc/cocaine/.cocaiane/tool.yml',
     '/etc/cocaine/orca.yml',
@@ -47,13 +48,13 @@ class Config(object):
             except Exception as err:
                 print('failed to read config file {}, {}'.format(conf, err))
 
-        if not parsed:
+        if not parsed:  # pragma nocover
             print('no config to read was found in file(s), using defaults.')
 
         return len(parsed)
 
     @property
-    def config(self):
+    def config(self):  # prgama nocover
         return self._config
 
     @property
