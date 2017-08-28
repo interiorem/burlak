@@ -54,7 +54,7 @@ class Config(object):
         return len(parsed)
 
     @property
-    def config(self):  # prgama nocover
+    def config(self):  # pragma nocover
         return self._config
 
     @property

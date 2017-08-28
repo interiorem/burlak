@@ -251,7 +251,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     state, version = yield ch.rx.get()
 
                     assert isinstance(version, int)
-                    if not isinstance(state, dict):
+                    if not isinstance(state, dict):  # pragma nocover
                         self.error(
                             'expected dictionary, got {}'.format(
                                 type(state).__name__))
@@ -273,7 +273,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                         StateUpdateMessage(state, app_list, version))
                     self.metrics_cnt['last_state_app_count'] = len(state)
 
-            except Exception as e:
+            except Exception as e:  # pragma nocover
                 self.error(
                     'failed to get state subscription with "{}"'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
