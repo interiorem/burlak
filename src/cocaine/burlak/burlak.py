@@ -58,6 +58,13 @@ LoggerSetup = namedtuple('LoggerSetup', [
 ])
 
 
+def close_tx_safe(ch):  # pragma nocover
+    try:
+        ch.tx.close()
+    except Exception:
+        pass
+
+
 class RunningAppsMessage(object):
     def __init__(self, run_list=[]):
         self.running_apps = set(run_list)
@@ -277,6 +284,9 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                 self.error(
                     'failed to get state subscription with "{}"'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
+            finally:
+                close_tx_safe(ch)
+                close_tx_safe(node_ch)
 
 
 class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
