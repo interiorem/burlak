@@ -1,5 +1,5 @@
 secure:
-  mod: BOO_MOD
+  mod: test1
   client_id: 100500
   client_secret: top secret
 

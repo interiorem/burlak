@@ -19,6 +19,7 @@ setup(
         'tornado>=4.3',
         'click>=5.0',
         'PyYAML>=3.0',
+        'cerberus>=0.9.0',
     ],
     namespace_packages=['cocaine'],
     setup_requires=['pytest-runner', 'python-debian'],

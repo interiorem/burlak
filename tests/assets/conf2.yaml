@@ -1,5 +1,5 @@
 secure:
-  mod: Classified
+  mod: tvm
   client_id: 42
   client_secret: not as secret at all
   tok_update_sec: 600

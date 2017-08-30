@@ -1,18 +1,17 @@
 import os
 
+import cerberus
 import yaml
 
 
 CONFIG_PATHS = [
     '/etc/cocaine/.cocaiane/tool.yml',
-    '/etc/cocaine/orca.yml',
-    '~/cocaine/orca.yml',
-    '~/.cocaine/orca.yml',
+    '/etc/cocaine/orca.yaml',
+    '~/cocaine/orca.yaml',
+    '~/.cocaine/orca.yaml',
 ]
 
 
-#
-# TODO: (cerberus) validator someday
 #
 # Should be compatible with tools secure section
 #
@@ -30,8 +29,67 @@ class Config(object):
 
     DEFAULT_PROFILE_NAME = 'default'
 
+    SCHEMA = {
+        'secure': {
+            'type': 'dict',
+            'required': False,
+            'schema': {
+                'mod': {
+                    'type': 'string',
+                    'allowed': [
+                        'tvm',
+                        'promiscuous',
+                        'test1', 'test2'
+                    ]
+                },
+                'client_id': {'type': 'integer'},
+                'client_secret': {'type': 'string'},
+                'tok_update': {'type': 'integer'},
+            },
+        },
+        'unicorn_service_name': {
+            'type': 'string',
+            'required': False,
+        },
+        'node_service_name': {
+            'type': 'string',
+            'required': False,
+        },
+        'port': {
+            'type': 'integer',
+            'min': 0,
+            'required': False,
+        },
+        'web_path': {
+            'type': 'string',
+            'required': False,
+        },
+        'uuid_path': {
+            'type': 'string',
+            'required': False,
+        },
+        'default_profile': {
+            'type': 'string',
+            'required': False,
+        },
+        'locator_endpoints': {
+            'type': 'list',
+            'required': False,
+            'items': [
+                {
+                    'type': 'list',
+                    'items': [
+                        {'type': 'string'},  # host
+                        {'type': 'integer'}, # port
+                    ],
+                },
+            ]
+        },
+    }
+
     def __init__(self):
         self._config = dict()
+        self._validator = cerberus.Validator(self.SCHEMA, allow_unknown=True)
 
     def update(self, paths=CONFIG_PATHS):
         parsed = []
@@ -42,6 +100,9 @@ class Config(object):
 
                     config = yaml.safe_load(fl.read())
                     if config:
+                        if not self._validator.validate(config):
+                            raise Exception('incorrect config format')
+
                         self._config.update(config)
 
                     parsed.append(conf)

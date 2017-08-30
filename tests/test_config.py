@@ -5,9 +5,9 @@ import pytest
 
 good_secret_conf = [
     ('tests/assets/conf1.yaml',
-        'BOO_MOD', 100500, 'top secret', Config.DEFAULT_TOK_UPDATE_SEC),
+        'test1', 100500, 'top secret', Config.DEFAULT_TOK_UPDATE_SEC),
     ('tests/assets/conf2.yaml',
-        'Classified', 42, 'not as secret at all', 600),
+        'tvm', 42, 'not as secret at all', 600),
 ]
 
 empty_conf = 'tests/assets/empty.conf.yaml'
