@@ -55,7 +55,9 @@ def main(
     logging = Logger(config.locator_endpoints)
 
     unicorn = SecureServiceFabric.make_secure_adaptor(
-        Service(config.unicorn_name, config.locator_endpoints), *config.secure)
+        Service(config.unicorn_name, config.locator_endpoints),
+        *config.secure, endpoints=config.locator_endpoints)
+
     node = Service(config.node_name, config.locator_endpoints)
 
     logger_setup = burlak.LoggerSetup(logging, dup_to_console)

@@ -3,14 +3,13 @@
 Provides method for Service adaptor construction, capable to wrap Cocaine
 service and inject security token into the header of service request.
 
-TODO: backported from cocaine-framework, should be removed once published in
-framework.
+Note: backported from cocaine-framework, should be removed once published
+in framework
 """
-
 import time
 
-from cocaine.exceptions import CocaineError
 from cocaine.services import Service
+from cocaine.exceptions import CocaineError
 
 from tornado import gen
 
@@ -41,17 +40,18 @@ class TVM(object):
     # in less general name formatting rules.
     TYPE = 'TVM'
 
-    def __init__(self, client_id, client_secret, name='tvm'):
+    def __init__(self, client_id, client_secret, endpoints=None, name='tvm'):
         """TVM
 
         :param client_id: Integer client identifier.
         :param client_secret: Client secret.
+        :param endpoints: TVM service endpoints list in format (host, port).
         :param name: TVM service name, defaults to 'tvm'.
         """
         self._client_id = client_id
         self._client_secret = client_secret
 
-        self._tvm = Service(name)
+        self._tvm = Service(name, endpoints) if endpoints else Service(name)
 
     @gen.coroutine
     def fetch_token(self):
@@ -132,16 +132,20 @@ class SecureServiceFabric(object):
 
     @staticmethod
     def make_secure_adaptor(
-            service, mod, client_id, client_secret, tok_update_sec=None):
+            service, mod,
+            client_id, client_secret, tok_update_sec=None, endpoints=None):
         """
         :param service: Service to wrap in.
         :param mod: Name (type) of token refresh backend.
         :param client_id: Client identifier.
         :param client_secret: Client secret.
+        :param endpoints: Token service endpoints.
         :param tok_update_sec: Token update interval in seconds.
         """
         if mod == 'TVM':
             return SecureServiceAdaptor(
-                service, TVM(client_id, client_secret), tok_update_sec)
+                service,
+                TVM(client_id, client_secret, endpoints),
+                tok_update_sec)
 
         return SecureServiceAdaptor(service, Promiscuous(), tok_update_sec)
