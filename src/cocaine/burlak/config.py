@@ -75,15 +75,13 @@ class Config(object):
         'locator_endpoints': {
             'type': 'list',
             'required': False,
-            'items': [
-                {
-                    'type': 'list',
-                    'items': [
-                        {'type': 'string'},  # host
-                        {'type': 'integer'}, # port
-                    ],
-                },
-            ]
+            'schema': {
+                'type': 'list',
+                'items': [
+                    {'type': 'string'},   # host
+                    {'type': 'integer'},  # port
+                ],
+            },
         },
     }
 

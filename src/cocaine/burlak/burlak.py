@@ -1,10 +1,10 @@
 #
 # TODO:
-#   - TBD
-#   - use cerberus validator on inputed state
-#   - console logger wrapper
+#   - timing metrics
 #
 # DONE:
+#   - console logger wrapper
+#   - use cerberus validator on inputed state
 #   - take start_app 'profile' from, emmm... state?
 #   - get uuid from 'uniresis' (temporary proxy)
 #   - expose state to web handle (partly implemented)
@@ -15,6 +15,7 @@ import time
 
 from collections import defaultdict, namedtuple
 
+from cerberus import Validator
 from cocaine.exceptions import CocaineError
 
 from tornado import gen
@@ -26,7 +27,7 @@ from .uniresis import catchup_an_uniresis
 DEFAULT_RETRY_TIMEOUT_SEC = 10
 DEFAULT_UNKNOWN_VERSIONS = 1
 
-DEFAULT_RETRY_ATTEMPTS = 3
+DEFAULT_RETRY_ATTEMPTS = 4
 DEFAULT_RETRY_EXP_BASE_SEC = 2
 
 
@@ -65,6 +66,15 @@ def close_tx_safe(ch):  # pragma nocover
         pass
 
 
+def transmute_state(input_state):
+    '''Converts raw state dictionary to (app => StateRecords) mapping
+    '''
+    return {
+        app: StateRecord(int(workers), str(profile))
+        for app, (workers, profile) in input_state.iteritems()
+    }
+
+
 class RunningAppsMessage(object):
     def __init__(self, run_list=[]):
         self.running_apps = set(run_list)
@@ -75,10 +85,7 @@ class RunningAppsMessage(object):
 
 class StateUpdateMessage(object):
     def __init__(self, state, running_apps, version=-1):
-        self.state = {
-            app: StateRecord(int(workers), str(profile))
-            for app, (workers, profile) in state.iteritems()
-        }
+        self.state = transmute_state(state)
 
         self.running_apps = running_apps
         self.version = version
@@ -202,6 +209,20 @@ class LoggerMixin(object):  # pragma nocover
 
 
 class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
+
+    SCHEMA = {
+        'state': {
+            'type': 'dict',
+            'valueschema': {
+                'type': 'list',
+                'items': [
+                    {'type': 'integer'},
+                    {'type': 'string'},
+                ],
+            },
+        },
+    }
+
     def __init__(
             self,
             logger_setup,
@@ -238,6 +259,10 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
     def subscribe_to_state_updates(self, unicorn, node, state_pfx):
 
         uniresis = catchup_an_uniresis(self.use_uniresis_stub)
+        validator = Validator(StateAcquirer.SCHEMA)
+
+        ch = None
+        node_ch = None
 
         while self.should_run():
             try:
@@ -258,12 +283,26 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     state, version = yield ch.rx.get()
 
                     assert isinstance(version, int)
+
                     if not isinstance(state, dict):  # pragma nocover
                         self.error(
                             'expected dictionary, got {}'.format(
                                 type(state).__name__))
                         self.metrics_cnt['got_broken_sate'] += 1
                         continue
+
+                    #
+                    # Bench result:
+                    # dict with 1000 records is validated for ~ 100 ms
+                    #
+                    if not validator.validate({'state': state}):
+                        # If state isn't valid, report to log as error, but
+                        # try to continue as it possible that 'transmute_state'
+                        # will correct/coerse state records to normal format,
+                        # if not it would be exception in StateUpdateMessage
+                        # ctor.
+                        self.error('state not valid {}'.format(state))
+                        self.metrics_cnt['not_valid_state'] += 1
 
                     self.debug(
                         'subscribe: got subscribed state {}'
