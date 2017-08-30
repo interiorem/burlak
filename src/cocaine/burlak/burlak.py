@@ -292,8 +292,8 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                         continue
 
                     #
-                    # Bench result:
-                    # dict with 1000 records is validated for ~ 100 ms
+                    # Bench results:
+                    # dict with 1000 records (apps) is validated for ~ 100 ms
                     #
                     if not validator.validate({'state': state}):
                         # If state isn't valid, report to log as error, but

@@ -1,3 +1,7 @@
+#
+# TODO:
+#   - endpoints for logger
+#
 import burlak
 
 import click

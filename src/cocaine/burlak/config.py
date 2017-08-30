@@ -92,6 +92,10 @@ class Config(object):
         self._config = dict()
         self._validator = cerberus.Validator(self.SCHEMA, allow_unknown=True)
 
+    def _validate_raise(self, config):
+        if not self._validator.validate(config):  # pragma nocover
+            raise Exception('incorrect config format')
+
     def update(self, paths=CONFIG_PATHS):
         parsed = []
         for conf in paths:
@@ -101,9 +105,7 @@ class Config(object):
 
                     config = yaml.safe_load(fl.read())
                     if config:
-                        if not self._validator.validate(config):
-                            raise Exception('incorrect config format')
-
+                        self._validate_raise(config)
                         self._config.update(config)
 
                     parsed.append(conf)
