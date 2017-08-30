@@ -1,3 +1,12 @@
+cocaine-orca (0.1.6) unstable; urgency=medium
+
+  * locator endpoints could be provided via config.
+  * cerberus validator for config and for incoming state record.
+  * minor tests update.
+  * minor docs update.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Wed, 30 Aug 2017 14:58:49 +0300
+
 cocaine-orca (0.1.5) unstable; urgency=medium
 
   * preliminary docs and code comments.
