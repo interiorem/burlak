@@ -49,8 +49,8 @@ def main(
     # TODO: names from config
     logging = Logger()
     unicorn = SecureServiceFabric.make_secure_adaptor(
-        Service('unicorn'), *config.secure)
-    node = Service('node')
+        Service('unicorn', config.locator_endpoints), *config.secure)
+    node = Service('node', config.locator_endpoints)
 
     logger_setup = burlak.LoggerSetup(logging, dup_to_console)
 
@@ -86,7 +86,7 @@ def main(
         state=state_processor,
         elysium=apps_elysium)
 
-    cfg_port, prefix = config.endpoint
+    cfg_port, prefix = config.web_endpoint
 
     if not port:
         port = cfg_port

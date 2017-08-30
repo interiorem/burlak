@@ -30,6 +30,7 @@ print v.validate({'state' : doc})
 #if not v.validate('boo'):
 #    print 'broken'
 
+
 schema2 = {
     'state' : {
         'type' : 'list', 
@@ -62,5 +63,3 @@ def is_valid(d):
 
 #print timeit.repeat('v.validate({"state":doc})', setup="from __main__ import doc, v", number=10, repeat=3)
 #print timeit.repeat('is_valid(doc)', setup="from __main__ import doc, is_valid", number=10, repeat=3)
-
-

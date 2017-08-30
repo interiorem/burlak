@@ -29,6 +29,9 @@ class Config(object):
 
     DEFAULT_PROFILE_NAME = 'default'
 
+    DEFAULT_LOCATOR_HOST = 'localhost'
+    DEFAULT_LOCATOR_PORT = 10053
+
     SCHEMA = {
         'secure': {
             'type': 'dict',
@@ -131,7 +134,7 @@ class Config(object):
         return mod, client_id, client_secret, tok_update
 
     @property
-    def endpoint(self):
+    def web_endpoint(self):
         port = self._config.get('port', self.DEFAULT_WEB_PORT)
         path = self._config.get('web_path', self.DEFAULT_WEB_PATH)
 
@@ -155,3 +158,9 @@ class Config(object):
     def default_profile(self):
         return self._config.get(
             'default_profile', self.DEFAULT_PROFILE_NAME)
+
+    @property
+    def locator_endpoints(self):
+        return self._config.get(
+            'locator_endpoints',
+            [[Config.DEFAULT_LOCATOR_HOST, Config.DEFAULT_LOCATOR_PORT], ])

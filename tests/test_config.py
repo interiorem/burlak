@@ -79,7 +79,7 @@ def test_endpoints_options(
     cfg = Config()
     cfg.update([config])
 
-    assert (expect_port, expect_web_path) == cfg.endpoint
+    assert (expect_port, expect_web_path) == cfg.web_endpoint
     assert expect_uuid_path == cfg.uuid_path
 
 
@@ -110,3 +110,18 @@ def test_misc_options(config, expect_profile):
     cfg.update([config])
 
     assert cfg.default_profile == expect_profile
+
+
+@pytest.mark.parametrize(
+    'config,expect_loc_endp',
+    [
+        ('tests/assets/conf1.yaml',
+            [[Config.DEFAULT_LOCATOR_HOST, Config.DEFAULT_LOCATOR_PORT], ]),
+        ('tests/assets/conf2.yaml', [['host1', 100500], ['host2', 42]]),
+    ]
+)
+def test_locator_endpoints(config, expect_loc_endp):
+    cfg = Config()
+    cfg.update([config])
+
+    assert cfg.locator_endpoints == expect_loc_endp
