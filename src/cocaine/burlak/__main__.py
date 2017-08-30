@@ -1,5 +1,7 @@
 #
 # TODO:
+#
+# DONE:
 #   - endpoints for logger
 #
 import burlak
@@ -50,11 +52,11 @@ def main(
     input_queue = queues.Queue()
     control_queue = queues.Queue()
 
-    # TODO: names from config
-    logging = Logger()
+    logging = Logger(config.locator_endpoints)
+
     unicorn = SecureServiceFabric.make_secure_adaptor(
-        Service('unicorn', config.locator_endpoints), *config.secure)
-    node = Service('node', config.locator_endpoints)
+        Service(config.unicorn_name, config.locator_endpoints), *config.secure)
+    node = Service(config.node_name, config.locator_endpoints)
 
     logger_setup = burlak.LoggerSetup(logging, dup_to_console)
 
