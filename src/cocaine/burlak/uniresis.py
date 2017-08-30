@@ -19,9 +19,14 @@ class ResoursesProxy(object):
 
 
 class UniresisProxy(ResoursesProxy):
+
+    def __init__(self, endpoints=None, name='uniresis'):
+        self.uniresis = \
+            Service(name, endpoints) if endpoints else Service(name)
+
     @gen.coroutine
     def uuid(self):
-        ch = yield Service('uniresis').uuid()
+        ch = yield self.uniresis.uuid()
         uuid = yield ch.rx.get()
         raise gen.Return(uuid)
 
@@ -38,8 +43,8 @@ class DummyProxy():
         raise gen.Return(self.COCAINE_TEST_UUID)
 
 
-def catchup_an_uniresis(use_stub=False):
+def catchup_an_uniresis(use_stub=False, endpoints=None):
     if use_stub:
         return DummyProxy()
     else:
-        return UniresisProxy()
+        return UniresisProxy(endpoints)

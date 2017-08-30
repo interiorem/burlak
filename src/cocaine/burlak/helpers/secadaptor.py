@@ -8,8 +8,8 @@ in framework
 """
 import time
 
-from cocaine.services import Service
 from cocaine.exceptions import CocaineError
+from cocaine.services import Service
 
 from tornado import gen
 

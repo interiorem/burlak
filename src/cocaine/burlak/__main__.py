@@ -20,6 +20,7 @@ from tornado.ioloop import IOLoop
 from .config import Config
 from .helpers import SecureServiceFabric
 
+from .uniresis import catchup_an_uniresis
 from .web import MetricsHandler, StateHandler
 
 
@@ -59,19 +60,19 @@ def main(
         *config.secure, endpoints=config.locator_endpoints)
 
     node = Service(config.node_name, config.locator_endpoints)
+    uniresis = catchup_an_uniresis(uniresis_stub, config.locator_endpoints)
 
     logger_setup = burlak.LoggerSetup(logging, dup_to_console)
 
     acquirer = burlak.StateAcquirer(
-        logger_setup, input_queue, apps_poll_interval, uniresis_stub)
+        logger_setup, input_queue, apps_poll_interval)
     state_processor = burlak.StateAggregator(
         logger_setup, input_queue, control_queue)
 
     committed_state = burlak.CommittedState()
 
     apps_elysium = burlak.AppsElysium(
-        logger_setup,
-        committed_state, node, control_queue)
+        logger_setup, committed_state, node, control_queue)
 
     if not uuid_prefix:
         uuid_prefix = config.uuid_path
@@ -86,7 +87,7 @@ def main(
         lambda: acquirer.poll_running_apps_list(node))
     io_loop.spawn_callback(
         lambda: acquirer.subscribe_to_state_updates(
-            unicorn, node, uuid_prefix))
+            unicorn, node, uniresis, uuid_prefix))
 
     qs = dict(input=input_queue, adjust=control_queue)
     units = dict(

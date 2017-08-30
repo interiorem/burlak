@@ -21,8 +21,6 @@ from cocaine.exceptions import CocaineError
 from tornado import gen
 from tornado.iostream import StreamClosedError
 
-from .uniresis import catchup_an_uniresis
-
 
 DEFAULT_RETRY_TIMEOUT_SEC = 10
 DEFAULT_UNKNOWN_VERSIONS = 1
@@ -224,18 +222,11 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
     }
 
     def __init__(
-            self,
-            logger_setup,
-            input_queue, poll_interval_sec,
-            use_uniresis_stub=False,
-            **kwargs):
-        super(StateAcquirer, self).__init__(
-            logger_setup, **kwargs)
+            self, logger_setup, input_queue, poll_interval_sec, **kwargs):
+        super(StateAcquirer, self).__init__(logger_setup, **kwargs)
 
         self.input_queue = input_queue
-
         self.poll_interval_sec = poll_interval_sec
-        self.use_uniresis_stub = use_uniresis_stub
 
     @gen.coroutine
     def poll_running_apps_list(self, node_service):
@@ -256,9 +247,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
 
     @gen.coroutine
-    def subscribe_to_state_updates(self, unicorn, node, state_pfx):
-
-        uniresis = catchup_an_uniresis(self.use_uniresis_stub)
+    def subscribe_to_state_updates(self, unicorn, node, uniresis, state_pfx):
         validator = Validator(StateAcquirer.SCHEMA)
 
         ch = None

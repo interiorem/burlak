@@ -1,4 +1,5 @@
 from cocaine.burlak import burlak
+from cocaine.burlak.uniresis import catchup_an_uniresis
 
 import mock
 import pytest
@@ -48,8 +49,7 @@ def acq(mocker):
     return burlak.StateAcquirer(
         burlak.LoggerSetup(logger, False),
         input_queue,
-        0.01,
-        use_uniresis_stub=True)
+        0.01)
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
@@ -131,8 +131,11 @@ def test_state_subscribe_input(acq, mocker):
         ]
     )
 
+    uniresis = catchup_an_uniresis(use_stub=True)
+
     for state, ver in states_list:
-        yield acq.subscribe_to_state_updates(unicorn, node, TEST_UUID_PFX)
+        yield acq.subscribe_to_state_updates(
+            unicorn, node, uniresis, TEST_UUID_PFX)
 
         inp = yield acq.input_queue.get()
         acq.input_queue.task_done()

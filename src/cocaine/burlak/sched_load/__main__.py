@@ -21,9 +21,10 @@ from tornado.ioloop import IOLoop
 import yaml
 
 from ..config import Config
+from ..uniresis import catchup_an_uniresis
 
 
-UNICORN_STATE_PREFIX = '/state/SOME_UUID'
+UNICORN_STATE_PREFIX = '/state'
 DEFAULT_SLEEP_TO_SEC = 4
 X_INC = 0.05
 AMPF = 20
@@ -57,13 +58,27 @@ def verify_state(input_state, result_state):
     print('state verified at {}'.format(int(time.time())))
 
 
+def make_state_path(prefix, uuid):
+    return '{}/{}'.format(prefix, uuid)
+
+
 @gen.coroutine
 def state_pusher(
-        unicorn, path, working_state,
+        unicorn, path_prefix, uniresis_stub, working_state,
         max_workers, to_sleep, verify_url, stop_proportion):
+
+    uniresis = catchup_an_uniresis(uniresis_stub)
+
+    uuid = yield uniresis.uuid()
+    path = make_state_path(path_prefix, uuid)
 
     ch = yield unicorn.get(path)
     _, version = yield ch.rx.get()
+
+    print 'version is {}'.format(version)
+
+    if version == -1:
+        yield unicorn.create(path, {})
 
     x = 0
     wrk_generators = [sample_sin, sample_cos]
@@ -112,9 +127,12 @@ def state_pusher(
 
 @click.command()
 @click.option(
-    '--uuid-path',
+    '--uuid-prefix',
     default=UNICORN_STATE_PREFIX,
-    help='path to store state in')
+    help='prefix path to store state in')
+@click.option(
+    '--use-uniresis-stub',
+    is_flag=True, default=False, help='use uniresis stub')
 @click.option(
     '--to-sleep',
     default=DEFAULT_SLEEP_TO_SEC,
@@ -136,7 +154,10 @@ def state_pusher(
     default=DEFAULT_DISABLE_PROPORTION,
     help='randomly stop specified proportion of application'
 )
-def main(uuid_path, to_sleep, state_file, verify_url, max_workers, proportion):
+def main(
+        uuid_prefix, use_uniresis_stub, to_sleep, state_file, verify_url,
+        max_workers, proportion):
+
     config = Config()
     config.update()
 
@@ -158,8 +179,8 @@ def main(uuid_path, to_sleep, state_file, verify_url, max_workers, proportion):
     IOLoop.current().run_sync(
         lambda:
             state_pusher(
-                unicorn, uuid_path, emul_state, max_workers,
-                to_sleep, verify_url, proportion))
+                unicorn, uuid_prefix, use_uniresis_stub, emul_state,
+                max_workers, to_sleep, verify_url, proportion))
 
 
 if __name__ == '__main__':
