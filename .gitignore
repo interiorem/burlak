@@ -10,5 +10,5 @@ MANIFEST
 /build
 /.cache
 /*.egg
-/.*.swp
+**/.*.swp
 .coverage
