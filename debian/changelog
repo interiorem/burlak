@@ -6,7 +6,7 @@ cocaine-orca (0.1.5) unstable; urgency=medium
   * backport of SecureServiceAdapotor. 
   * +plead of tiny changes, refacts and fixes.
 
- -- karapuz <karapuz@karapuz-ub14>  Mon, 28 Aug 2017 13:51:25 +0300
+ -- Alex Karev <karapuz@yandex-team.ru>  Mon, 28 Aug 2017 13:51:25 +0300
 
 cocaine-orca (0.1.4) unstable; urgency=medium
 

@@ -76,7 +76,7 @@ class RunningAppsMessage(object):
 class StateUpdateMessage(object):
     def __init__(self, state, running_apps, version=-1):
         self.state = {
-            app: StateRecord(workers, profile)
+            app: StateRecord(int(workers), str(profile))
             for app, (workers, profile) in state.iteritems()
         }
 
