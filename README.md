@@ -7,7 +7,7 @@
 > Ему господин кажет с неба кулак,  
 > А ему все смешно - в кулаке [cocaine](https://github.com/cocaine).  
 
-Also known as __Cocaine Orca__.
+Also known as __cocaine-orca__ (aka Killer whale).
 
 ## Install
 `sudo apt-get install cocaine-orca`

@@ -44,7 +44,7 @@ schema2 = {
     },
 }
 
-doc2 = [ ('app{}'.format(i), -i) for i in xrange(1000)]
+doc2 = [('app{}'.format(i), -i) for i in xrange(1000)]
 
 
 print 'doc2 ready'
