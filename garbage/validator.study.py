@@ -38,7 +38,7 @@ schema2 = {
             'type': 'list',
             'items': [
                 {'type': 'string'},
-                {'type': 'integer', 'min' : 0},
+                {'type': 'integer', 'min' : -900},
             ],
         },
     },
@@ -51,7 +51,10 @@ print 'doc2 ready'
 
 v2 = Validator(schema2)
 print v2.validate({'state' : doc2})
+#for err, msg in v2.errors.iteritems():
+#    print('{} => {}'.format(err, msg))
 
+print 'err: {}'.format(v2.errors)
 
 def is_valid(d):
     for k, (v1, v2) in d.iteritems():

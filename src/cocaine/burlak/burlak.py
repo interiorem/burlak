@@ -58,18 +58,25 @@ LoggerSetup = namedtuple('LoggerSetup', [
 
 
 def close_tx_safe(ch):  # pragma nocover
+    '''Close transmitter side of the pipe
+
+    Not really needed in current setup, but may be useful for persistent
+    channel of future control implementation.
+
+    '''
     try:
         ch.tx.close()
     except Exception:
         pass
 
 
-def transmute_state(input_state):
+def transmute_and_filter_state(input_state):
     '''Converts raw state dictionary to (app => StateRecords) mapping
     '''
     return {
         app: StateRecord(int(workers), str(profile))
         for app, (workers, profile) in input_state.iteritems()
+        if workers >= 0
     }
 
 
@@ -83,7 +90,7 @@ class RunningAppsMessage(object):
 
 class StateUpdateMessage(object):
     def __init__(self, state, running_apps, version=-1):
-        self.state = transmute_state(state)
+        self.state = transmute_and_filter_state(state)
 
         self.running_apps = running_apps
         self.version = version
@@ -208,13 +215,13 @@ class LoggerMixin(object):  # pragma nocover
 
 class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
-    SCHEMA = {
+    STATE_SCHEMA = {
         'state': {
             'type': 'dict',
             'valueschema': {
                 'type': 'list',
                 'items': [
-                    {'type': 'integer'},
+                    {'type': 'integer', 'min': 0},
                     {'type': 'string'},
                 ],
             },
@@ -248,7 +255,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def subscribe_to_state_updates(self, unicorn, node, uniresis, state_pfx):
-        validator = Validator(StateAcquirer.SCHEMA)
+        validator = Validator(StateAcquirer.STATE_SCHEMA)
 
         ch = None
         node_ch = None
@@ -286,11 +293,13 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     #
                     if not validator.validate({'state': state}):
                         # If state isn't valid, report to log as error, but
-                        # try to continue as it possible that 'transmute_state'
-                        # will correct/coerse state records to normal format,
-                        # if not it would be exception in StateUpdateMessage
-                        # ctor.
-                        self.error('state not valid {}'.format(state))
+                        # try to continue as it possible that
+                        # 'transmute_and_filter_state' will correct/coerse
+                        # state records to normal format, if not it would be
+                        # exception in StateUpdateMessage ctor.
+                        self.error(
+                            'state not valid {} {}'
+                            .format(state, validator.errors))
                         self.metrics_cnt['not_valid_state'] += 1
 
                     self.debug(
@@ -312,7 +321,8 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                 self.error(
                     'failed to get state subscription with "{}"'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
-            finally:
+            finally:  # pragma nocover
+                # TODO: Is it really needed?
                 close_tx_safe(ch)
                 close_tx_safe(node_ch)
 
