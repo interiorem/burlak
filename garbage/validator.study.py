@@ -38,13 +38,13 @@ schema2 = {
             'type': 'list',
             'items': [
                 {'type': 'string'},
-                {'type': 'integer'},
+                {'type': 'integer', 'min' : 0},
             ],
         },
     },
 }
 
-doc2 = [('app{}'.format(i), str(i)) for i in xrange(1000)]
+doc2 = [ ('app{}'.format(i), -i) for i in xrange(1000)]
 
 
 print 'doc2 ready'

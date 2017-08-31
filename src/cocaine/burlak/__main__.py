@@ -21,7 +21,7 @@ from .config import Config
 from .helpers import SecureServiceFabric
 
 from .uniresis import catchup_an_uniresis
-from .web import MetricsHandler, StateHandler
+from .web import MetricsHandler, SelfUUID, StateHandler, Uptime
 
 
 APP_LIST_POLL_INTERVAL = 8
@@ -100,11 +100,17 @@ def main(
     if not port:
         port = cfg_port
 
+    uptime = Uptime()
+
     app = web.Application([
         (prefix + r'/state', StateHandler,
             dict(committed_state=committed_state)),
         (prefix + r'/metrics', MetricsHandler,
-            dict(queues=qs, units=units))
+            dict(queues=qs, units=units)),
+        # Used for testing/debugging, not for production, even could
+        # cause problem if suspicious code will know node uuid.
+        (prefix + r'/info', SelfUUID,
+            dict(uniresis_stub=uniresis, uptime=uptime)),
     ])
 
     app.listen(port)

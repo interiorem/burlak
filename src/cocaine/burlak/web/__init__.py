@@ -1,3 +1,3 @@
-from .web import MetricsHandler, StateHandler
+from .web import MetricsHandler, SelfUUID, StateHandler, Uptime
 
-__all__ = ['MetricsHandler', 'StateHandler']
+__all__ = ['MetricsHandler', 'SelfUUID', 'StateHandler', 'Uptime']

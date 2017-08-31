@@ -1,7 +1,7 @@
 import json
 
 from cocaine.burlak import burlak
-from cocaine.burlak.web import MetricsHandler, StateHandler
+from cocaine.burlak.web import MetricsHandler, SelfUUID, StateHandler
 
 import mock
 import pytest
@@ -9,6 +9,11 @@ import pytest
 import tornado.queues
 import tornado.web
 
+from .common import make_future
+
+
+TEST_UUID = 'some_correct_uuid'
+TEST_UPTIME = 100500
 
 test_state = {
     'app1': ['STOPPED', 100500, 0],
@@ -33,7 +38,7 @@ class MetricsMock(burlak.MetricsMixin):
 
 
 @pytest.fixture
-def app():
+def app(mocker):
     input_queue = tornado.queues.Queue()
     adjust_queue = tornado.queues.Queue()
     stop_queue = tornado.queues.Queue()
@@ -54,9 +59,16 @@ def app():
             slayer=MetricsMock(3),
             resurrecter=MetricsMock(4))
 
+    uniresis = mocker.Mock()
+    uniresis.uuid = mocker.Mock(return_value=make_future(TEST_UUID))
+
+    uptime = mocker.Mock()
+    uptime.uptime = mocker.Mock(return_value=TEST_UPTIME)
+
     return tornado.web.Application([
         (r'/state', StateHandler, dict(committed_state=committed_state)),
-        (r'/metrics', MetricsHandler, dict(queues=qs, units=units))
+        (r'/metrics', MetricsHandler, dict(queues=qs, units=units)),
+        (r'/info', SelfUUID, dict(uniresis_stub=uniresis, uptime=uptime)),
     ])
 
 
@@ -85,3 +97,15 @@ def test_get_state(http_client, base_url):
 
     assert response.code == 200
     assert json.loads(response.body) == test_state
+
+
+@pytest.mark.gen_test
+def test_get_uuid(http_client, base_url):
+    response = yield http_client.fetch(base_url + '/info')
+
+    assert response.code == 200
+    assert json.loads(response.body) == \
+        {
+            'uuid': TEST_UUID,
+            'uptime': TEST_UPTIME,
+        }
