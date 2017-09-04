@@ -50,7 +50,11 @@ class SelfUUID(web.RequestHandler):
 
     @gen.coroutine
     def get(self):
-        uuid = yield self.uniresis_stub.uuid()
+        uuid = ''
+        try:
+            uuid = yield self.uniresis_stub.uuid()
+        except Exception:
+            pass
 
         self.write({
             'uuid': uuid,
