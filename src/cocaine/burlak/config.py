@@ -22,7 +22,8 @@ class Config(object):
     DEFAULT_WEB_PORT = 8877
     DEFAULT_WEB_PATH = ''
 
-    DEFAULT_UUID_PATH = '/state'
+    # DEFAULT_UUID_PATH = '/state'
+    DEFAULT_UUID_PATH = '/darkvoice/nodes'
 
     DEFAULT_NODE_SERVICE_NAME = 'node'
     DEFAULT_UNICORN_SERVICE_NAME = 'unicorn'
