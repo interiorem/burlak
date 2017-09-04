@@ -7,7 +7,7 @@ secure:
 unicorn_service_name: big_unicorn
 
 web_path: '/to-heaven'
-uuid_path: '/some/deep/location'
+uuid_path: /some/deep/location
 
 default_profile: isolate_profile
 

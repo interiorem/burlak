@@ -69,7 +69,7 @@ def test_empty_config():
 @pytest.mark.parametrize(
     'config,expect_port,expect_web_path,expect_uuid_path',
     [
-        ('tests/assets/conf1.yaml', 100500, '', '/state'),
+        ('tests/assets/conf1.yaml', 100500, '', Config.DEFAULT_UUID_PATH),
         ('tests/assets/conf2.yaml', 8877, '/to-heaven', '/some/deep/location'),
     ]
 )

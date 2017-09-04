@@ -40,7 +40,7 @@ class DummyProxy():
 
     @gen.coroutine
     def uuid(self):
-        raise gen.Return(self.COCAINE_TEST_UUID)
+        raise gen.Return(DummyProxy.COCAINE_TEST_UUID)
 
 
 def catchup_an_uniresis(use_stub=False, endpoints=None):
