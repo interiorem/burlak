@@ -65,13 +65,15 @@ def make_state_path(prefix, uuid):
 
 @gen.coroutine
 def state_pusher(
-        unicorn, path_prefix, uniresis_stub, working_state,
+        unicorn, path_prefix, uniresis_stub_uuid, working_state,
         max_workers, to_sleep, verify_url, stop_proportion):
 
-    uniresis = catchup_an_uniresis(uniresis_stub)
+    uniresis = catchup_an_uniresis(uniresis_stub_uuid)
 
     uuid = yield uniresis.uuid()
     path = make_state_path(path_prefix, uuid)
+
+    click.secho('pushing load to path {}'.format(path), fg='green')
 
     ch = yield unicorn.get(path)
     _, version = yield ch.rx.get()
@@ -132,8 +134,8 @@ def state_pusher(
     default=UNICORN_STATE_PREFIX,
     help='prefix path to store state in')
 @click.option(
-    '--use-uniresis-stub',
-    is_flag=True, default=False, help='use uniresis stub')
+    '--uniresis-stub-uuid',
+    help='use uniresis stub with specified uuid')
 @click.option(
     '--to-sleep',
     default=DEFAULT_SLEEP_TO_SEC,
@@ -156,7 +158,7 @@ def state_pusher(
     help='randomly stop specified proportion of application'
 )
 def main(
-        uuid_prefix, use_uniresis_stub, to_sleep, state_file, verify_url,
+        uuid_prefix, uniresis_stub_uuid, to_sleep, state_file, verify_url,
         max_workers, proportion):
 
     config = Config()
@@ -180,7 +182,7 @@ def main(
     IOLoop.current().run_sync(
         lambda:
             state_pusher(
-                unicorn, uuid_prefix, use_uniresis_stub, emul_state,
+                unicorn, uuid_prefix, uniresis_stub_uuid, emul_state,
                 max_workers, to_sleep, verify_url, proportion))
 
 

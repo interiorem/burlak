@@ -35,8 +35,7 @@ APP_LIST_POLL_INTERVAL = 8
     default=APP_LIST_POLL_INTERVAL, help='default profile for app running')
 @click.option('--port', help='web iface port')
 @click.option(
-    '--uniresis-stub',
-    is_flag=True, default=False, help='use stub for uniresis uuid')
+    '--uniresis-stub-uuid', help='use uniresis stub with provided uuid')
 @click.option(
     '--dup-to-console',
     is_flag=True, default=False, help='copy logger output to console')
@@ -44,7 +43,7 @@ def main(
         uuid_prefix,
         apps_poll_interval,
         port,
-        uniresis_stub,
+        uniresis_stub_uuid,
         dup_to_console):
 
     config = Config()
@@ -60,7 +59,8 @@ def main(
         *config.secure, endpoints=config.locator_endpoints)
 
     node = Service(config.node_name, config.locator_endpoints)
-    uniresis = catchup_an_uniresis(uniresis_stub, config.locator_endpoints)
+    uniresis = catchup_an_uniresis(
+        uniresis_stub_uuid, config.locator_endpoints)
 
     logger_setup = burlak.LoggerSetup(logging, dup_to_console)
 
@@ -110,7 +110,7 @@ def main(
         # Used for testing/debugging, not for production, even could
         # cause problem if suspicious code will know node uuid.
         (prefix + r'/info', SelfUUID,
-            dict(uniresis_stub=uniresis, uptime=uptime)),
+            dict(uniresis_proxy=uniresis, uptime=uptime)),
     ])
 
     app.listen(port)

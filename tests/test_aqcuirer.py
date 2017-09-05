@@ -11,6 +11,7 @@ from .common import make_future, make_logger_mock, make_mock_channel_with
 
 
 TEST_UUID_PFX = '/test_uuid_prefix'
+TEST_UUID = 'test_uuid1'
 
 apps_lists = [
     ('app1', 'app2', 'app3'),
@@ -131,7 +132,7 @@ def test_state_subscribe_input(acq, mocker):
         ]
     )
 
-    uniresis = catchup_an_uniresis(use_stub=True)
+    uniresis = catchup_an_uniresis(use_stub_uuid=TEST_UUID)
 
     for state, ver in states_list:
         yield acq.subscribe_to_state_updates(

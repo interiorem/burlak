@@ -68,7 +68,7 @@ def app(mocker):
     return tornado.web.Application([
         (r'/state', StateHandler, dict(committed_state=committed_state)),
         (r'/metrics', MetricsHandler, dict(queues=qs, units=units)),
-        (r'/info', SelfUUID, dict(uniresis_stub=uniresis, uptime=uptime)),
+        (r'/info', SelfUUID, dict(uniresis_proxy=uniresis, uptime=uptime)),
     ])
 
 

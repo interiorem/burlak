@@ -38,13 +38,16 @@ class DummyProxy():
 
     COCAINE_TEST_UUID = 'SOME_UUID'
 
+    def __init__(self, uuid=None):
+        self._uuid = uuid if uuid else DummyProxy.COCAINE_TEST_UUID
+
     @gen.coroutine
     def uuid(self):
-        raise gen.Return(DummyProxy.COCAINE_TEST_UUID)
+        raise gen.Return(self._uuid)
 
 
-def catchup_an_uniresis(use_stub=False, endpoints=None):
-    if use_stub:
-        return DummyProxy()
+def catchup_an_uniresis(use_stub_uuid=None, endpoints=None):
+    if use_stub_uuid:
+        return DummyProxy(use_stub_uuid)
     else:
         return UniresisProxy(endpoints)

@@ -290,6 +290,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     #
                     # Bench results:
                     # dict with 1000 records (apps) is validated for ~ 100 ms
+                    # on core-i7 notebook.
                     #
                     if not validator.validate({'state': state}):
                         # If state isn't valid, report to log as error, but
@@ -306,15 +307,18 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                         'subscribe: got subscribed state {}'
                         .format(state))
 
+                    # Note that while it is second point of failure here,
+                    # in case of error it would be resubscription and last
+                    # state would be requested again.
                     node_ch = yield node.list()
-                    app_list = yield node_ch.rx.get()
+                    apps_list = yield node_ch.rx.get()
 
                     self.debug(
                         'got running apps on state update {}'
-                        .format(app_list))
+                        .format(apps_list))
 
                     yield self.input_queue.put(
-                        StateUpdateMessage(state, app_list, version))
+                        StateUpdateMessage(state, apps_list, version))
                     self.metrics_cnt['last_state_app_count'] = len(state)
 
             except Exception as e:  # pragma nocover
@@ -528,7 +532,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             command = yield self.control_queue.get()
 
             self.debug(
-                'bless: state {}, state_ver {}, do_adjust? {}, '
+                'control task: state {}, state_ver {}, do_adjust? {}, '
                 'to_stop {}, to_run {}'
                 .format(
                     command.state,

@@ -11,10 +11,8 @@ TESTING_UUID = 'TEST_UUID'
 
 @pytest.mark.gen_test
 def test_uniresis():
-    from cocaine.burlak.uniresis import DummyProxy
-
-    uuid = yield catchup_an_uniresis(use_stub=True).uuid()
-    assert uuid == DummyProxy.COCAINE_TEST_UUID
+    uuid = yield catchup_an_uniresis(use_stub_uuid=TESTING_UUID).uuid()
+    assert uuid == TESTING_UUID
 
 
 @pytest.mark.gen_test
@@ -23,7 +21,7 @@ def test_uniresis_stub(mocker):
         Service, 'uuid', create=True,
         return_value=make_future(MockChannel(TESTING_UUID)))
 
-    uniresis = catchup_an_uniresis(use_stub=False)
+    uniresis = catchup_an_uniresis()
 
     uuid = yield uniresis.uuid()
     assert uuid == TESTING_UUID

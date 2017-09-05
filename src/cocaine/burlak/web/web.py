@@ -44,16 +44,16 @@ class StateHandler(web.RequestHandler):
 
 
 class SelfUUID(web.RequestHandler):
-    def initialize(self, uniresis_stub, uptime):
-        self.uniresis_stub = uniresis_stub
+    def initialize(self, uniresis_proxy, uptime):
+        self.uniresis_proxy = uniresis_proxy
         self.uptime = uptime
 
     @gen.coroutine
     def get(self):
         uuid = ''
         try:
-            uuid = yield self.uniresis_stub.uuid()
-        except Exception:
+            uuid = yield self.uniresis_proxy.uuid()
+        except Exception:  # pragma nocover
             pass
 
         self.write({
