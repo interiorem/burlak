@@ -46,18 +46,22 @@ def sample_cos(a, x):
 def verify_state(input_state, result_state):
     for app, (wrk, prof) in input_state.iteritems():
         orca_state = result_state[app]
-        # TODO: check state
+
+        errors=[]
         if orca_state[1] != wrk:
-            raise Exception(
+            errors.append(
                 'wrong number of workers for app {}, input {}, remote {}'
                 .format(app, wrk, orca_state[1]))
+
         if orca_state[2] != prof:
-            raise Exception(
+            errors.append(
                 'wrong profile for app {}, input {}, remote {}'
                 .format(app, prof, orca_state[2]))
 
-    print('state verified at {}'.format(int(time.time())))
-
+    if errors:
+        raise Exception(errors)
+    else:
+        print('state verified at {}'.format(int(time.time())))
 
 def make_state_path(prefix, uuid):
     return '{}/{}'.format(prefix, uuid)
