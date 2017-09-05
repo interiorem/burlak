@@ -484,12 +484,16 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 self.error(
                     "failed to adjust app's {} workers "
-                    "count to {} with err: {}, "
-                    "attempts left {} "
+                    "count to {} with err: {}, attempts left {} "
                     .format(app, to_adjust, se, attempts))
 
                 yield gen.sleep(to_sleep)
                 to_sleep *= DEFAULT_RETRY_EXP_BASE_SEC
+
+                if not attempts:
+                    self.error(
+                        "lost control command for app {} workers count {}"
+                        .format(app, to_adjust))
 
                 assert attempts >= 0
             else:
