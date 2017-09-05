@@ -175,16 +175,16 @@ class VoidLogger(object):  # pragma nocover
 
 class ConsoleLogger(VoidLogger):  # pragma nocover
     def debug(self, msg):
-        print('dbg: {}'.format(msg))
+        print('{} dbg: {}'.format(int(time.time()), msg))
 
     def info(self, msg):
-        print('info: {}'.format(msg))
+        print('{} info: {}'.format(int(time.time()), msg))
 
     def warn(self, msg):
-        print('warn: {}'.format(msg))
+        print('{} warn: {}'.format(int(time.time()), msg))
 
     def error(self, msg):
-        print('error: {}'.format(msg))
+        print('{} error: {}'.format(int(time.time()), msg))
 
 
 class LoggerMixin(object):  # pragma nocover
