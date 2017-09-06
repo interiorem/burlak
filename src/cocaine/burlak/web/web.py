@@ -39,7 +39,18 @@ class StateHandler(web.RequestHandler):
         self.committed_state = committed_state
 
     def get(self):
-        self.write(self.committed_state.as_dict())
+        last_state = self.committed_state.as_dict()
+        request = self.get_arguments('app')
+
+        result = dict()
+        if request:
+            for app in request:
+                if app in last_state:
+                    result[app] = last_state[app]
+        else:
+            result = last_state
+
+        self.write(result)
         self.flush()
 
 

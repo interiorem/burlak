@@ -580,7 +580,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     self.metrics_cnt['rerun_apps_count'] += len(command.to_run)
                     self.info('stopped apps rerunned')
 
-            except Exception as e:
+            except Exception as e:  # pragma nocover
                 self.error(
                     'failed to exec command with error {}: {}'
                     .format(type(e).__name__, e))

@@ -100,6 +100,16 @@ def test_get_state(http_client, base_url):
 
 
 @pytest.mark.gen_test
+def test_get_state_by_app(http_client, base_url):
+    for app in test_state:
+        response = yield http_client.fetch(
+            base_url + '/state?app={}'.format(app))
+
+        assert response.code == 200
+        assert json.loads(response.body) == {app: test_state[app]}
+
+
+@pytest.mark.gen_test
 def test_get_uuid(http_client, base_url):
     response = yield http_client.fetch(base_url + '/info')
 

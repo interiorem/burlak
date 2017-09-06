@@ -47,7 +47,7 @@ def verify_state(input_state, result_state):
     for app, (wrk, prof) in input_state.iteritems():
         orca_state = result_state[app]
 
-        errors=[]
+        errors = []
         if orca_state[1] != wrk:
             errors.append(
                 'wrong number of workers for app {}, input {}, remote {}'
@@ -62,6 +62,7 @@ def verify_state(input_state, result_state):
         raise Exception(errors)
     else:
         print('state verified at {}'.format(int(time.time())))
+
 
 def make_state_path(prefix, uuid):
     return '{}/{}'.format(prefix, uuid)
