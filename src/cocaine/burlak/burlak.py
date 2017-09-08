@@ -239,8 +239,6 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
     def poll_running_apps_list(self, node_service):
         while self.should_run():
             try:
-                self.debug('poll: getting apps list')
-
                 ch = yield node_service.list()
                 app_list = yield ch.rx.get()
 
@@ -456,7 +454,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 .format(app, profile, ce))
 
     @gen.coroutine
-    def adjust(self, app, to_adjust, profile, state_version, tm):
+    def adjust(self, ctl_cache, app, to_adjust, profile, state_version, tm):
         '''Control application workers count
 
         TODO: seen a pattern here, move attempts retry to external patch
@@ -470,8 +468,17 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     'control command to {} with {}'
                     .format(app, to_adjust))
 
-                ch = yield self.node_service.control(app)
+                if app in ctl_cache:
+                    print 'CACHE HIT'
+                    ch = ctl_cache[app]
+                else:
+                    print 'CACHE MISS'
+                    ch = yield self.node_service.control(app)
+                    ctl_cache[app] = ch
+
+                print 'BEFORE WRITE'
                 yield ch.tx.write(to_adjust)
+                print 'AFTER WRITE'
 
                 self.ci_state.mark_running(
                     app, to_adjust, profile, state_version, tm)
@@ -514,23 +521,37 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.error('failed to stop app {} with error: {}'.format(app, e))
 
     @gen.coroutine
-    def filtered_control_apps(self, should_control_app, command):
+    def filtered_control_apps(self, ctl_cache, should_control_app, command):
         '''Control applications from filtered command.to_run list
         '''
         tm = time.time()
         yield [
             self.adjust(
+                ctl_cache,
                 app, int(state_record.workers), state_record.profile,
                 command.state_version, tm)
             for app, state_record in command.state.iteritems()
             if should_control_app(app)
         ]
 
+        self._purge_cache(ctl_cache, command.state)
+
+    def _purge_cache(sefl, ctl_cache, state):
+        to_purge = set(ctl_cache.keys()) - set(state.keys())
+
+        for app in to_purge:
+            close_tx_safe(ctl_cache[app])
+            del ctl_cache[app]
+
     @gen.coroutine
     def blessing_road(self):
 
         # TODO: method not implemented yet, using control_app as stub!
         # control_channel = yield self.node_service.control('Echo')
+
+        # Temporary control channel cache, should be removed after
+        # node.control_app(<Echo>, <Workers>)
+        ctl_ch_cache = dict()
 
         while self.should_run():
             command = yield self.control_queue.get()
@@ -565,6 +586,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 if command.is_state_updated:
                     # Send control to every app in state.
                     yield self.filtered_control_apps(
+                        ctl_ch_cache,
                         lambda _: True,
                         command)
 
@@ -574,6 +596,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     # If app was stopped (crushed), but state wasn't updated
                     # yet, just relaunch app and push last control to it.
                     yield self.filtered_control_apps(
+                        ctl_ch_cache,
                         lambda app: app in command.to_run,
                         command)
 
