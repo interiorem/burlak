@@ -58,7 +58,7 @@ def main(
         Service(config.unicorn_name, config.locator_endpoints),
         *config.secure, endpoints=config.locator_endpoints)
 
-    node_ctl  = Service(config.node_name, config.locator_endpoints)
+    node_ctl = Service(config.node_name, config.locator_endpoints)
     node_list = Service(config.node_name, config.locator_endpoints)
 
     uniresis = catchup_an_uniresis(

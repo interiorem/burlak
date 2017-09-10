@@ -558,7 +558,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             else:
                 break
 
-
     @gen.coroutine
     def blessing_road(self):
 
