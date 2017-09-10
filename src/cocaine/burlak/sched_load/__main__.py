@@ -97,7 +97,7 @@ def state_pusher(
             state = {
                 app: (
                     int(wrk_generators[
-                        i % len(wrk_generators)](max_workers, x)),
+                        i % len(wrk_generators)](max_workers, x)) + 1,
                     random.choice(
                         [
                             prof
