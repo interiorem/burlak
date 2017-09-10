@@ -51,8 +51,11 @@ print 'doc2 ready'
 
 v2 = Validator(schema2)
 print v2.validate({'state' : doc2})
-#for err, msg in v2.errors.iteritems():
-#    print('{} => {}'.format(err, msg))
+
+
+for err, msg in v2.errors.iteritems():
+    print('{} => {}'.format(err, msg))
+
 
 print 'err: {}'.format(v2.errors)
 
