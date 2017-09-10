@@ -21,6 +21,8 @@ from cocaine.exceptions import CocaineError
 from tornado import gen
 from tornado.iostream import StreamClosedError
 
+from .chcache import ChannelsCache, close_tx_safe
+
 
 DEFAULT_RETRY_TIMEOUT_SEC = 10
 DEFAULT_UNKNOWN_VERSIONS = 1
@@ -55,19 +57,6 @@ LoggerSetup = namedtuple('LoggerSetup', [
     'logger',
     'dup_to_console',
 ])
-
-
-def close_tx_safe(ch):  # pragma nocover
-    '''Close transmitter side of the pipe
-
-    Not really needed in current setup, but may be useful for persistent
-    channel of future control implementation.
-
-    '''
-    try:
-        ch.tx.close()
-    except Exception:
-        pass
 
 
 def transmute_and_filter_state(input_state):
@@ -442,7 +431,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         self.control_queue = control_queue
 
     @gen.coroutine
-    def bless(self, app, profile, tm):
+    def start(self, app, profile, tm):
         '''Trying to start application with specified profile
         '''
         try:
@@ -456,7 +445,26 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 .format(app, profile, ce))
 
     @gen.coroutine
-    def adjust(self, app, to_adjust, profile, state_version, tm):
+    def adjust_by_channel(
+            self, app, channels_cache, to_adjust, profile, state_version, tm):
+
+        self.debug(
+            'control command to {} with {}'
+            .format(app, to_adjust))
+
+        ch = yield channels_cache.get_ch(app)
+        yield ch.tx.write(to_adjust)
+
+        self.ci_state.mark_running(
+            app, to_adjust, profile, state_version, tm)
+
+        self.debug(
+            'have adjusted workers count for app {} to {}'
+            .format(app, to_adjust))
+
+    # deprecated: will be removed someday
+    @gen.coroutine
+    def adjust_old(self, app, to_adjust, profile, state_version, tm):
         '''Control application workers count
 
         TODO: seen a pattern here, move attempts retry to external patch
@@ -514,23 +522,50 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.error('failed to stop app {} with error: {}'.format(app, e))
 
     @gen.coroutine
-    def filtered_control_apps(self, should_control_app, command):
+    def control_apps(self, command, channels_cache):
         '''Control applications from filtered command.to_run list
         '''
-        tm = time.time()
-        yield [
-            self.adjust(
-                app, int(state_record.workers), state_record.profile,
-                command.state_version, tm)
-            for app, state_record in command.state.iteritems()
-            if should_control_app(app)
-        ]
+        attempts = DEFAULT_RETRY_ATTEMPTS
+        to_sleep = DEFAULT_RETRY_EXP_BASE_SEC
+
+        reset_cache = False
+        while attempts:
+            try:
+                if reset_cache:
+                    yield channels_cache.reconnect_all()
+
+                tm = time.time()
+                yield [
+                    self.adjust_by_channel(
+                        app, channels_cache,
+                        int(state_record.workers), state_record.profile,
+                        command.state_version, tm)
+                    for app, state_record in command.state.iteritems()
+                ]
+            except Exception as e:
+                attempts -= 1
+
+                self.error(
+                    'failed to send control to apps {}, error {}'
+                    ' attempts left {}'
+                    .format([app for app in command.state], e, attempts))
+
+                assert attempts >= 0
+                reset_cache = True
+
+                yield gen.sleep(to_sleep)
+                to_sleep *= to_sleep
+            else:
+                break
+
 
     @gen.coroutine
     def blessing_road(self):
 
         # TODO: method not implemented yet, using control_app as stub!
         # control_channel = yield self.node_service.control('Echo')
+
+        channels_cache = ChannelsCache(self, self.node_service)
 
         while self.should_run():
             command = yield self.control_queue.get()
@@ -558,28 +593,18 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 # the state, sanity redundant check.
                 tm = time.time()
                 yield [
-                    self.bless(app, command.state[app].profile, tm)
+                    self.start(app, command.state[app].profile, tm)
                     for app in command.to_run if app in command.state
                 ]
 
-                if command.is_state_updated:
+                yield channels_cache.update(command.to_stop, command.to_run)
+
+                if command.is_state_updated or command.to_run:
                     # Send control to every app in state.
-                    yield self.filtered_control_apps(
-                        lambda _: True,
-                        command)
+                    yield self.control_apps(command, channels_cache)
 
                     self.metrics_cnt['state_updates_count'] += 1
                     self.info('state updated')
-                elif command.to_run:
-                    # If app was stopped (crushed), but state wasn't updated
-                    # yet, just relaunch app and push last control to it.
-                    yield self.filtered_control_apps(
-                        lambda app: app in command.to_run,
-                        command)
-
-                    self.metrics_cnt['rerun_apps_count'] += len(command.to_run)
-                    self.info('stopped apps rerunned')
-
             except Exception as e:  # pragma nocover
                 self.error(
                     'failed to exec command with error {}: {}'

@@ -58,7 +58,9 @@ def main(
         Service(config.unicorn_name, config.locator_endpoints),
         *config.secure, endpoints=config.locator_endpoints)
 
-    node = Service(config.node_name, config.locator_endpoints)
+    node_ctl  = Service(config.node_name, config.locator_endpoints)
+    node_list = Service(config.node_name, config.locator_endpoints)
+
     uniresis = catchup_an_uniresis(
         uniresis_stub_uuid, config.locator_endpoints)
 
@@ -72,7 +74,7 @@ def main(
     committed_state = burlak.CommittedState()
 
     apps_elysium = burlak.AppsElysium(
-        logger_setup, committed_state, node, control_queue)
+        logger_setup, committed_state, node_ctl, control_queue)
 
     if not uuid_prefix:
         uuid_prefix = config.uuid_path
@@ -80,14 +82,14 @@ def main(
     # run async poll tasks in date flow reverse order, from sink to source
     io_loop = IOLoop.current()
     io_loop.spawn_callback(apps_elysium.blessing_road)
-
     io_loop.spawn_callback(state_processor.process_loop)
 
     io_loop.spawn_callback(
-        lambda: acquirer.poll_running_apps_list(node))
+        # TODO: make node list constructor parameter
+        lambda: acquirer.poll_running_apps_list(node_list))
     io_loop.spawn_callback(
         lambda: acquirer.subscribe_to_state_updates(
-            unicorn, node, uniresis, uuid_prefix))
+            unicorn, node_list, uniresis, uuid_prefix))
 
     qs = dict(input=input_queue, adjust=control_queue)
     units = dict(
