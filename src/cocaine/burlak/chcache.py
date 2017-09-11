@@ -5,7 +5,7 @@
 #
 from tornado import gen
 
-
+@gen.coroutine
 def close_tx_safe(ch):  # pragma nocover
     '''Close transmitter side of the pipe
 
@@ -14,7 +14,7 @@ def close_tx_safe(ch):  # pragma nocover
 
     '''
     try:
-        ch.tx.close()
+        yield ch.tx.close()
     except Exception:
         pass
 
@@ -38,7 +38,7 @@ class ChannelsCache(object):
 
         while attempts:
             try:
-                yield self.remove(to_remove)
+                yield self.close_and_remove(to_remove)
                 self.logger.info('removed from ch cache {}'.format(to_remove))
 
                 if to_remove:
@@ -60,12 +60,12 @@ class ChannelsCache(object):
                 break
 
     @gen.coroutine
-    def remove(self, to_rem):
+    def close_and_remove(self, to_rem):
         cnt = 0
         for app in to_rem:
             if app in self.channels:
                 self.logger.debug('removing from cache {}'.format(app))
-                close_tx_safe(self.channels[app])
+                yield close_tx_safe(self.channels[app])
                 del self.channels[app]
                 cnt += 1
 

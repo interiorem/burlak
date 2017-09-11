@@ -13,6 +13,7 @@
 #
 import time
 
+from datetime import timedelta
 from collections import defaultdict, namedtuple
 
 from cerberus import Validator
@@ -30,6 +31,7 @@ DEFAULT_UNKNOWN_VERSIONS = 1
 DEFAULT_RETRY_ATTEMPTS = 4
 DEFAULT_RETRY_EXP_BASE_SEC = 2
 
+SYNC_COMPLETION_TIMEOUT_SEC = 60
 
 SELF_NAME = 'app/orca'  # aka 'Killer Whale'
 
@@ -69,33 +71,19 @@ def transmute_and_filter_state(input_state):
     }
 
 
-class RunningAppsMessage(object):
-    def __init__(self, run_list=[]):
-        self.running_apps = set(run_list)
-
-    def get_apps_set(self):
-        return self.running_apps
-
-
 class StateUpdateMessage(object):
-    def __init__(self, state, running_apps, version=-1):
+    def __init__(self, state, version=-1):
         self.state = transmute_and_filter_state(state)
-
-        self.running_apps = running_apps
         self.version = version
 
     def get_state(self):
         return self.state
 
-    def get_running_apps_set(self):
-        return set(self.running_apps)
-
     def get_version(self):
         return self.version
 
     def get_all(self):
-        return \
-            self.get_state(), self.get_running_apps_set(), self.get_version()
+        return self.get_state(), self.get_version()
 
 
 class CommittedState(object):
@@ -218,39 +206,19 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
     }
 
     def __init__(
-            self, logger_setup, input_queue, poll_interval_sec, **kwargs):
+            self, logger_setup, input_queue, **kwargs):
         super(StateAcquirer, self).__init__(logger_setup, **kwargs)
 
         self.input_queue = input_queue
-        self.poll_interval_sec = poll_interval_sec
-
-    @gen.coroutine
-    def poll_running_apps_list(self, node_service):
-        while self.should_run():
-            try:
-                self.debug('poll: getting apps list')
-
-                ch = yield node_service.list()
-                app_list = yield ch.rx.get()
-
-                self.metrics_cnt['polled_running_nodes_count'] = len(app_list)
-                self.info('getting apps list {}'.format(app_list))
-
-                yield self.input_queue.put(RunningAppsMessage(app_list))
-                yield gen.sleep(self.poll_interval_sec)
-            except Exception as e:
-                self.error('failed to poll apps list with "{}"'.format(e))
-                yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
 
     @gen.coroutine
     def subscribe_to_state_updates(self, unicorn, node, uniresis, state_pfx):
         validator = Validator(StateAcquirer.STATE_SCHEMA)
 
         ch = None
-        node_ch = None
-
         while self.should_run():
             try:
+                self.debug('retrieving uuid from uniresis')
                 uuid = yield uniresis.uuid()
 
                 # TODO: validate uuid
@@ -259,13 +227,17 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
                     continue
 
-                self.debug('subscription for path {}'.format(
+                self.debug('subscribing for path {}'.format(
                     make_state_path(state_pfx, uuid)))
 
                 ch = yield unicorn.subscribe(make_state_path(state_pfx, uuid))
 
                 while self.should_run():
+                    self.debug('waiting for state subscription')
                     state, version = yield ch.rx.get()
+                    self.debug(
+                        'subscribe:: got version {} state {}'
+                        .format(version, state))
 
                     assert isinstance(version, int)
 
@@ -292,42 +264,36 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                             .format(state, validator.errors))
                         self.metrics_cnt['not_valid_state'] += 1
 
-                    self.debug(
-                        'subscribe: got subscribed state {}'
-                        .format(state))
-
-                    # Note that while it is second point of failure here,
-                    # in case of error it would be resubscription and last
-                    # state would be requested again.
-                    node_ch = yield node.list()
-                    apps_list = yield node_ch.rx.get()
-
-                    self.debug(
-                        'got running apps on state update {}'
-                        .format(apps_list))
-
                     yield self.input_queue.put(
-                        StateUpdateMessage(state, apps_list, version))
-                    self.metrics_cnt['last_state_app_count'] = len(state)
+                        StateUpdateMessage(state, version))
 
+                    self.metrics_cnt['last_state_app_count'] = len(state)
             except Exception as e:  # pragma nocover
                 self.error(
                     'failed to get state subscription with "{}"'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
             finally:  # pragma nocover
                 # TODO: Is it really needed?
-                close_tx_safe(ch)
-                close_tx_safe(node_ch)
+                yield close_tx_safe(ch)
 
 
 class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
     def __init__(
-            self, logger_setup,
-            input_queue, control_queue, **kwargs):
+            self,
+            node,
+            logger_setup,
+            input_queue, control_queue, sync_queue,
+            poll_interval_sec,
+            **kwargs):
         super(StateAggregator, self).__init__(logger_setup, **kwargs)
+
+        self.node_service = node
 
         self.input_queue = input_queue
         self.control_queue = control_queue
+        self.sync_queue = sync_queue
+
+        self.poll_interval_sec = poll_interval_sec
 
     def make_prof_update_set(self, prev_state, state):
         to_update = []
@@ -343,6 +309,13 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         return set(to_update)
 
     @gen.coroutine
+    def get_running_apps_set(self):
+        ch = yield self.node_service.list()
+        apps_list = yield ch.rx.get()
+
+        raise gen.Return(set(apps_list))
+
+    @gen.coroutine
     def process_loop(self):
 
         running_apps = set()
@@ -351,33 +324,40 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         )
 
         while self.should_run():
+            # used for signaling `queue get` event to run `task_done` later.
+            input_queue_event = False
             is_state_updated = False
-            msg = yield self.input_queue.get()
+            msg = None
 
             try:
-                if isinstance(msg, RunningAppsMessage):
-                    running_apps = msg.get_apps_set()
+                msg = yield self.input_queue.get(
+                    timeout=timedelta(seconds=self.poll_interval_sec))
+                input_queue_event = True
+            except gen.TimeoutError:
+                input_queue_event = False
+                self.info('input_queue timeout')
 
-                    assert isinstance(running_apps, set)
-                    self.debug(
-                        'disp::got running apps list {}'
-                        .format(running_apps))
-                elif isinstance(msg, StateUpdateMessage):
-                    state, running_apps, state_version = msg.get_all()
+            try:
+                running_apps = yield self.get_running_apps_set()
+                self.debug('got running apps list {}'.format(running_apps))
+
+                # Note that `StateUpdateMessage` only massage type currently
+                # supported.
+                if msg and isinstance(msg, StateUpdateMessage):
+                    state, state_version = msg.get_all()
                     is_state_updated = True
 
                     self.debug(
                         'disp::got state update with version {}: {} and '
                         'running apps {}'
                         .format(state_version, state, running_apps))
-                else:
-                    self.error('unknown message type {}'.format(msg))
             except Exception as e:
                 self.error(
                     'failed to get control message with {}'
                     .format(e))
             finally:
-                self.input_queue.task_done()
+                if input_queue_event:
+                    self.input_queue.task_done()
 
             if not state:
                 self.info(
@@ -390,7 +370,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             to_run = update_state_apps_set - running_apps
             to_stop = running_apps - update_state_apps_set
 
-            if is_state_updated:
+            if is_state_updated: # check for porfiles change
                 to_update = self.make_prof_update_set(prev_state, state)
 
                 to_run.update(to_update)
@@ -412,6 +392,19 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 )
                 self.metrics_cnt['total_run_app_commands'] += len(to_run)
 
+                try:
+                    # TODO: more errors check?
+                    # Wait for command completion to avoid races in node service.
+                    self.debug('waiting for command execution completion...')
+                    yield self.sync_queue.get(
+                        timeout=timedelta(seconds=SYNC_COMPLETION_TIMEOUT_SEC))
+                    self.sync_queue.task_done()
+                    self.debug('command completed')
+                except gen.TimeoutError:
+                    self.error(
+                        'fatal error: '
+                        'command execution completion timeout')
+
 
 class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     '''Controls life-time of applications based on supplied state
@@ -421,7 +414,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             logger_setup,
             ci_state,
             node,
-            control_queue,
+            control_queue, sync_queue,
             **kwargs):
         super(AppsElysium, self).__init__(logger_setup, **kwargs)
 
@@ -429,13 +422,16 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
         self.node_service = node
         self.control_queue = control_queue
+        self.sync_queue = sync_queue
 
     @gen.coroutine
     def start(self, app, profile, tm):
         '''Trying to start application with specified profile
         '''
         try:
-            yield self.node_service.start_app(app, profile)
+            ch = yield self.node_service.start_app(app, profile)
+            yield ch.rx.get()
+
             self.info(
                 'starting app {} with profile {}'.format(app, profile))
             self.metrics_cnt['exec_run_app_commands'] += 1
@@ -443,6 +439,21 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.error(
                 'failed to start app {} {} with err: {}'
                 .format(app, profile, ce))
+
+    @gen.coroutine
+    def slay(self, app, state_version, tm):
+        '''Stop/pause application
+        '''
+        try:
+            ch = yield self.node_service.pause_app(app)
+            yield ch.rx.get()
+
+            self.ci_state.mark_stopped(app, state_version, tm)
+            self.metrics_cnt['apps_slayed'] += 1
+
+            self.info('app {} has been stopped'.format(app))
+        except Exception as e:  # pragma nocover
+            self.error('failed to stop app {} with error: {}'.format(app, e))
 
     @gen.coroutine
     def adjust_by_channel(
@@ -462,65 +473,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             'have adjusted workers count for app {} to {}'
             .format(app, to_adjust))
 
-    # deprecated: will be removed someday
-    @gen.coroutine
-    def adjust_old(self, app, to_adjust, profile, state_version, tm):
-        '''Control application workers count
-
-        TODO: seen a pattern here, move attempts retry to external patch
-        '''
-        attempts = DEFAULT_RETRY_ATTEMPTS
-        to_sleep = DEFAULT_RETRY_EXP_BASE_SEC
-
-        while attempts:
-            try:
-                self.debug(
-                    'control command to {} with {}'
-                    .format(app, to_adjust))
-
-                ch = yield self.node_service.control(app)
-                yield ch.tx.write(to_adjust)
-
-                self.ci_state.mark_running(
-                    app, to_adjust, profile, state_version, tm)
-
-                self.debug(
-                    'have adjusted workers count for app {} to {}'
-                    .format(app, to_adjust))
-            except (StreamClosedError, CocaineError) as se:
-                attempts -= 1
-
-                self.error(
-                    "failed to adjust app's {} workers "
-                    "count to {} with err: {}, attempts left {} "
-                    .format(app, to_adjust, se, attempts))
-
-                yield gen.sleep(to_sleep)
-                to_sleep *= DEFAULT_RETRY_EXP_BASE_SEC
-
-                if not attempts:
-                    self.error(
-                        "lost control command for app {} workers count {}"
-                        .format(app, to_adjust))
-
-                assert attempts >= 0
-            else:
-                break
-
-    @gen.coroutine
-    def slay(self, app, state_version, tm):
-        '''Stop/pause application
-        '''
-        try:
-            yield self.node_service.pause_app(app)
-
-            self.ci_state.mark_stopped(app, state_version, tm)
-            self.metrics_cnt['apps_slayed'] += 1
-
-            self.info('app {} has been stopped'.format(app))
-        except Exception as e:  # pragma nocover
-            self.error('failed to stop app {} with error: {}'.format(app, e))
-
     @gen.coroutine
     def control_apps(self, command, channels_cache):
         '''Control applications from filtered command.to_run list
@@ -532,6 +484,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         while attempts:
             try:
                 if reset_cache:
+                    self.debug('chcache::running reconnect_all')
                     yield channels_cache.reconnect_all()
 
                 tm = time.time()
@@ -567,21 +520,25 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         channels_cache = ChannelsCache(self, self.node_service)
 
         while self.should_run():
-            command = yield self.control_queue.get()
-
-            self.debug(
-                'control task: state {}, state_ver {}, do_adjust? {}, '
-                'to_stop {}, to_run {}'
-                .format(
-                    command.state,
-                    command.state_version,
-                    command.is_state_updated,
-                    command.to_stop,
-                    command.to_run,
-                )
-            )
-
             try:
+                self.debug('waiting for control command...')
+                command = yield self.control_queue.get()
+
+                self.debug(
+                    'control task: state {}, state_ver {}, do_adjust? {}, '
+                    'to_stop {}, to_run {}'
+                    .format(
+                        command.state,
+                        command.state_version,
+                        command.is_state_updated,
+                        command.to_stop,
+                        command.to_run,
+                    )
+                )
+
+                self.debug('closing control channels')
+                yield channels_cache.close_and_remove(command.to_stop)
+
                 tm = time.time()
                 yield [
                     self.slay(app, command.state_version, tm)
@@ -596,8 +553,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     for app in command.to_run if app in command.state
                 ]
 
-                yield channels_cache.update(command.to_stop, command.to_run)
-
                 if command.is_state_updated or command.to_run:
                     # Send control to every app in state.
                     yield self.control_apps(command, channels_cache)
@@ -610,7 +565,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     .format(type(e).__name__, e))
 
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
-                # TODO: can throw, do something?
-                # control_channel = yield self.node_service.control('Echo')
             finally:
+                self.debug('sending sync...')
                 self.control_queue.task_done()
+                yield self.sync_queue.put(True)
+                self.debug('send sync ack')
