@@ -27,6 +27,8 @@ from ..uniresis import catchup_an_uniresis
 
 UNICORN_STATE_PREFIX = '/state'
 DEFAULT_SLEEP_TO_SEC = 4
+DEFAULT_SLEEP_ON_ERROR_SEC = 10
+
 X_INC = 0.05
 AMPF = 20
 DEFAULT_DISABLE_PROPORTION = 0.3
@@ -87,6 +89,7 @@ def state_pusher(
 
     if version == -1:
         yield unicorn.create(path, {})
+        version = 0
 
     x = 0
     wrk_generators = [sample_sin, sample_cos]
@@ -131,6 +134,7 @@ def state_pusher(
 
         except Exception as e:
             print('error: {}'.format(e))
+            yield gen.sleep(DEFAULT_SLEEP_ON_ERROR_SEC)
 
 
 @click.command()

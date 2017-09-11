@@ -5,6 +5,7 @@
 #
 from tornado import gen
 
+
 @gen.coroutine
 def close_tx_safe(ch):  # pragma nocover
     '''Close transmitter side of the pipe
@@ -70,6 +71,10 @@ class ChannelsCache(object):
                 cnt += 1
 
         raise gen.Return(cnt)
+
+    @gen.coroutine
+    def close_all(self):
+        yield self.close_and_remove(channels.iterkeys())
 
     @gen.coroutine
     def reconnect_all(self):
