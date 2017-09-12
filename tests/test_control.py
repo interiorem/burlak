@@ -19,14 +19,14 @@ to_run_apps = [
     dict(
         run2=burlak.StateRecord(2, 't2'),
         run3=burlak.StateRecord(3, 't3'),
-        run4=burlak.StateRecord(4, 't4')
+        run4=burlak.StateRecord(4, 't4'),
     ),
     dict(
         run3=burlak.StateRecord(3, 't3'),
         run4=burlak.StateRecord(4, 't4'),
         run5=burlak.StateRecord(5, 't5'),
         run6=burlak.StateRecord(6, 't6'),
-        run7=burlak.StateRecord(7, 't7')
+        run7=burlak.StateRecord(7, 't7'),
     ),
     dict(),
 ]
@@ -70,9 +70,9 @@ def test_stop(elysium, mocker):
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_run(elysium, mocker):
+
     stop_side_effect = [True for _ in to_run_apps]
     stop_side_effect.append(False)
-
     mocker.patch.object(
         burlak.LoopSentry, 'should_run', side_effect=stop_side_effect)
 
@@ -95,8 +95,10 @@ def test_run(elysium, mocker):
         elysium.node_service.start_app.call_count == \
         sum(map(len, to_run_apps))
 
-    assert elysium.node_service.control.call_count == \
-        sum(map(len, to_run_apps))
+    # As control channels are taken from cache now we need count only unique
+    # apps names.
+    assert elysium.node_service_ctl.control.call_count == \
+        len(set(app for command in to_run_apps for app in command))
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
@@ -128,8 +130,8 @@ def test_control(elysium, mocker):
         elysium.node_service.start_app.call_count == \
         sum(map(len, to_run_apps))
     assert \
-        elysium.node_service.control.call_count == \
-        sum(map(len, to_run_apps))
+        elysium.node_service_ctl.control.call_count == \
+        len(set(app for command in to_run_apps for app in command))
 
 
 #
@@ -177,8 +179,8 @@ def test_control_exceptions(elysium, mocker):
         elysium.node_service.start_app.call_count == \
         sum(map(len, to_run_apps))
     assert \
-        elysium.node_service.control.call_count == \
-        sum(map(len, to_run_apps))
+        elysium.node_service_ctl.control.call_count == \
+        len(set(app for command in to_run_apps for app in command))
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
@@ -228,4 +230,5 @@ def test_gapped_control(elysium, mocker):
         elysium.node_service.start_app.call_count == \
         sum(map(len, gapped_states))
     assert \
-        elysium.node_service.control.call_count == sum(map(len, gapped_states))
+        elysium.node_service.control.call_count == \
+        len(set(app for command in gapped_states for app in command))
