@@ -70,12 +70,11 @@ class ChannelsCache(object):
         raise gen.Return(self.channels[app])
 
     @gen.coroutine
-    def get_ch(self, app):
+    def get_ch(self, app, should_close=False):
         if app in self.channels:
             self.logger.debug('ch.cache.get_ch hit for {}'.format(app))
             raise gen.Return(self.channels[app])
 
         self.logger.debug('ch.cache.get_ch miss for {}'.format(app))
-
-        ch = yield self.add_one(app)
+        ch = yield self.add_one(app, should_close)
         raise gen.Return(ch)

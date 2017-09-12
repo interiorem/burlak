@@ -24,7 +24,7 @@ from tornado import gen
 from .chcache import ChannelsCache, close_tx_safe
 
 
-CONTROL_RETRY_ATTEMPTS = 20
+CONTROL_RETRY_ATTEMPTS = 10
 
 DEFAULT_RETRY_TIMEOUT_SEC = 10
 DEFAULT_UNKNOWN_VERSIONS = 1
