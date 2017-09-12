@@ -2,8 +2,8 @@ ppn:
   - ['IsoProcess', 10]
 Echo:
   - ['IsoProcess', 50]
-  - ['IsoProcess2', 5]
+Echo1:
+  - ['IsoProcess', 50]
 Echo2:
   - ['IsoProcess', 50]
-  - ['IsoProcess2', 5]
 

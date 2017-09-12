@@ -7,7 +7,8 @@ import pytest
 
 from tornado import queues
 
-from .common import ASYNC_TESTS_TIMEOUT, make_logger_mock
+from .common import ASYNC_TESTS_TIMEOUT, \
+    make_logger_mock, make_mock_channel_with
 
 
 running_app_lists = [
@@ -49,9 +50,15 @@ state_input = [
 
 @pytest.fixture
 def disp(mocker):
+    node = mocker.Mock()
+    node.list = mocker.Mock(
+        return_value=make_mock_channel_with(['a1', 'a2', 'a3']))
+
     return burlak.StateAggregator(
+        node,
         burlak.LoggerSetup(make_logger_mock(mocker), False),
-        queues.Queue(), queues.Queue())
+        queues.Queue(), queues.Queue(), queues.Queue(),
+        0.01)
 
 
 @pytest.fixture
@@ -61,7 +68,6 @@ def init_state():
             app1=(10, 'TestProfile1'),
             app4=(5, 'TestProfile2'),
         ),
-        [],
         1
     )
 
@@ -115,7 +121,7 @@ def test_state_input(disp, mocker):
 
     for state, running_list, version in state_input:
         yield disp.input_queue.put(
-            burlak.StateUpdateMessage(state, running_list, version))
+            burlak.StateUpdateMessage(state, version))
 
     yield disp.process_loop()
 

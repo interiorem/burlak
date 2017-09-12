@@ -7,7 +7,7 @@ import pytest
 from tornado import queues
 
 from .common import ASYNC_TESTS_TIMEOUT
-from .common import make_future, make_logger_mock, make_mock_channel_with
+from .common import make_logger_mock, make_mock_channel_with
 
 
 TEST_UUID_PFX = '/test_uuid_prefix'
@@ -49,64 +49,7 @@ def acq(mocker):
 
     return burlak.StateAcquirer(
         burlak.LoggerSetup(logger, False),
-        input_queue,
-        0.01)
-
-
-@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
-def test_app_list_input(acq, mocker):
-    node = mocker.Mock()
-    node.list = mock.Mock(
-        side_effect=[
-            make_mock_channel_with(app_list)
-            for app_list in apps_lists
-        ]
-    )
-
-    stop_side_effect = [True for _ in apps_lists]
-    stop_side_effect.append(False)
-
-    mocker.patch.object(
-        burlak.LoopSentry, 'should_run', side_effect=stop_side_effect)
-
-    for tsk in apps_lists:
-        yield acq.poll_running_apps_list(node)
-
-        inp = yield acq.input_queue.get()
-        acq.input_queue.task_done()
-
-        assert isinstance(inp, burlak.RunningAppsMessage)
-        assert inp.get_apps_set() == set(tsk)
-
-
-@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
-def test_app_list_exception(acq, mocker):
-
-    node = mocker.Mock()
-    node.list = mock.Mock(
-        side_effect=[
-            make_mock_channel_with(app_excp_list)
-            for app_excp_list in apps_lists_ecxpt
-        ]
-    )
-
-    stop_side_effect = [True for _ in apps_lists_ecxpt]
-    stop_side_effect.append(False)
-
-    mocker.patch.object(
-        burlak.LoopSentry, 'should_run', side_effect=stop_side_effect)
-
-    mocker.patch('tornado.gen.sleep', return_value=make_future(0))
-
-    for tsk in apps_lists_ecxpt:
-        yield acq.poll_running_apps_list(node)
-
-        if not isinstance(tsk, Exception):
-            inp = yield acq.input_queue.get()
-            acq.input_queue.task_done()
-
-            assert isinstance(inp, burlak.RunningAppsMessage)
-            assert inp.get_apps_set() == set(tsk)
+        input_queue)
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)

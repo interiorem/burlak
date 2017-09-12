@@ -6,6 +6,7 @@ App start/stop:
     ☐ Read initial apps profiles somewhere in sync(atomic) way (seems can't be done yet).
 
 Tests:
+    ☐ Remake test after massive refactoring.
     ☐ tests for exceptions cases.
 
 Metrics:
