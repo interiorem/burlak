@@ -450,7 +450,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         '''Stop/pause application
         '''
         try:
-            print 'stop {}'.format(app)
             ch = yield self.node_service.pause_app(app)
             yield ch.rx.get()
 

@@ -1,3 +1,13 @@
+cocaine-orca (0.1.7) unstable; urgency=medium
+
+  * Control channels cache.
+  * Info web handler.
+  * Secure service adaptor from yet unreleased framework.
+  * Robust uneresis support, uuid could be provided from command line.
+  * Usage of sync queue to avoid some of interferences between cocaine requests. 
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Tue, 12 Sep 2017 16:03:43 +0300
+
 cocaine-orca (0.1.6) unstable; urgency=medium
 
   * locator endpoints could be provided via config.
