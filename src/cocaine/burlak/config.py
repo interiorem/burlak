@@ -5,7 +5,7 @@ import yaml
 
 
 CONFIG_PATHS = [
-    '/etc/cocaine/.cocaiane/tool.yml',
+    '/etc/cocaine/.cocaine/tools.yml',
     '/etc/cocaine/orca.yaml',
     '~/cocaine/orca.yaml',
     '~/.cocaine/orca.yaml',
@@ -22,8 +22,9 @@ class Config(object):
     DEFAULT_WEB_PORT = 8877
     DEFAULT_WEB_PATH = ''
 
+    # TODO: make mandatory and config only
     # DEFAULT_UUID_PATH = '/state'
-    DEFAULT_UUID_PATH = '/darkvoice/nodes'
+    DEFAULT_UUID_PATH = '/darkvoice/states'
 
     DEFAULT_NODE_SERVICE_NAME = 'node'
     DEFAULT_UNICORN_SERVICE_NAME = 'unicorn'
@@ -33,6 +34,7 @@ class Config(object):
     DEFAULT_LOCATOR_HOST = 'localhost'
     DEFAULT_LOCATOR_PORT = 10053
 
+    # TODO: make schema work with tools config
     SCHEMA = {
         'secure': {
             'type': 'dict',
@@ -42,13 +44,14 @@ class Config(object):
                     'type': 'string',
                     'allowed': [
                         'tvm',
+                        'TVM',
                         'promiscuous',
                         'test1', 'test2'
                     ]
                 },
                 'client_id': {'type': 'integer'},
                 'client_secret': {'type': 'string'},
-                'tok_update': {'type': 'integer'},
+                'tok_update': {'type': 'integer', 'required': False},
             },
         },
         'unicorn_service_name': {
@@ -89,9 +92,10 @@ class Config(object):
         },
     }
 
-    def __init__(self):
+    def __init__(self, logger=None):
         self._config = dict()
         self._validator = cerberus.Validator(self.SCHEMA, allow_unknown=True)
+        self._logger = logger
 
     def _validate_raise(self, config):
         if not self._validator.validate(config):  # pragma nocover
@@ -106,15 +110,21 @@ class Config(object):
 
                     config = yaml.safe_load(fl.read())
                     if config:
+                        # TODO: temporary disabled
                         self._validate_raise(config)
                         self._config.update(config)
 
                     parsed.append(conf)
             except Exception as err:
-                print('failed to read config file {}, {}'.format(conf, err))
+                self.err_to_logger(
+                    'failed to read config file {}, {}'.format(conf, err),
+                    True)
 
         if not parsed:  # pragma nocover
             print('no config to read was found in file(s), using defaults.')
+        else:
+            self.info_to_logger(
+                'config updated from files {}'.format(parsed), True)
 
         return len(parsed)
 
@@ -167,3 +177,17 @@ class Config(object):
         return self._config.get(
             'locator_endpoints',
             [[Config.DEFAULT_LOCATOR_HOST, Config.DEFAULT_LOCATOR_PORT], ])
+
+    # TODO: refactor to single method?
+    def err_to_logger(self, msg, to_console=False):
+        if self._logger:
+            self._logger.error(msg)
+        if to_console:
+            print (msg)
+
+    # TODO: refactor to single method?
+    def info_to_logger(self, msg, to_console=False):
+        if self._logger:
+            self._logger.info(msg)
+        if to_console:
+            print (msg)
