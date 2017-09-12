@@ -7,7 +7,7 @@ from tornado import gen
 
 
 @gen.coroutine
-def close_tx_safe(ch):  # pragma nocover
+def close_tx_safe(ch, logger=None):  # pragma nocover
     '''Close transmitter side of the pipe
 
     Not really needed in current setup, but may be useful for persistent
@@ -16,8 +16,9 @@ def close_tx_safe(ch):  # pragma nocover
     '''
     try:
         yield ch.tx.close()
-    except Exception:
-        pass
+    except Exception as e:
+        if logger:
+            logger.error('failed to close channel, err {}'.format(e))
 
 
 #
@@ -30,59 +31,32 @@ class ChannelsCache(object):
 
     def __init__(self, logger, node):
         self.channels = dict()
-        self.node = node
         self.logger = logger
-
-    @gen.coroutine
-    def update(self, to_remove, to_add):
-        attempts = ChannelsCache.DEFAULT_UPDATE_ATTEMPTS
-
-        while attempts:
-            try:
-                yield self.close_and_remove(to_remove)
-                self.logger.info('removed from ch cache {}'.format(to_remove))
-
-                if to_remove:
-                    yield self.reconnect_all()
-                    self.logger.info('cache: all control channels reconnected')
-
-                yield [self.add_one(app) for app in to_add]
-                self.logger.info('added to cache {}'.format(to_add))
-            except Exception as e:
-                attempts -= 1
-
-                self.logger.error(
-                    'failed to update channels cache {} attempts left {}'
-                    .format(e, attempts))
-
-                assert attempts >= 0
-                yield gen.sleep(ChannelsCache.DEFAULT_UPDATE_TIMEOUT_SEC)
-            else:
-                break
+        self.node = node
 
     @gen.coroutine
     def close_and_remove(self, to_rem):
         cnt = 0
         for app in to_rem:
-            if app in self.channels:
-                self.logger.debug('removing from cache {}'.format(app))
-                yield close_tx_safe(self.channels[app])
-                del self.channels[app]
+            result = yield self.close_one(app)
+            if result:
                 cnt += 1
 
         raise gen.Return(cnt)
 
     @gen.coroutine
-    def close_all(self):
-        yield self.close_and_remove(channels.iterkeys())
+    def close_and_remove_all(self):
+        yield self.close_and_remove(list(self.channels.iterkeys()))
 
     @gen.coroutine
-    def reconnect_all(self):
-        for app in self.channels:
-            self.logger.debug('reconnecting control to {}'.format(app))
-            close_tx_safe(self.channels[app])
-            self.channels[app] = yield self.node.control(app)
-            self.logger.info('reconnected control for app {}'.format(app))
+    def close_one(self, app):
+        if app in self.channels:
+            self.logger.debug('removing from cache {}'.format(app))
+            yield close_tx_safe(self.channels[app])
+            del self.channels[app]
+            raise gen.Return(True)
+
+        raise gen.Return(False)
 
     @gen.coroutine
     def add_one(self, app, should_close=False):
@@ -90,7 +64,7 @@ class ChannelsCache(object):
                 self.logger.debug(
                     'ch chache `add_one`: closing ch for {}'
                     .format(app))
-                close_tx_safe(self.channels[app])
+                yield close_tx_safe(self.channels[app])
 
         self.channels[app] = yield self.node.control(app)
         raise gen.Return(self.channels[app])
@@ -101,7 +75,7 @@ class ChannelsCache(object):
             self.logger.debug('ch.cache.get_ch hit for {}'.format(app))
             raise gen.Return(self.channels[app])
 
-        self.logger.debug('ch.cache.get_ch hit for {}'.format(app))
+        self.logger.debug('ch.cache.get_ch miss for {}'.format(app))
 
         ch = yield self.add_one(app)
         raise gen.Return(ch)

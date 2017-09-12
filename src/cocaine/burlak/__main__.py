@@ -58,6 +58,7 @@ def main(
         *config.secure, endpoints=config.locator_endpoints)
 
     node = Service(config.node_name, config.locator_endpoints)
+    node_ctl = Service(config.node_name, config.locator_endpoints)
 
     uniresis = catchup_an_uniresis(
         uniresis_stub_uuid, config.locator_endpoints)
@@ -74,7 +75,9 @@ def main(
     committed_state = burlak.CommittedState()
 
     apps_elysium = burlak.AppsElysium(
-        logger_setup, committed_state, node, control_queue, sync_queue)
+        logger_setup, committed_state,
+        node, node_ctl,
+        control_queue, sync_queue)
 
     if not uuid_prefix:
         uuid_prefix = config.uuid_path
