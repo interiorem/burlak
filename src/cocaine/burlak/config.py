@@ -121,10 +121,13 @@ class Config(object):
                     True)
 
         if not parsed:  # pragma nocover
-            print('no config to read was found in file(s), using defaults.')
+            self.info_to_logger(
+                'no config was found in file(s), using defaults.',
+                True)
         else:
             self.info_to_logger(
-                'config updated from files {}'.format(parsed), True)
+                'config has been updated from file(s) {}'.format(parsed),
+                True)
 
         return len(parsed)
 

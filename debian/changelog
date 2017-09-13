@@ -1,3 +1,10 @@
+cocaine-orca (0.1.7-1) unstable; urgency=medium
+
+  * Fixes for config files pathes.
+  * Fixes for config schema.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Wed, 13 Sep 2017 12:41:41 +0300
+
 cocaine-orca (0.1.7) unstable; urgency=medium
 
   * Control channels cache.

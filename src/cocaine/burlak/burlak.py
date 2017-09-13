@@ -227,10 +227,9 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
                     continue
 
-                self.debug('subscribing for path {}'.format(
-                    make_state_path(state_pfx, uuid)))
-
-                ch = yield unicorn.subscribe(make_state_path(state_pfx, uuid))
+                to_listen = make_state_path(state_pfx, uuid)
+                self.info('subscribing for path {}'.format(to_listen))
+                ch = yield unicorn.subscribe(to_listen)
 
                 while self.should_run():
                     self.debug('waiting for state subscription')
@@ -257,7 +256,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                         # If state isn't valid, report to log as error, but
                         # try to continue as it possible that
                         # 'transmute_and_filter_state' will correct/coerse
-                        # state records to normal format, if not it would be
+                        # state records to normal format, if not, it would be
                         # exception in StateUpdateMessage ctor.
                         self.error(
                             'state not valid {} {}'
@@ -269,8 +268,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
                     self.metrics_cnt['last_state_app_count'] = len(state)
             except Exception as e:  # pragma nocover
-                self.error(
-                    'failed to get state subscription with "{}"'.format(e))
+                self.error('failed to get state, error: "{}"'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
             finally:  # pragma nocover
                 # TODO: Is it really needed?

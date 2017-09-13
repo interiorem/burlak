@@ -50,7 +50,7 @@ def main(
     config.update()
 
     input_queue, control_queue, sync_queue = \
-        [queues.Queue() for _ in xrange(3)]
+        (queues.Queue() for _ in xrange(3))
     logging = Logger(config.locator_endpoints)
 
     unicorn = SecureServiceFabric.make_secure_adaptor(
