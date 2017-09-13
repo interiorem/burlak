@@ -32,7 +32,7 @@ DEFAULT_UNKNOWN_VERSIONS = 1
 DEFAULT_RETRY_ATTEMPTS = 4
 DEFAULT_RETRY_EXP_BASE_SEC = 2
 
-SYNC_COMPLETION_TIMEOUT_SEC = 60
+SYNC_COMPLETION_TIMEOUT_SEC = 600
 
 SELF_NAME = 'app/orca'  # aka 'Killer Whale'
 
@@ -323,17 +323,16 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
         while self.should_run():
             # used for signaling `queue get` event to run `task_done` later.
-            input_queue_event = False
             is_state_updated = False
             msg = None
 
             try:
                 msg = yield self.input_queue.get(
                     timeout=timedelta(seconds=self.poll_interval_sec))
-                input_queue_event = True
             except gen.TimeoutError:
-                input_queue_event = False
                 self.info('input_queue timeout')
+            else:
+                self.input_queue.task_done()
 
             try:
                 running_apps = yield self.get_running_apps_set()
@@ -353,9 +352,6 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 self.error(
                     'failed to get control message with {}'
                     .format(e))
-            finally:
-                if input_queue_event:
-                    self.input_queue.task_done()
 
             if not state:
                 self.info(
@@ -393,19 +389,17 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 self.metrics_cnt['total_run_app_commands'] += len(to_run)
 
                 try:
-                    # TODO: more errors check?
                     # Wait for command completion to avoid races in
                     # node service.
                     self.debug('waiting for command execution completion...')
                     yield self.sync_queue.get(
                         timeout=timedelta(seconds=SYNC_COMPLETION_TIMEOUT_SEC))
+                    self.sync_queue.task_done()
                     self.debug('command completed')
                 except gen.TimeoutError:
                     self.error(
                         'fatal error: '
                         'command execution completion timeout')
-                finally:
-                    self.sync_queue.task_done()
 
 
 class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
