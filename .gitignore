@@ -12,3 +12,4 @@ MANIFEST
 /*.egg
 **/.*.swp
 .coverage
+/pcaps
