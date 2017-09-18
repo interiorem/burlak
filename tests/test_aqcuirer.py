@@ -27,8 +27,20 @@ apps_lists_ecxpt = [
     Exception('some', 'error2'),
 ]
 
-
 states_list = [
+    (dict(
+        app1=dict(workers=1, profile='SomeProfile1'),
+        app2=dict(workers=2, profile='SomeProfile2'),
+        app3=dict(workers=3, profile='SomeProfile3'),
+    ), 0),
+    (dict(
+        app3=dict(workers=3, profile='SomeProfile3'),
+        app4=dict(workers=4, profile='SomeProfile4'),
+        app5=dict(workers=5, profile='SomeProfile5'),
+    ), 1),
+]
+
+states_list_old = [
     (dict(
         app1=(1, 'SomeProfile1'),
         app2=(2, 'SomeProfile2'),
@@ -86,5 +98,10 @@ def test_state_subscribe_input(acq, mocker):
 
         assert isinstance(inp, burlak.StateUpdateMessage)
 
-        assert inp.get_state() == state
+        awaited_state = {
+            app: burlak.StateRecord(val['workers'], val['profile'])
+            for app, val in state.iteritems()
+        }
+
+        assert inp.get_state() == awaited_state
         assert inp.get_version() == ver

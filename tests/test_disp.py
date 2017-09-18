@@ -18,7 +18,7 @@ running_app_lists = [
     ['zooloo1']
 ]
 
-state_input = [
+state_input_old = [
     (
         dict(
             app1=(1, 'TestProfile1'),
@@ -40,6 +40,35 @@ state_input = [
     (
         dict(
             app6=(1, 'TestProfile1'),
+        ),
+        ['app6'],
+        1,
+    ),
+    (dict(), [], 0)
+]
+
+state_input = [
+    (
+        dict(
+            app1=dict(workers=1, profile='TestProfile1'),
+            app2=dict(workers=2, profile='TestProfile2'),
+            app3=dict(workers=3, profile='TestProfile1'),
+            app4=dict(workers=4, profile='TestProfile2'),
+            app5=dict(workers=5, profile='TestProfile1'),
+        ),
+        ['app1', 'app2'],
+        0,
+    ),
+    (
+        dict(
+            app1=dict(workers=1, profile='TestProfile1'),
+        ),
+        ['app2'],
+        1,
+    ),
+    (
+        dict(
+            app6=dict(workers=1, profile='TestProfile1'),
         ),
         ['app6'],
         1,
