@@ -1,3 +1,9 @@
+cocaine-orca (0.1.7-3) unstable; urgency=medium
+
+  * Adopt code to new state schema.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Mon, 18 Sep 2017 14:44:19 +0300
+
 cocaine-orca (0.1.7-2) unstable; urgency=medium
 
   * Simplify queue ack code.
