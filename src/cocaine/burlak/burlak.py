@@ -66,9 +66,9 @@ def transmute_and_filter_state(input_state):
     '''Converts raw state dictionary to (app => StateRecords) mapping
     '''
     return {
-        app: StateRecord(int(workers), str(profile))
-        for app, (workers, profile) in input_state.iteritems()
-        if workers >= 0
+        app: StateRecord(int(val['workers']), str(val['profile']))
+        for app, val in input_state.iteritems()
+        if val['workers'] >= 0
     }
 
 
@@ -197,11 +197,16 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
         'state': {
             'type': 'dict',
             'valueschema': {
-                'type': 'list',
-                'items': [
-                    {'type': 'integer', 'min': 0},
-                    {'type': 'string'},
-                ],
+                'type': 'dict',
+                'schema': {
+                    'profile': {
+                        'type': 'string',
+                    },
+                    'workers': {
+                        'type': 'integer',
+                        'min': 0,
+                    },
+                },
             },
         },
     }

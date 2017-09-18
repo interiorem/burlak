@@ -46,15 +46,17 @@ def sample_cos(a, x):
 
 
 def verify_state(input_state, result_state):
-    for app, (wrk, prof) in input_state.iteritems():
+    for app, val in input_state.iteritems():
         orca_state = result_state[app]
 
         errors = []
+        wrk = val['workers']
         if orca_state[1] != wrk:
             errors.append(
                 'wrong number of workers for app {}, input {}, remote {}'
                 .format(app, wrk, orca_state[1]))
 
+        prof = val['profile']
         if orca_state[2] != prof:
             errors.append(
                 'wrong profile for app {}, input {}, remote {}'
@@ -98,17 +100,17 @@ def state_pusher(
             x += X_INC
 
             state = {
-                app: (
-                    int(wrk_generators[
+                app: {
+                    'workers': int(wrk_generators[
                         i % len(wrk_generators)](max_workers, x)) + 1,
-                    random.choice(
+                    'profile': random.choice(
                         [
                             prof
                             for (prof, weight) in working_state[app]
                             for p in xrange(int(weight))
                         ]
                     )
-                )
+                }
                 for i, (app, profiles) in enumerate(working_state.iteritems())
             }
 
