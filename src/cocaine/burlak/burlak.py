@@ -471,8 +471,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             except Exception as e:
                 attempts -= 1
                 self.error(
-                    'failed to send control with attempts {}, err {}'
-                    .format(attempts, e))
+                    'failed to send control to `{}` with attempts {}, err {}'
+                    .format(app, attempts, e))
 
                 yield channels_cache.close_one(app)
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
