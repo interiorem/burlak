@@ -194,15 +194,17 @@ class Config(object):
             Config.DEFAULT_STOP_APPS_NOT_IN_STATE)
 
     # TODO: refactor to single method?
-    def err_to_logger(self, msg, to_console=False):
+    def err_to_logger(self, msg, to_console=False):  # pragma nocover
         if self._logger:
             self._logger.error(msg)
-        if to_console:
-            print (msg)
+        self.dump_to_console(msg, to_console)
 
     # TODO: refactor to single method?
-    def info_to_logger(self, msg, to_console=False):
+    def info_to_logger(self, msg, to_console=False):  # pragma nocover
         if self._logger:
             self._logger.info(msg)
+        self.dump_to_console(msg, to_console)
+
+    def dump_to_console(self, msg, to_console=False):  # pragma nocovers
         if to_console:
             print (msg)
