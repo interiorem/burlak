@@ -34,6 +34,8 @@ class Config(object):
     DEFAULT_LOCATOR_HOST = 'localhost'
     DEFAULT_LOCATOR_PORT = 10053
 
+    DEFAULT_STOP_APPS_NOT_IN_STATE = False
+
     # TODO: make schema work with tools config
     SCHEMA = {
         'secure': {
@@ -77,6 +79,10 @@ class Config(object):
         },
         'default_profile': {
             'type': 'string',
+            'required': False,
+        },
+        'stop_apps': {
+            'type': 'boolean',
             'required': False,
         },
         'locator_endpoints': {
@@ -180,6 +186,12 @@ class Config(object):
         return self._config.get(
             'locator_endpoints',
             [[Config.DEFAULT_LOCATOR_HOST, Config.DEFAULT_LOCATOR_PORT], ])
+
+    @property
+    def stop_apps(self):
+        return self._config.get(
+            'stop_apps',
+            Config.DEFAULT_STOP_APPS_NOT_IN_STATE)
 
     # TODO: refactor to single method?
     def err_to_logger(self, msg, to_console=False):
