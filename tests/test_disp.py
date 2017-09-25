@@ -19,35 +19,6 @@ running_app_lists = [
     ['zooloo1']
 ]
 
-state_input_old = [
-    (
-        dict(
-            app1=(1, 'TestProfile1'),
-            app2=(2, 'TestProfile2'),
-            app3=(3, 'TestProfile1'),
-            app4=(4, 'TestProfile2'),
-            app5=(5, 'TestProfile1'),
-        ),
-        ['app1', 'app2'],
-        0,
-    ),
-    (
-        dict(
-            app1=(1, 'TestProfile1'),
-        ),
-        ['app2'],
-        1,
-    ),
-    (
-        dict(
-            app6=(1, 'TestProfile1'),
-        ),
-        ['app6'],
-        1,
-    ),
-    (dict(), [], 0)
-]
-
 state_input = [
     (
         dict(
@@ -74,16 +45,14 @@ state_input = [
         ['app6'],
         1,
     ),
-    (dict(), [], 0)
+    (dict(), ['app7'], 0)
 ]
 
 
 @pytest.fixture
 def disp(mocker):
     node = mocker.Mock()
-    node.list = mocker.Mock(
-        return_value=make_mock_channel_with(['a1', 'a2', 'a3']))
-
+    node.list = mocker.Mock()
     config = mocker.Mock()
 
     return burlak.StateAggregator(
@@ -104,7 +73,6 @@ def init_state():
     )
 
 
-# TODO: repair test
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_state_input(disp, mocker):
     stop_side_effect = [True for _ in state_input]
@@ -115,22 +83,37 @@ def test_state_input(disp, mocker):
 
     assert state_input
 
+    disp.sync_queue = mocker.Mock()
+    disp.sync_queue.get = mocker.Mock(
+        side_effect=[make_mock_channel_with(True) for _ in state_input])
+
+    running_apps_list = []
     for state, running_list, version in state_input:
         yield disp.input_queue.put(
             burlak.StateUpdateMessage(state, version))
+        running_apps_list.append(running_list)
 
-    # disp.node_service.
-    # yield disp.process_loop()
+    disp.node_service.list = mocker.Mock(
+        return_value=make_mock_channel_with(*running_apps_list))
+
+    yield disp.process_loop()
 
     for state, running_list, version in state_input:
         if not state:
             continue
 
-        # command = yield disp.control_queue.get()
-        # state_apps = set(state.iterkeys())
+        command = yield disp.control_queue.get()
+        disp.control_queue.task_done()
 
-        # running_list_set = set(running_list)
+        state_apps = set(state.iterkeys())
+        running_list_set = set(running_list)
 
-        # assert command.to_stop == running_list_set - state_apps
-        # assert command.to_run == state_apps - running_list_set
-        # assert command.state == state
+        assert command.to_stop == running_list_set - state_apps
+        assert command.to_run == state_apps - running_list_set
+
+        normalized_state = {
+            app: burlak.StateRecord(val['workers'], val['profile'])
+            for app, val in state.iteritems()
+        }
+
+        assert command.state == normalized_state

@@ -69,7 +69,6 @@ def acq(mocker):
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_state_subscribe_input(acq, mocker):
-
     stop_side_effect = [True for _ in states_list]
     stop_side_effect.append(True)
     stop_side_effect.append(False)

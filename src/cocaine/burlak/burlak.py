@@ -15,10 +15,7 @@ import time
 
 from collections import defaultdict, namedtuple
 from datetime import timedelta
-
 from cerberus import Validator
-from cocaine.exceptions import CocaineError
-
 from tornado import gen
 
 from .chcache import ChannelsCache, close_tx_safe
@@ -330,7 +327,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 msg = yield self.input_queue.get(
                     timeout=timedelta(seconds=self.poll_interval_sec))
             except gen.TimeoutError:
-                self.info('input_queue timeout')
+                self.debug('input_queue timeout')
             else:
                 self.input_queue.task_done()
 
@@ -488,10 +485,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def blessing_road(self):
-
-        # TODO: method not implemented yet, using control_app as stub!
-        # control_channel = yield self.node_service.control('Echo')
-
         channels_cache = ChannelsCache(self, self.node_service_ctl)
 
         while self.should_run():
