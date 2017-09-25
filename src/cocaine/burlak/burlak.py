@@ -414,6 +414,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             **kwargs):
         super(AppsElysium, self).__init__(context, **kwargs)
 
+        self.context = context
         self.ci_state = ci_state
 
         self.node_service = node
@@ -508,11 +509,12 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 yield channels_cache.close_and_remove(command.to_stop)
 
-                tm = time.time()
-                yield [
-                    self.slay(app, command.state_version, tm)
-                    for app in command.to_stop
-                ]
+                if self.context.config.stop_apps:  # False by default
+                    tm = time.time()
+                    yield [
+                        self.slay(app, command.state_version, tm)
+                        for app in command.to_stop
+                    ]
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.
