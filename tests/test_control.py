@@ -1,4 +1,5 @@
 from cocaine.burlak import burlak
+from cocaine.burlak.config import Config
 from cocaine.burlak.context import Context, LoggerSetup
 
 import pytest
@@ -40,7 +41,7 @@ def elysium(mocker):
     node.pause_app = mocker.Mock(return_value=make_mock_channel_with(0))
     node.control = mocker.Mock(return_value=make_mock_channel_with(0))
 
-    config = mocker.Mock()
+    config = Config()
 
     return burlak.AppsElysium(
         Context(LoggerSetup(make_logger_mock(mocker), False), config),
@@ -61,14 +62,32 @@ def test_stop(elysium, mocker):
             burlak.DispatchMessage(dict(), -1, False, set(stop_apps), set())
         )
 
+    elysium.context.config._config['stop_apps'] = True
     yield elysium.blessing_road()
 
     for apps_list in to_stop_apps:
         for app in apps_list:
-            assert elysium.node_service.called_with(app)
+            assert elysium.node_service.pause_app.called_with(app)
 
     assert elysium.node_service.pause_app.call_count == \
         sum(map(len, to_stop_apps))
+
+
+@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
+def test_stop_apps_disabled(elysium, mocker):
+    stop_side_effect = [True for _ in to_stop_apps]
+    stop_side_effect.append(False)
+
+    mocker.patch.object(
+        burlak.LoopSentry, 'should_run', side_effect=stop_side_effect)
+
+    for stop_apps in to_stop_apps:
+        yield elysium.control_queue.put(
+            burlak.DispatchMessage(dict(), -1, False, set(stop_apps), set())
+        )
+
+    yield elysium.blessing_road()
+    assert elysium.node_service.pause_app.call_count == 0
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
