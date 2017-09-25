@@ -56,12 +56,6 @@ StateRecord = namedtuple('StateRecord', [
 ])
 
 
-LoggerSetup = namedtuple('LoggerSetup', [
-    'logger',
-    'dup_to_console',
-])
-
-
 def transmute_and_filter_state(input_state):
     '''Converts raw state dictionary to (app => StateRecords) mapping
     '''
@@ -137,6 +131,7 @@ class MetricsMixin(object):
         return self.metrics_cnt
 
 
+# TODO: move all logger stuff to separate file
 class VoidLogger(object):  # pragma nocover
     def debug(self, msg):
         pass
@@ -166,12 +161,12 @@ class ConsoleLogger(VoidLogger):  # pragma nocover
 
 
 class LoggerMixin(object):  # pragma nocover
-    def __init__(self, logger_setup, name=SELF_NAME, **kwargs):
+    def __init__(self, context, name=SELF_NAME, **kwargs):
         super(LoggerMixin, self).__init__(**kwargs)
 
-        self.logger = logger_setup.logger
+        self.logger = context.logger_setup.logger
         self.format = '{} :: %s'.format(name)
-        self.console = ConsoleLogger() if logger_setup.dup_to_console \
+        self.console = ConsoleLogger() if context.logger_setup.dup_to_console \
             else VoidLogger()
 
     def debug(self, msg):
@@ -212,8 +207,8 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
     }
 
     def __init__(
-            self, logger_setup, input_queue, **kwargs):
-        super(StateAcquirer, self).__init__(logger_setup, **kwargs)
+            self, context, input_queue, **kwargs):
+        super(StateAcquirer, self).__init__(context, **kwargs)
         self.input_queue = input_queue
 
     @gen.coroutine
@@ -283,12 +278,12 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
     def __init__(
             self,
+            context,
             node,
-            logger_setup,
             input_queue, control_queue, sync_queue,
             poll_interval_sec,
             **kwargs):
-        super(StateAggregator, self).__init__(logger_setup, **kwargs)
+        super(StateAggregator, self).__init__(context, **kwargs)
 
         self.node_service = node
 
@@ -412,12 +407,12 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     '''
     def __init__(
             self,
-            logger_setup,
+            context,
             ci_state,
             node, node_ctl,
             control_queue, sync_queue,
             **kwargs):
-        super(AppsElysium, self).__init__(logger_setup, **kwargs)
+        super(AppsElysium, self).__init__(context, **kwargs)
 
         self.ci_state = ci_state
 

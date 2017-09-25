@@ -18,6 +18,7 @@ from tornado import web
 from tornado.ioloop import IOLoop
 
 from .config import Config
+from .context import Context, LoggerSetup
 from .helpers import SecureServiceFabric
 
 from .uniresis import catchup_an_uniresis
@@ -63,19 +64,21 @@ def main(
     uniresis = catchup_an_uniresis(
         uniresis_stub_uuid, config.locator_endpoints)
 
-    logger_setup = burlak.LoggerSetup(logging, dup_to_console)
+    context = Context(
+        LoggerSetup(logging, dup_to_console), config)
 
     acquirer = burlak.StateAcquirer(
-        logger_setup, input_queue)
+        context, input_queue)
     state_processor = burlak.StateAggregator(
-        node, logger_setup,
+        context,
+        node,
         input_queue, control_queue, sync_queue,
         apps_poll_interval)
 
     committed_state = burlak.CommittedState()
 
     apps_elysium = burlak.AppsElysium(
-        logger_setup, committed_state,
+        context, committed_state,
         node, node_ctl,
         control_queue, sync_queue)
 
