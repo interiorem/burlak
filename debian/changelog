@@ -1,3 +1,11 @@
+cocaine-orca (0.1.7-5) unstable; urgency=medium
+
+  * Version in info web handler generated from debian/changelog.
+  * Renaming of counter metrics.
+  * Errors counters metrics.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Mon, 25 Sep 2017 21:13:32 +0300
+
 cocaine-orca (0.1.7-4) unstable; urgency=medium
 
   * Application stopping disabled by default.
