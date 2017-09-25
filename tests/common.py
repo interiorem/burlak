@@ -43,3 +43,4 @@ class MockChannel(object):
 
         self.tx = mock.Mock()
         self.tx.write = mock.Mock(return_value=make_future(0))
+        self.tx.close = mock.Mock(return_value=make_future(0))

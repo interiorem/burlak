@@ -62,8 +62,7 @@ class ChannelsCache(object):
     def add_one(self, app, should_close=False):
         if should_close and app in self.channels:
                 self.logger.debug(
-                    'ch chache `add_one`: closing ch for {}'
-                    .format(app))
+                    'ch chache `add_one`: closing ch for {}'.format(app))
                 yield close_tx_safe(self.channels[app])
 
         self.channels[app] = yield self.node.control(app)
