@@ -433,10 +433,11 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.info(
                 'starting app {} with profile {}'.format(app, profile))
             self.metrics_cnt['exec_run_app_commands'] += 1
-        except CocaineError as ce:
+        except Exception as e:
             self.error(
                 'failed to start app {} {} with err: {}'
-                .format(app, profile, ce))
+                .format(app, profile, e))
+            self.metrics_cnt['errors_app_start'] += 1
 
     @gen.coroutine
     def slay(self, app, state_version, tm):
@@ -452,6 +453,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.info('app {} has been stopped'.format(app))
         except Exception as e:  # pragma nocover
             self.error('failed to stop app {} with error: {}'.format(app, e))
+            self.metrics_cnt['errors_slay_app'] += 1
 
     @gen.coroutine
     def adjust_by_channel(
@@ -469,6 +471,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 self.error(
                     'failed to send control to `{}` with attempts {}, err {}'
                     .format(app, attempts, e))
+
+                self.metrics_cnt['errors_control_app'] += 1
 
                 yield channels_cache.close_one(app)
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
@@ -515,6 +519,10 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         self.slay(app, command.state_version, tm)
                         for app in command.to_stop
                     ]
+                elif command.to_stop:
+                    self.info(
+                        'to_stop list not empty, '
+                        'but stop_apps flag is disabled')
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.
