@@ -34,7 +34,7 @@ APP_LIST_POLL_INTERVAL = 10
 @click.option(
     '--apps-poll-interval',
     default=APP_LIST_POLL_INTERVAL, help='default profile for app running')
-@click.option('--port', help='web iface port')
+@click.option('--port', type=int, help='web iface port')
 @click.option(
     '--uniresis-stub-uuid', help='use uniresis stub with provided uuid')
 @click.option(
