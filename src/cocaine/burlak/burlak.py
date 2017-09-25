@@ -263,7 +263,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     yield self.input_queue.put(
                         StateUpdateMessage(state, version))
 
-                    self.metrics_cnt['last_state_app_count'] = len(state)
+                    self.metrics_cnt['last_state_apps_count'] = len(state)
             except Exception as e:  # pragma nocover
                 self.error('failed to get state, error: "{}"'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
@@ -383,7 +383,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     )
                 )
 
-                self.metrics_cnt['total_run_app_commands'] += len(to_run)
+                self.metrics_cnt['to_run_commands'] += len(to_run)
 
                 try:
                     # Wait for command completion to avoid races in
@@ -429,7 +429,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
             self.info(
                 'starting app {} with profile {}'.format(app, profile))
-            self.metrics_cnt['exec_run_app_commands'] += 1
+            self.metrics_cnt['apps_started'] += 1
         except Exception as e:
             self.error(
                 'failed to start app {} {} with err: {}'
@@ -445,7 +445,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             yield ch.rx.get()
 
             self.ci_state.mark_stopped(app, state_version, tm)
-            self.metrics_cnt['apps_slayed'] += 1
+            self.metrics_cnt['apps_stopped'] += 1
 
             self.info('app {} has been stopped'.format(app))
         except Exception as e:  # pragma nocover
@@ -536,7 +536,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         for app, state_record in command.state.iteritems()
                     ]
 
-                    self.metrics_cnt['state_updates_count'] += 1
+                    self.metrics_cnt['state_updates'] += 1
                     self.info('state updated')
             except Exception as e:  # pragma nocover
                 self.error(

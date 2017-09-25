@@ -13,6 +13,7 @@ from .common import make_future
 
 
 TEST_UUID = 'some_correct_uuid'
+TEST_VERSION = 0.1
 TEST_UPTIME = 100500
 
 test_state = {
@@ -68,7 +69,11 @@ def app(mocker):
     return tornado.web.Application([
         (r'/state', StateHandler, dict(committed_state=committed_state)),
         (r'/metrics', MetricsHandler, dict(queues=qs, units=units)),
-        (r'/info', SelfUUID, dict(uniresis_proxy=uniresis, uptime=uptime)),
+        (r'/info', SelfUUID,
+            dict(
+                uniresis_proxy=uniresis,
+                uptime=uptime,
+                version=TEST_VERSION)),
     ])
 
 
@@ -118,4 +123,5 @@ def test_get_uuid(http_client, base_url):
         {
             'uuid': TEST_UUID,
             'uptime': TEST_UPTIME,
+            'version': TEST_VERSION,
         }

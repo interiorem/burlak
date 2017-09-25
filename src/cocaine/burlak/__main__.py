@@ -24,6 +24,10 @@ from .helpers import SecureServiceFabric
 from .uniresis import catchup_an_uniresis
 from .web import MetricsHandler, SelfUUID, StateHandler, Uptime
 
+try:
+    from .ver import __version__
+except ImportError:
+    __version__ = 'unknown'
 
 APP_LIST_POLL_INTERVAL = 10
 
@@ -118,7 +122,7 @@ def main(
         # Used for testing/debugging, not for production, even could
         # cause problem if suspicious code will know node uuid.
         (prefix + r'/info', SelfUUID,
-            dict(uniresis_proxy=uniresis, uptime=uptime)),
+            dict(uniresis_proxy=uniresis, uptime=uptime, version=__version__)),
     ])
 
     app.listen(port)

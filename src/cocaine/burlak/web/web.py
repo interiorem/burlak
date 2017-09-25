@@ -55,9 +55,10 @@ class StateHandler(web.RequestHandler):
 
 
 class SelfUUID(web.RequestHandler):
-    def initialize(self, uniresis_proxy, uptime):
+    def initialize(self, uniresis_proxy, uptime, version):
         self.uniresis_proxy = uniresis_proxy
         self.uptime = uptime
+        self.version = version
 
     @gen.coroutine
     def get(self):
@@ -70,5 +71,6 @@ class SelfUUID(web.RequestHandler):
         self.write({
             'uuid': uuid,
             'uptime': self.uptime.uptime(),
+            'version': self.version,
         })
         self.flush()
