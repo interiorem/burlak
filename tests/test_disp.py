@@ -2,6 +2,7 @@
 # TODO: more test for StateUpdateMessage
 #
 from cocaine.burlak import burlak
+from cocaine.burlak.context import Context, LoggerSetup
 
 import pytest
 
@@ -83,9 +84,11 @@ def disp(mocker):
     node.list = mocker.Mock(
         return_value=make_mock_channel_with(['a1', 'a2', 'a3']))
 
+    config = mocker.Mock()
+
     return burlak.StateAggregator(
         node,
-        burlak.LoggerSetup(make_logger_mock(mocker), False),
+        Context(LoggerSetup(make_logger_mock(mocker), False), config),
         queues.Queue(), queues.Queue(), queues.Queue(),
         0.01)
 
@@ -101,6 +104,7 @@ def init_state():
     )
 
 
+# TODO: repair test
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_state_input(disp, mocker):
     stop_side_effect = [True for _ in state_input]

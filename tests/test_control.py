@@ -1,4 +1,5 @@
 from cocaine.burlak import burlak
+from cocaine.burlak.context import Context, LoggerSetup
 
 import pytest
 
@@ -39,8 +40,10 @@ def elysium(mocker):
     node.pause_app = mocker.Mock(return_value=make_mock_channel_with(0))
     node.control = mocker.Mock(return_value=make_mock_channel_with(0))
 
+    config = mocker.Mock()
+
     return burlak.AppsElysium(
-        burlak.LoggerSetup(make_logger_mock(mocker), False),
+        Context(LoggerSetup(make_logger_mock(mocker), False), config),
         burlak.CommittedState(), node, node,
         queues.Queue(), queues.Queue())
 

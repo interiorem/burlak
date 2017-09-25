@@ -1,4 +1,5 @@
 from cocaine.burlak import burlak
+from cocaine.burlak.context import Context, LoggerSetup
 from cocaine.burlak.uniresis import catchup_an_uniresis
 
 import mock
@@ -59,8 +60,10 @@ def acq(mocker):
     logger = make_logger_mock(mocker)
     input_queue = queues.Queue()
 
+    config = mocker.Mock()
+
     return burlak.StateAcquirer(
-        burlak.LoggerSetup(logger, False),
+        Context(LoggerSetup(logger, False), config),
         input_queue)
 
 
