@@ -14,3 +14,4 @@ MANIFEST
 .coverage
 /pcaps
 **/ver.py
+/garbage/*.dsn

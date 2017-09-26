@@ -3,13 +3,22 @@
 from raven import Client
 from raven.transport.tornado import TornadoHTTPTransport
 
-try:
-    cli = Client('https://sentry.test.yandex-team.ru/cocaine', transport=TornadoHTTPTransport)
-except Exception as err:
-    print('Error {}'.format(err))
+from tornado.ioloop import IOLoop
+from tornado import gen
 
-try:
-    1/0
-except ZeroDivisionError as err:
-    cli.captureException()
+@gen.coroutine
+def async_except(cli):
+    try:
+        1/0
+    except ZeroDivisionError as err:
+        cli.captureException()
+        yield gen.sleep(10)
+    except Exception as err:
+        print('Error {}'.format(err))
 
+def read_dsn(name):
+    with open(name) as f:
+        return f.read().rstrip()
+
+cli = Client(read_dsn('sentry.dsn'), transport=TornadoHTTPTransport)
+IOLoop.current().run_sync(lambda: async_except(cli))
