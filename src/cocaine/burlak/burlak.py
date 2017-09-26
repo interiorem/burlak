@@ -263,7 +263,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     yield self.input_queue.put(
                         StateUpdateMessage(state, version))
 
-                    self.metrics_cnt['last_state_apps_count'] = len(state)
+                    self.metrics_cnt['apps_in_last_state'] = len(state)
             except Exception as e:  # pragma nocover
                 self.error('failed to get state, error: "{}"'.format(e))
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
@@ -434,7 +434,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.error(
                 'failed to start app {} {} with err: {}'
                 .format(app, profile, e))
-            self.metrics_cnt['errors_app_start'] += 1
+            self.metrics_cnt['errors_start_app'] += 1
 
     @gen.coroutine
     def slay(self, app, state_version, tm):

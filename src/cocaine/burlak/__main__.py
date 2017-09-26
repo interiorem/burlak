@@ -103,8 +103,8 @@ def main(
 
     qs = dict(input=input_queue, control=control_queue, sync=sync_queue)
     units = dict(
-        acquisition=acquirer,
-        state=state_processor,
+        state_acquisition=acquirer,
+        state_dispatch=state_processor,
         elysium=apps_elysium)
 
     cfg_port, prefix = config.web_endpoint
