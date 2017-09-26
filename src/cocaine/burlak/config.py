@@ -36,6 +36,8 @@ class Config(object):
 
     DEFAULT_STOP_APPS_NOT_IN_STATE = False
 
+    DEFAULT_SENTRY_DSN = ''
+
     # TODO: make schema work with tools config
     SCHEMA = {
         'secure': {
@@ -83,6 +85,10 @@ class Config(object):
         },
         'stop_apps': {
             'type': 'boolean',
+            'required': False,
+        },
+        'sentry_dsn': {
+            'type': 'string',
             'required': False,
         },
         'locator_endpoints': {
@@ -192,6 +198,10 @@ class Config(object):
         return self._config.get(
             'stop_apps',
             Config.DEFAULT_STOP_APPS_NOT_IN_STATE)
+
+    @property
+    def sentry_dsn(self):
+        return self._config.get('sentry_dsn', Config.DEFAULT_SENTRY_DSN)
 
     # TODO: refactor to single method?
     def err_to_logger(self, msg, to_console=False):  # pragma nocover

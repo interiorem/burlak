@@ -55,9 +55,15 @@ def disp(mocker):
     node.list = mocker.Mock()
     config = mocker.Mock()
 
+    sentry_wrapper = mocker.Mock()
+
     return burlak.StateAggregator(
+        Context(
+            LoggerSetup(make_logger_mock(mocker), False),
+            config,
+            sentry_wrapper
+        ),
         node,
-        Context(LoggerSetup(make_logger_mock(mocker), False), config),
         queues.Queue(), queues.Queue(), queues.Queue(),
         0.01)
 

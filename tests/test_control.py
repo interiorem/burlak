@@ -42,9 +42,14 @@ def elysium(mocker):
     node.control = mocker.Mock(return_value=make_mock_channel_with(0))
 
     config = Config()
+    sentry_wrapper = mocker.Mock()
 
     return burlak.AppsElysium(
-        Context(LoggerSetup(make_logger_mock(mocker), False), config),
+        Context(
+            LoggerSetup(make_logger_mock(mocker), False),
+            config,
+            sentry_wrapper
+        ),
         burlak.CommittedState(), node, node,
         queues.Queue(), queues.Queue())
 

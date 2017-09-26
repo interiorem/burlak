@@ -20,5 +20,9 @@ def read_dsn(name):
     with open(name) as f:
         return f.read().rstrip()
 
-cli = Client(read_dsn('sentry.dsn'), transport=TornadoHTTPTransport)
+cli = Client(
+    read_dsn('sentry.dsn'),
+    transport=TornadoHTTPTransport,
+    release='0.1.1')
+
 IOLoop.current().run_sync(lambda: async_except(cli))

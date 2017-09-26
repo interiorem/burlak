@@ -61,9 +61,10 @@ def acq(mocker):
     input_queue = queues.Queue()
 
     config = mocker.Mock()
+    sentry_wrapper = mocker.Mock()
 
     return burlak.StateAcquirer(
-        Context(LoggerSetup(logger, False), config),
+        Context(LoggerSetup(logger, False), config, sentry_wrapper),
         input_queue)
 
 

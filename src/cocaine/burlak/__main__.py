@@ -20,7 +20,7 @@ from tornado.ioloop import IOLoop
 from .config import Config
 from .context import Context, LoggerSetup
 from .helpers import SecureServiceFabric
-
+from .sentry import SentryClientWrapper
 from .uniresis import catchup_an_uniresis
 from .web import MetricsHandler, SelfUUID, StateHandler, Uptime
 
@@ -68,8 +68,18 @@ def main(
     uniresis = catchup_an_uniresis(
         uniresis_stub_uuid, config.locator_endpoints)
 
+    sentry_wrapper = SentryClientWrapper(logging, config.sentry_dsn)
+
+    if config.sentry_dsn:
+        try:
+            sentry_wrapper.connect()
+        except Exception as e:
+            click.secho('failed to connect to sentry: {}'.format(e), fg='red')
+
     context = Context(
-        LoggerSetup(logging, dup_to_console), config)
+        LoggerSetup(logging, dup_to_console),
+        config,
+        sentry_wrapper)
 
     acquirer = burlak.StateAcquirer(
         context, input_queue)
