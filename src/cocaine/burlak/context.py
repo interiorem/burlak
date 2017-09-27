@@ -15,5 +15,6 @@ LoggerSetup = namedtuple('LoggerSetup', [
 Context = namedtuple('Context', [
     'logger_setup',
     'config',
+    'revision',
     'sentry_wrapper'
 ])

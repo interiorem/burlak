@@ -26,10 +26,13 @@ from .web import MetricsHandler, SelfUUID, StateHandler, Uptime
 
 try:
     from .ver import __version__
+    __version__ = str(version)
 except ImportError:
     __version__ = 'unknown'
 
-APP_LIST_POLL_INTERVAL = 10
+
+# TODO: get from config!
+APP_LIST_POLL_INTERVAL = 15
 
 
 @click.command()
@@ -56,7 +59,7 @@ def main(
 
     input_queue, control_queue, sync_queue = \
         (queues.Queue() for _ in xrange(3))
-    logging = Logger(config.locator_endpoints)
+    logger = Logger(config.locator_endpoints)
 
     unicorn = SecureServiceFabric.make_secure_adaptor(
         Service(config.unicorn_name, config.locator_endpoints),
@@ -68,17 +71,19 @@ def main(
     uniresis = catchup_an_uniresis(
         uniresis_stub_uuid, config.locator_endpoints)
 
-    sentry_wrapper = SentryClientWrapper(logging, config.sentry_dsn)
+    sentry_wrapper = SentryClientWrapper(logger, __version__)
 
-    if config.sentry_dsn:
-        try:
-            sentry_wrapper.connect()
-        except Exception as e:
-            click.secho('failed to connect to sentry: {}'.format(e), fg='red')
+    try:
+        sentry_wrapper.connect(dsn=config.sentry_dsn)
+    except Exception as e:
+        errmsg = 'failed to connect to sentry: {}'.format(e)
+        click.secho(errmsg, fg='red')
+        logger.error(errmsg)
 
     context = Context(
-        LoggerSetup(logging, dup_to_console),
+        LoggerSetup(logger, dup_to_console),
         config,
+        __version__,
         sentry_wrapper)
 
     acquirer = burlak.StateAcquirer(
