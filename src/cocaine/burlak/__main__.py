@@ -26,7 +26,7 @@ from .web import MetricsHandler, SelfUUID, StateHandler, Uptime
 
 try:
     from .ver import __version__
-    __version__ = str(version)
+    __version__ = str(__version__)
 except ImportError:
     __version__ = 'unknown'
 

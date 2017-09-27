@@ -282,6 +282,9 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             **kwargs):
         super(StateAggregator, self).__init__(context, **kwargs)
 
+        self.context = context
+        self.sentry_wrapper = context.sentry_wrapper
+
         self.node_service = node
 
         self.input_queue = input_queue
@@ -349,6 +352,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 self.error(
                     'failed to get control message with {}'
                     .format(e))
+                self.sentry_wrapper.capture_exception()
 
             if not state:
                 self.info(
@@ -397,6 +401,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     self.error(
                         'fatal error: '
                         'command execution completion timeout')
+                    self.sentry_wrapper.capture_exception()
 
 
 class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
@@ -412,6 +417,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         super(AppsElysium, self).__init__(context, **kwargs)
 
         self.context = context
+        self.sentry_wrapper = context.sentry_wrapper
+
         self.ci_state = ci_state
 
         self.node_service = node
@@ -435,6 +442,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 'failed to start app {} {} with err: {}'
                 .format(app, profile, e))
             self.metrics_cnt['errors_start_app'] += 1
+            self.sentry_wrapper.capture_exception()
 
     @gen.coroutine
     def slay(self, app, state_version, tm):
@@ -451,6 +459,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         except Exception as e:  # pragma nocover
             self.error('failed to stop app {} with error: {}'.format(app, e))
             self.metrics_cnt['errors_slay_app'] += 1
+
+            self.sentry_wrapper.capture_exception()
 
     @gen.coroutine
     def adjust_by_channel(
@@ -470,6 +480,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     .format(app, attempts, e))
 
                 self.metrics_cnt['errors_control_app'] += 1
+
+                self.sentry_wrapper.capture_exception()
 
                 yield channels_cache.close_one(app)
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
@@ -542,6 +554,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 self.error(
                     'failed to exec command with error {}: {}'
                     .format(type(e).__name__, e))
+
+                self.sentry_wrapper.capture_exception()
 
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
             finally:
