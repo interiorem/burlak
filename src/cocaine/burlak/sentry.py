@@ -21,9 +21,9 @@ class SentryClientWrapper(object):
         self.dsn = dsn
         self.revision = revision
 
-        self.client = self.connect(dsn, transport, **kwargs)
+        self.client = self._connect(dsn, transport, **kwargs)
 
-    def connect(self, dsn, transport=TornadoHTTPTransport, **kwargs):
+    def _connect(self, dsn, transport=TornadoHTTPTransport, **kwargs):
         self.dsn = dsn
         self.transport = TornadoHTTPTransport
 
