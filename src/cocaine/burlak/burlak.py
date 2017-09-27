@@ -99,6 +99,10 @@ class CommittedState(object):
         self.state.update(
             {app: ('RUNNING', workers, profile, state_version, int(tm))})
 
+    def mark_failed(self, app, profile, state_version, tm):
+        self.state.update(
+            {app: ('FAILED', 0, profile, state_version, int(tm))})
+
     def mark_stopped(self, app, state_version, tm):
         _, workers, profile, _, _ = self.state.get(
             app, ['', 0, self.NA_PROFILE_LABEL, 0, 0])
@@ -365,8 +369,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             to_stop = running_apps - update_state_apps_set
 
             if prev_state == state:
-                self.info(
-                    'got same state as in previous iteration on update, '
+                self.debug(
+                    'got same state as in previous update iteration, '
                     'skipping control step')
                 is_state_updated = False
 
@@ -401,7 +405,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     yield self.sync_queue.get(
                         timeout=timedelta(seconds=SYNC_COMPLETION_TIMEOUT_SEC))
                     self.sync_queue.task_done()
-                    self.debug('command completed')
+                    self.debug('state update command completed')
                 except gen.TimeoutError:
                     self.error(
                         'fatal error: '
@@ -432,22 +436,27 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         self.sync_queue = sync_queue
 
     @gen.coroutine
-    def start(self, app, profile, tm):
+    def start(self, app, profile, state_version, tm, started_set=None):
         '''Trying to start application with specified profile
         '''
         try:
             ch = yield self.node_service.start_app(app, profile)
             yield ch.rx.get()
-
-            self.info(
-                'starting app {} with profile {}'.format(app, profile))
-            self.metrics_cnt['apps_started'] += 1
         except Exception as e:
             self.error(
                 'failed to start app {} {} with err: {}'
                 .format(app, profile, e))
             self.metrics_cnt['errors_start_app'] += 1
             self.sentry_wrapper.capture_exception()
+
+            self.ci_state.mark_failed(app, profile, state_version, tm)
+        else:
+            self.info(
+                'starting app {} with profile {}'.format(app, profile))
+            self.metrics_cnt['apps_started'] += 1
+
+            if started_set is not None:
+                started_set.add(app)
 
     @gen.coroutine
     def slay(self, app, state_version, tm):
@@ -536,14 +545,27 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.
+                started = set()
                 tm = time.time()
                 yield [
-                    self.start(app, command.state[app].profile, tm)
+                    self.start(
+                        app,
+                        command.state[app].profile, command.state_version,
+                        tm,
+                        started)
                     for app in command.to_run if app in command.state
                 ]
 
                 if command.is_state_updated or command.to_run:
-                    # Send control to every app in state.
+                    # Send control to every app in state, except known for
+                    # start up fail.
+                    failed_to_start_set = command.to_run - started
+                    if failed_to_start_set:
+                        self.info(
+                            'control command will be skipped for '
+                            'failed to start apps {}'
+                            .format(failed_to_start_set))
+
                     tm = time.time()
                     yield [
                         self.adjust_by_channel(
@@ -551,6 +573,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                             int(state_record.workers), state_record.profile,
                             command.state_version, tm)
                         for app, state_record in command.state.iteritems()
+                        if app not in failed_to_start_set
                     ]
 
                     self.metrics_cnt['state_updates'] += 1
