@@ -114,6 +114,20 @@ def test_misc_options(config, expect_profile, expect_stop_apps):
 
 
 @pytest.mark.parametrize(
+    'config,expect_dsn',
+    [
+        ('tests/assets/conf1.yaml', ''),
+        ('tests/assets/conf2.yaml', 'https://100400@some.sentry.org'),
+    ]
+)
+def test_sentry_dsn(config, expect_dsn):
+    cfg = Config()
+    cfg.update([config])
+
+    assert cfg.sentry_dsn == expect_dsn
+
+
+@pytest.mark.parametrize(
     'config,expect_loc_endp',
     [
         ('tests/assets/conf1.yaml',

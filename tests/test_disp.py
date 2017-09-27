@@ -61,6 +61,7 @@ def disp(mocker):
         Context(
             LoggerSetup(make_logger_mock(mocker), False),
             config,
+            '0',
             sentry_wrapper
         ),
         node,

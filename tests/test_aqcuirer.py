@@ -64,7 +64,7 @@ def acq(mocker):
     sentry_wrapper = mocker.Mock()
 
     return burlak.StateAcquirer(
-        Context(LoggerSetup(logger, False), config, sentry_wrapper),
+        Context(LoggerSetup(logger, False), config, '0', sentry_wrapper),
         input_queue)
 
 

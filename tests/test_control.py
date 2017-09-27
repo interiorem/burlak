@@ -48,6 +48,7 @@ def elysium(mocker):
         Context(
             LoggerSetup(make_logger_mock(mocker), False),
             config,
+            '0',
             sentry_wrapper
         ),
         burlak.CommittedState(), node, node,
