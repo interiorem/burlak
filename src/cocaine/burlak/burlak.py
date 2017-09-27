@@ -322,7 +322,6 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         )
 
         while self.should_run():
-            # used for signaling `queue get` event to run `task_done` later.
             is_state_updated = False
             msg = None
 
@@ -364,6 +363,12 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
             to_run = update_state_apps_set - running_apps
             to_stop = running_apps - update_state_apps_set
+
+            if prev_state == state:
+                self.info(
+                    'got same state as in previous iteration on update, '
+                    'skipping control step')
+                is_state_updated = False
 
             if is_state_updated:  # check for porfiles change
                 to_update = self.make_prof_update_set(prev_state, state)
