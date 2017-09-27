@@ -71,14 +71,8 @@ def main(
     uniresis = catchup_an_uniresis(
         uniresis_stub_uuid, config.locator_endpoints)
 
-    sentry_wrapper = SentryClientWrapper(logger, __version__)
-
-    try:
-        sentry_wrapper.connect(dsn=config.sentry_dsn)
-    except Exception as e:
-        errmsg = 'failed to connect to sentry: {}'.format(e)
-        click.secho(errmsg, fg='red')
-        logger.error(errmsg)
+    sentry_wrapper = SentryClientWrapper(
+        logger, dsn=config.sentry_dsn, revision=__version__)
 
     context = Context(
         LoggerSetup(logger, dup_to_console),
