@@ -106,5 +106,5 @@ def test_state_subscribe_input(acq, mocker):
             for app, val in state.iteritems()
         }
 
-        assert inp.get_state() == awaited_state
-        assert inp.get_version() == ver
+        assert inp.state == awaited_state
+        assert inp.version == ver
