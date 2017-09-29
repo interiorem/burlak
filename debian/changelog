@@ -1,3 +1,11 @@
+cocaine-orca (0.1.7-9) unstable; urgency=medium
+
+  * Fix for case when state was not updated if cocaine runtime 
+    was restarted and same state was send again by scheduler.
+  * Basic sentry wrapper tests.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Fri, 29 Sep 2017 16:27:21 +0300
+
 cocaine-orca (0.1.7-8) unstable; urgency=medium
 
   * Skip zero diff states updates.
