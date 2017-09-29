@@ -15,3 +15,4 @@ MANIFEST
 /pcaps
 **/ver.py
 /garbage/*.dsn
+/htmlcov
