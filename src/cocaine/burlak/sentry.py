@@ -1,6 +1,6 @@
 # TODO: tests
 #
-from raven import Client
+import raven
 from raven.transport.tornado import TornadoHTTPTransport
 
 
@@ -27,7 +27,7 @@ class SentryClientWrapper(object):
         self.dsn = dsn
         self.transport = TornadoHTTPTransport
 
-        self.client = Client(
+        self.client = raven.Client(
             self.dsn,
             transport=self.transport,
             revision=self.revision,
@@ -38,12 +38,12 @@ class SentryClientWrapper(object):
     def capture_exception(self, **kwargs):
         try:
             return self.client.captureException(**kwargs)
-        except Exception as e:
+        except Exception as e:  # pragma nocover
             self.logger.error(
                 'failed to send exception info to sentry: {}'.format(e))
 
-    def capture_message(self, **kwargs):
+    def capture_message(self, message, **kwargs):
         try:
-            return self.client.captureMessage(**kwargs)
-        except Exception as e:
+            return self.client.captureMessage(message, **kwargs)
+        except Exception as e:  # pragma nocover
             self.logger.error('failed to send info to sentry: {}'.format(e))

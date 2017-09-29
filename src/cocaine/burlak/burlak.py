@@ -64,18 +64,21 @@ def transmute_and_filter_state(input_state):
 
 
 class StateUpdateMessage(object):
-    def __init__(self, state, version=-1):
-        self.state = transmute_and_filter_state(state)
-        self.version = version
+    def __init__(self, state, version, uuid):
+        self._state = transmute_and_filter_state(state)
+        self._version = version
+        self._uuid = uuid
 
-    def get_state(self):
-        return self.state
+    @property
+    def state(self):
+        return self._state
 
-    def get_version(self):
-        return self.version
+    @property
+    def version(self):
+        return self._version
 
     def get_all(self):
-        return self.get_state(), self.get_version()
+        return self._state, self._version, self._uuid
 
 
 class CommittedState(object):
@@ -265,7 +268,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                         self.metrics_cnt['not_valid_state'] += 1
 
                     yield self.input_queue.put(
-                        StateUpdateMessage(state, version))
+                        StateUpdateMessage(state, version, uuid))
 
                     self.metrics_cnt['apps_in_last_state'] = len(state)
             except Exception as e:  # pragma nocover
@@ -325,9 +328,12 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             dict(), dict(), DEFAULT_UNKNOWN_VERSIONS
         )
 
+        last_uuid = None
         while self.should_run():
+
             is_state_updated = False
             msg = None
+            uuid = None
 
             try:
                 msg = yield self.input_queue.get(
@@ -344,7 +350,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 # Note that `StateUpdateMessage` only massage type currently
                 # supported.
                 if msg and isinstance(msg, StateUpdateMessage):
-                    state, state_version = msg.get_all()
+                    state, state_version, uuid = msg.get_all()
                     is_state_updated = True
 
                     self.debug(
@@ -368,11 +374,13 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             to_run = update_state_apps_set - running_apps
             to_stop = running_apps - update_state_apps_set
 
-            if prev_state == state:
+            if last_uuid == uuid and prev_state == state:
                 self.debug(
-                    'got same state as in previous update iteration, '
-                    'skipping control step')
+                    'got same state as in previous update iteration '
+                    'for same uuid, skipping control step')
                 is_state_updated = False
+
+            last_uuid = uuid
 
             if is_state_updated:  # check for porfiles change
                 to_update = self.make_prof_update_set(prev_state, state)
