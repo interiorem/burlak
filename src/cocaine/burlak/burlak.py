@@ -345,7 +345,9 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
             try:
                 running_apps = yield self.get_running_apps_set()
+
                 self.debug('got running apps list {}'.format(running_apps))
+                self.debug('last known uuid is {}'.format(last_uuid))
 
                 # Note that `StateUpdateMessage` only massage type currently
                 # supported.
@@ -354,9 +356,9 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     is_state_updated = True
 
                     self.debug(
-                        'disp::got state update with version {}: {} and '
-                        'running apps {}'
-                        .format(state_version, state, running_apps))
+                        'disp::got state update with version {}: {} uuid {} '
+                        'and running apps {}'
+                        .format(state_version, state, uuid, running_apps))
             except Exception as e:
                 self.error(
                     'failed to get control message with {}'
@@ -488,7 +490,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     def adjust_by_channel(
             self, app, channels_cache, to_adjust, profile, state_version, tm):
 
-        self.debug('control command to {} with {}'.format(app, to_adjust))
+        self.debug('control command to {} with {}...'.format(app, to_adjust))
 
         attempts = CONTROL_RETRY_ATTEMPTS
         while attempts:
@@ -498,8 +500,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             except Exception as e:
                 attempts -= 1
                 self.error(
-                    'failed to send control to `{}` with attempts {}, err {}'
-                    .format(app, attempts, e))
+                    'failed to send control to `{}`, workers {}, with attempts {}, err {}'
+                    .format(app, to_adjust, attempts, e))
 
                 self.metrics_cnt['errors_control_app'] += 1
 

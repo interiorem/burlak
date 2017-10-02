@@ -6,7 +6,11 @@ import yaml
 
 CONFIG_PATHS = [
     '/etc/cocaine/.cocaine/tools.yml',
+    '/etc/cocaine/.cocaine/tools.yaml',
     '/etc/cocaine/orca.yaml',
+    # `orca.dynamic.yaml` is used for template dynamic config per:
+    # DC, cluster, ect.
+    '/etc/cocaine/orca.dynamic.yaml',  # for dynamic sentry config only!
     '~/cocaine/orca.yaml',
     '~/.cocaine/orca.yaml',
 ]

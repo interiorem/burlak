@@ -8,7 +8,7 @@ from .sentry import SentryClientWrapper
 
 __all__ = [
     'AppsElysium', 'StateAcquirer', 'StateAggregator', 'Config',
-    # seems we need to export following classes only for tests
+    # Seems that we need to export following classes only for tests:
     'CommittedState',
     'ChannelsCache',
     'SentryClientWrapper',
