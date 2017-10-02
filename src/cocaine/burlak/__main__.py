@@ -14,7 +14,6 @@ from cocaine.logger import Logger
 from cocaine.services import Service
 
 from tornado import queues
-from tornado import web
 from tornado.ioloop import IOLoop
 
 from .config import Config
@@ -22,7 +21,7 @@ from .context import Context, LoggerSetup
 from .helpers import SecureServiceFabric
 from .sentry import SentryClientWrapper
 from .uniresis import catchup_an_uniresis
-from .web import MetricsHandler, SelfUUID, StateHandler, Uptime
+from .web import Uptime, make_web_app
 
 try:
     from .ver import __version__
@@ -121,20 +120,12 @@ def main(
     if not port:
         port = cfg_port
 
+    # TODO: use non-default address
     uptime = Uptime()
-
-    app = web.Application([
-        (prefix + r'/state', StateHandler,
-            dict(committed_state=committed_state)),
-        (prefix + r'/metrics', MetricsHandler,
-            dict(queues=qs, units=units)),
-        # Used for testing/debugging, not for production, even could
-        # cause problem if suspicious code will know node uuid.
-        (prefix + r'/info', SelfUUID,
-            dict(uniresis_proxy=uniresis, uptime=uptime, version=__version__)),
-    ])
-
+    app = make_web_app(
+        prefix, uptime, uniresis, committed_state, qs, units, __version__)
     app.listen(port)
+
     click.secho('orca is starting...', fg='green')
     IOLoop.current().start()
 

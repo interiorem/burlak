@@ -1,13 +1,12 @@
 import json
 
 from cocaine.burlak import burlak
-from cocaine.burlak.web import MetricsHandler, SelfUUID, StateHandler
+from cocaine.burlak.web import make_web_app
 
 import mock
 import pytest
 
 import tornado.queues
-import tornado.web
 
 from .common import make_future
 
@@ -66,15 +65,8 @@ def app(mocker):
     uptime = mocker.Mock()
     uptime.uptime = mocker.Mock(return_value=TEST_UPTIME)
 
-    return tornado.web.Application([
-        (r'/state', StateHandler, dict(committed_state=committed_state)),
-        (r'/metrics', MetricsHandler, dict(queues=qs, units=units)),
-        (r'/info', SelfUUID,
-            dict(
-                uniresis_proxy=uniresis,
-                uptime=uptime,
-                version=TEST_VERSION)),
-    ])
+    return make_web_app(
+        '', uptime, uniresis, committed_state, qs, units, TEST_VERSION)
 
 
 @pytest.mark.gen_test

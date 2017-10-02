@@ -500,7 +500,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             except Exception as e:
                 attempts -= 1
                 self.error(
-                    'failed to send control to `{}`, workers {}, with attempts {}, err {}'
+                    'failed to send control to `{}`, workers {}, '
+                    'with attempts {}, err {}'
                     .format(app, to_adjust, attempts, e))
 
                 self.metrics_cnt['errors_control_app'] += 1

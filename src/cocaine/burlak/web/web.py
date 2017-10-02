@@ -5,6 +5,23 @@ from tornado import gen
 from tornado import web
 
 
+def make_web_app(
+        prefix, uptime, uniresis, committed_state, qs, units, version):
+    return web.Application([
+        (prefix + r'/state', StateHandler,
+            dict(committed_state=committed_state)),
+        (prefix + r'/metrics', MetricsHandler,
+            dict(queues=qs, units=units)),
+        # Used for testing/debugging, not for production, even could
+        # cause problem if suspicious code will know node uuid.
+        (prefix + r'/info', SelfUUID,
+            dict(
+                uniresis_proxy=uniresis,
+                uptime=uptime,
+                version=version)),
+    ], debug=False)
+
+
 class Uptime(object):  # pragma nocover
     def __init__(self):
         self.start_time = time.time()
