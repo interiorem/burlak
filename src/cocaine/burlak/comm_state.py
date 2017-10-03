@@ -8,7 +8,7 @@ class CommittedState(object):
     State record format:
         <app name> : (<STATE>, <WORKERS COUNT>, <TIMESTAMP>)
 
-        <STATE> - (RUNNING|STOPPED)
+        <STATE> - (STARTED|STOPPED)
         <TIMESTAMP> - last state update time
     """
 
@@ -32,7 +32,7 @@ class CommittedState(object):
         self.state.update(
             {
                 app: CommittedState.Record(
-                    'RUNNING',
+                    'STARTED',
                     workers,
                     profile,
                     state_version,

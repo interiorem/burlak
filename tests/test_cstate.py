@@ -4,9 +4,9 @@ import pytest
 
 
 all_runnung_state = dict(
-    app1=('RUNNING', 1, 'a', 3, 2),
-    app2=('RUNNING', 2, 'b', 2, 2),
-    app3=('RUNNING', 3, 'c', 1, 2),
+    app1=('STARTED', 1, 'a', 3, 2),
+    app2=('STARTED', 2, 'b', 2, 2),
+    app3=('STARTED', 3, 'c', 1, 2),
 )
 
 all_stopped_state = dict(
@@ -16,11 +16,11 @@ all_stopped_state = dict(
 )
 
 mixed_state = dict(
-    app1=('RUNNING', 1, 'a', 3, 2),
+    app1=('STARTED', 1, 'a', 3, 2),
     app2=('STOPPED', 0, CommittedState.NA_PROFILE_LABEL, 1, 20),
-    app3=('RUNNING', 3, 'b', 2, 2),
+    app3=('STARTED', 3, 'b', 2, 2),
     app4=('STOPPED', 0, CommittedState.NA_PROFILE_LABEL, 2, 2),
-    app5=('RUNNING', 3, 'c', 1, 5),
+    app5=('STARTED', 3, 'c', 1, 5),
     app6=('STOPPED', 0, CommittedState.NA_PROFILE_LABEL, 3, 50),
 )
 
@@ -29,7 +29,7 @@ def init_state(ci, state):
     for k, (st, wrk, prof, ver, ts) in state.iteritems():
         if st == 'STOPPED':
             ci.mark_stopped(k, ver, ts)
-        elif st == 'RUNNING':
+        elif st == 'STARTED':
             ci.mark_running(k, wrk, prof, ver, ts)
 
 

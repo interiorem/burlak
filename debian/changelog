@@ -1,3 +1,12 @@
+cocaine-orca (0.1.7-10) unstable; urgency=medium
+
+  * Refactoring: move committed state class to separate file.
+  * Refactoring: move web app instance creation from __main__ to .web folder.
+  * Add method to remove expired stopped apps record from committed state.
+  * Score of new count metrics.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Tue, 03 Oct 2017 16:25:22 +0300
+
 cocaine-orca (0.1.7-9) unstable; urgency=medium
 
   * Fix for case when state was not updated if cocaine runtime 
