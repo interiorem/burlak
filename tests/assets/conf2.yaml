@@ -15,3 +15,5 @@ locator_endpoints: [ ['host1', 100500], ['host2', 42] ]
 stop_apps: True
 
 sentry_dsn: https://100400@some.sentry.org
+
+expire_stopped: 42

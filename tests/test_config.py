@@ -99,18 +99,23 @@ def test_service_names(config, expect_unicorn_name, expect_node_name):
 
 
 @pytest.mark.parametrize(
-    'config,expect_profile,expect_stop_apps',
+    'config,expect_profile,expect_stop_apps,expect_expire_stopped',
     [
-        ('tests/assets/conf1.yaml', 'default', False),
-        ('tests/assets/conf2.yaml', 'isolate_profile', True),
+        (
+            'tests/assets/conf1.yaml', 'default', False,
+            Config.DEFAULT_EXPIRE_STOPPED_SEC,
+        ),
+        ('tests/assets/conf2.yaml', 'isolate_profile', True, 42),
     ]
 )
-def test_misc_options(config, expect_profile, expect_stop_apps):
+def test_misc_options(
+        config, expect_profile, expect_stop_apps, expect_expire_stopped):
     cfg = Config()
     cfg.update([config])
 
     assert cfg.default_profile == expect_profile
     assert cfg.stop_apps == expect_stop_apps
+    assert cfg.expire_stopped == expect_expire_stopped
 
 
 @pytest.mark.parametrize(
