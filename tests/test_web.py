@@ -17,9 +17,9 @@ TEST_VERSION = 0.1
 TEST_UPTIME = 100500
 
 test_state = {
-    'app1': ['STOPPED', 100500, 0],
-    'app2': ['RUNNING', 100501, 1],
-    'app3': ['STOPPED', 100502, 3],
+    'app1': CommittedState.Record('STOPPED', 100500, 1, 3, 100500),
+    'app2': CommittedState.Record('RUNNING', 100501, 2, 2, 100501),
+    'app3': CommittedState.Record('STOPPED', 100502, 3, 1, 100502),
 }
 
 
@@ -51,6 +51,12 @@ def app(mocker):
     committed_state = CommittedState()
     committed_state.as_dict = mock.MagicMock(
         return_value=test_state
+    )
+    committed_state.as_named_dict = mock.MagicMock(
+        return_value={
+            app: record._asdict()
+            for app, record in test_state.iteritems()
+        }
     )
 
     qs = dict(input=input_queue, adjust=adjust_queue, stop=stop_queue)
@@ -94,7 +100,8 @@ def test_get_state(http_client, base_url):
     response = yield http_client.fetch(base_url + '/state')
 
     assert response.code == 200
-    assert json.loads(response.body) == test_state
+    assert json.loads(response.body) == \
+        {app: record._asdict() for app, record in test_state.iteritems()}
 
 
 @pytest.mark.gen_test
@@ -104,7 +111,8 @@ def test_get_state_by_app(http_client, base_url):
             base_url + '/state?app={}'.format(app))
 
         assert response.code == 200
-        assert json.loads(response.body) == {app: test_state[app]}
+        print 'app {} body {}'.format(app, response.body)
+        assert json.loads(response.body) == {app: test_state[app]._asdict()}
 
 
 @pytest.mark.gen_test

@@ -56,7 +56,7 @@ class StateHandler(web.RequestHandler):
         self.committed_state = committed_state
 
     def get(self):
-        last_state = self.committed_state.as_dict()
+        last_state = self.committed_state.as_named_dict()
         request = self.get_arguments('app')
 
         result = dict()
