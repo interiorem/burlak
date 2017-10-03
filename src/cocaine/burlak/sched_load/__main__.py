@@ -51,16 +51,16 @@ def verify_state(input_state, result_state):
 
         errors = []
         wrk = val['workers']
-        if orca_state[1] != wrk:
+        if orca_state['workers'] != wrk:
             errors.append(
                 'wrong number of workers for app {}, input {}, remote {}'
-                .format(app, wrk, orca_state[1]))
+                .format(app, wrk, orca_state['workers']))
 
         prof = val['profile']
-        if orca_state[2] != prof:
+        if orca_state['profile'] != prof:
             errors.append(
                 'wrong profile for app {}, input {}, remote {}'
-                .format(app, prof, orca_state[2]))
+                .format(app, prof, orca_state['profile']))
 
     if errors:
         raise Exception(errors)
