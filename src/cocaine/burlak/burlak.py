@@ -81,39 +81,6 @@ class StateUpdateMessage(object):
         return self._state, self._version, self._uuid
 
 
-class CommittedState(object):
-    """
-    State record format:
-        <app name> : (<STATE>, <WORKERS COUNT>, <TIMESTAMP>)
-
-        <STATE> - (RUNNING|STOPPED)
-        <TIMESTAMP> - last state update time
-    """
-
-    NA_PROFILE_LABEL = 'n/a'
-
-    def __init__(self):
-        self.state = dict()
-
-    def as_dict(self):
-        return self.state
-
-    def mark_running(self, app, workers, profile, state_version, tm):
-        self.state.update(
-            {app: ('RUNNING', workers, profile, state_version, int(tm))})
-
-    def mark_failed(self, app, profile, state_version, tm):
-        self.state.update(
-            {app: ('FAILED', 0, profile, state_version, int(tm))})
-
-    def mark_stopped(self, app, state_version, tm):
-        _, workers, profile, _, _ = self.state.get(
-            app, ['', 0, self.NA_PROFILE_LABEL, 0, 0])
-
-        self.state.update(
-            {app: ('STOPPED', workers, profile, state_version, int(tm))})
-
-
 class LoopSentry(object):  # pragma nocover
     def __init__(self, **kwargs):
         super(LoopSentry, self).__init__(**kwargs)
@@ -284,6 +251,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             self,
             context,
             node,
+            ci_state,
             input_queue, control_queue, sync_queue,
             poll_interval_sec,
             **kwargs):
@@ -299,6 +267,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         self.sync_queue = sync_queue
 
         self.poll_interval_sec = poll_interval_sec
+
+        self.ci_state = ci_state
 
     def make_prof_update_set(self, prev_state, state):
         to_update = []
@@ -344,6 +314,9 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 self.input_queue.task_done()
 
             try:
+                self.ci_state.remove_old_stopped(
+                    self.context.config.expire_stopped)
+
                 running_apps = yield self.get_running_apps_set()
 
                 self.debug('got running apps list {}'.format(running_apps))

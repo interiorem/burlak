@@ -16,6 +16,7 @@ from cocaine.services import Service
 from tornado import queues
 from tornado.ioloop import IOLoop
 
+from .comm_state import CommittedState
 from .config import Config
 from .context import Context, LoggerSetup
 from .helpers import SecureServiceFabric
@@ -79,15 +80,15 @@ def main(
         __version__,
         sentry_wrapper)
 
-    acquirer = burlak.StateAcquirer(
-        context, input_queue)
+    committed_state = CommittedState()
+
+    acquirer = burlak.StateAcquirer(context, input_queue)
     state_processor = burlak.StateAggregator(
         context,
         node,
+        committed_state,
         input_queue, control_queue, sync_queue,
         apps_poll_interval)
-
-    committed_state = burlak.CommittedState()
 
     apps_elysium = burlak.AppsElysium(
         context, committed_state,

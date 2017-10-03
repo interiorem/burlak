@@ -42,6 +42,8 @@ class Config(object):
 
     DEFAULT_SENTRY_DSN = ''
 
+    DEFAULT_EXPIRE_STOPPED_SEC = 600
+
     # TODO: make schema work with tools config
     SCHEMA = {
         'secure': {
@@ -93,6 +95,10 @@ class Config(object):
         },
         'sentry_dsn': {
             'type': 'string',
+            'required': False,
+        },
+        'expire_stopped': {
+            'type': 'integer',
             'required': False,
         },
         'locator_endpoints': {
@@ -206,6 +212,11 @@ class Config(object):
     @property
     def sentry_dsn(self):
         return self._config.get('sentry_dsn', Config.DEFAULT_SENTRY_DSN)
+
+    @property
+    def expire_stopped(self):
+        return self._config.get(
+            'expire_stopped', Config.DEFAULT_EXPIRE_STOPPED_SEC)
 
     # TODO: refactor to single method?
     def err_to_logger(self, msg, to_console=False):  # pragma nocover

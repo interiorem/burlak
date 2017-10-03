@@ -1,3 +1,3 @@
-from .web import make_web_app, Uptime
+from .web import Uptime, make_web_app
 
 __all__ = ['make_web_app', 'Uptime']
