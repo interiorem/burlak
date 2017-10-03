@@ -407,6 +407,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 )
 
                 self.metrics_cnt['to_run_commands'] += len(to_run)
+                self.metrics_cnt['to_stop_commands'] += len(to_stop)
 
                 try:
                     # Wait for command completion to avoid races in
