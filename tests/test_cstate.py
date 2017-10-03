@@ -1,4 +1,4 @@
-from cocaine.burlak import CommittedState
+from cocaine.burlak.comm_state import CommittedState
 
 import pytest
 

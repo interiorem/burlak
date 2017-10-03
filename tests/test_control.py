@@ -1,4 +1,5 @@
 from cocaine.burlak import burlak
+from cocaine.burlak.comm_state import CommittedState
 from cocaine.burlak.config import Config
 from cocaine.burlak.context import Context, LoggerSetup
 
@@ -51,7 +52,8 @@ def elysium(mocker):
             '0',
             sentry_wrapper
         ),
-        burlak.CommittedState(), node, node,
+        CommittedState(),
+        node, node,
         queues.Queue(), queues.Queue())
 
 

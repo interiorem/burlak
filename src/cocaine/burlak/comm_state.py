@@ -69,7 +69,7 @@ class CommittedState(object):
         to_remove = [
             app for app, last_state in self.state.iteritems()
             if last_state.state == 'STOPPED'
-            and last_state.tm < now - expire_span
+            and last_state.time_stamp < now - expire_span
         ]
 
         for app in to_remove:

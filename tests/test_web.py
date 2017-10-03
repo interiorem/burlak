@@ -1,6 +1,7 @@
 import json
 
 from cocaine.burlak import burlak
+from cocaine.burlak.comm_state import CommittedState
 from cocaine.burlak.web import make_web_app
 
 import mock
@@ -47,7 +48,7 @@ def app(mocker):
     adjust_queue.qsize = mock.MagicMock(return_value=2)
     stop_queue.qsize = mock.MagicMock(return_value=3)
 
-    committed_state = burlak.CommittedState()
+    committed_state = CommittedState()
     committed_state.as_dict = mock.MagicMock(
         return_value=test_state
     )

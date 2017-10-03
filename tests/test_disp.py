@@ -2,6 +2,7 @@
 # TODO: more test for StateUpdateMessage
 #
 from cocaine.burlak import burlak
+from cocaine.burlak.comm_state import CommittedState
 from cocaine.burlak.context import Context, LoggerSetup
 
 import pytest
@@ -65,6 +66,7 @@ def disp(mocker):
             sentry_wrapper
         ),
         node,
+        CommittedState(),
         queues.Queue(), queues.Queue(), queues.Queue(),
         0.01)
 
