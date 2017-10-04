@@ -5,3 +5,5 @@ secure:
 
 node_service_name: some_other_node
 port: 100500
+
+console_log_level: 100
