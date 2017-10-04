@@ -3,6 +3,7 @@ import os
 import cerberus
 import yaml
 
+from .logger import ConsoleLogger
 
 CONFIG_PATHS = [
     '/etc/cocaine/.cocaine/tools.yml',
@@ -43,6 +44,8 @@ class Config(object):
     DEFAULT_SENTRY_DSN = ''
 
     DEFAULT_EXPIRE_STOPPED_SEC = 600
+
+    DEFAULT_CONSOLE_LOGGER_LEVEL = int(ConsoleLogger.ERROR) + 1
 
     # TODO: make schema work with tools config
     SCHEMA = {
@@ -98,6 +101,10 @@ class Config(object):
             'required': False,
         },
         'expire_stopped': {
+            'type': 'integer',
+            'required': False,
+        },
+        'console_log_level': {  # see ConsoleLogger.LEVELS for valie values
             'type': 'integer',
             'required': False,
         },
@@ -217,6 +224,11 @@ class Config(object):
     def expire_stopped(self):
         return self._config.get(
             'expire_stopped', Config.DEFAULT_EXPIRE_STOPPED_SEC)
+
+    @property
+    def console_log_level(self):
+        return self._config.get(
+            'console_log_level', Config.DEFAULT_CONSOLE_LOGGER_LEVEL)
 
     # TODO: refactor to single method?
     def err_to_logger(self, msg, to_console=False):  # pragma nocover

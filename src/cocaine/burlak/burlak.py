@@ -19,7 +19,7 @@ from cerberus import Validator
 from tornado import gen
 
 from .chcache import ChannelsCache, close_tx_safe
-
+from .logger import ConsoleLogger, VoidLogger
 
 CONTROL_RETRY_ATTEMPTS = 10
 
@@ -102,42 +102,14 @@ class MetricsMixin(object):
         return self.metrics_cnt
 
 
-# TODO: move all logger stuff to separate file
-class VoidLogger(object):  # pragma nocover
-    def debug(self, msg):
-        pass
-
-    def info(self, msg):
-        pass
-
-    def warn(self, msg):
-        pass
-
-    def error(self, msg):
-        pass
-
-
-class ConsoleLogger(VoidLogger):  # pragma nocover
-    def debug(self, msg):
-        print('{} dbg: {}'.format(int(time.time()), msg))
-
-    def info(self, msg):
-        print('{} info: {}'.format(int(time.time()), msg))
-
-    def warn(self, msg):
-        print('{} warn: {}'.format(int(time.time()), msg))
-
-    def error(self, msg):
-        print('{} error: {}'.format(int(time.time()), msg))
-
-
 class LoggerMixin(object):  # pragma nocover
     def __init__(self, context, name=SELF_NAME, **kwargs):
         super(LoggerMixin, self).__init__(**kwargs)
 
         self.logger = context.logger_setup.logger
         self.format = '{} :: %s'.format(name)
-        self.console = ConsoleLogger() if context.logger_setup.dup_to_console \
+        self.console = ConsoleLogger(context.config.console_log_level) \
+            if context.logger_setup.dup_to_console \
             else VoidLogger()
 
     def debug(self, msg):
