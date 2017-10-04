@@ -49,11 +49,8 @@ APP_LIST_POLL_INTERVAL = 15
     is_flag=True, default=False, help='copy logger output to console')
 @click.option(
     '--console-log-level',
-    # CocaineError.ERROR (max level) + 1 means disabled
     # See CocaineError.LEVELS for valid lavels numbers
-    default=Config.DEFAULT_CONSOLE_LOGGER_LEVEL,
-    help='if console logger is active, setup loglevel'
-)
+    type=int, help='if console logger is active, set loglevel')
 def main(
         uuid_prefix,
         apps_poll_interval,
@@ -65,7 +62,8 @@ def main(
     config = Config()
     config.update()
 
-    config.console_log_level = console_log_level
+    if console_log_level is not None:
+        config.console_log_level = console_log_level
 
     input_queue, control_queue, sync_queue = \
         (queues.Queue() for _ in xrange(3))

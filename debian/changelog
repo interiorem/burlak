@@ -1,3 +1,16 @@
+cocaine-orca (0.1.7-12) unstable; urgency=medium
+
+  * Hot fix: console_log_level from command line is more important then
+    from config.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Wed, 04 Oct 2017 19:14:44 +0300
+
+cocaine-orca (0.1.7-11) unstable; urgency=medium
+
+  * Refactoring of ConsoleLogger stuff + config for log level.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Wed, 04 Oct 2017 17:55:29 +0300
+
 cocaine-orca (0.1.7-10) unstable; urgency=medium
 
   * Refactoring: move committed state class to separate file.
