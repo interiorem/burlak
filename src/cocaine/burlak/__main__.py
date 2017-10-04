@@ -47,15 +47,25 @@ APP_LIST_POLL_INTERVAL = 15
 @click.option(
     '--dup-to-console',
     is_flag=True, default=False, help='copy logger output to console')
+@click.option(
+    '--console-log-level',
+    # CocaineError.ERROR (max level) + 1 means disabled
+    # See CocaineError.LEVELS for valid lavels numbers
+    default=Config.DEFAULT_CONSOLE_LOGGER_LEVEL,
+    help='if console logger is active, setup loglevel'
+)
 def main(
         uuid_prefix,
         apps_poll_interval,
         port,
         uniresis_stub_uuid,
-        dup_to_console):
+        dup_to_console,
+        console_log_level):
 
     config = Config()
     config.update()
+
+    config.console_log_level = console_log_level
 
     input_queue, control_queue, sync_queue = \
         (queues.Queue() for _ in xrange(3))

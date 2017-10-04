@@ -230,6 +230,10 @@ class Config(object):
         return self._config.get(
             'console_log_level', Config.DEFAULT_CONSOLE_LOGGER_LEVEL)
 
+    @console_log_level.setter
+    def console_log_level(self, level):
+        self._config['console_log_level'] = level
+
     # TODO: refactor to single method?
     def err_to_logger(self, msg, to_console=False):  # pragma nocover
         if self._logger:
