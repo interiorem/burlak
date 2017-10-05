@@ -70,7 +70,7 @@ def loop():
 			chs = yield [make_ch(node, app) for app, _ in apps]
 
 			for y in xrange(10):
-				yield [control(c, y+z)  for c in chs]
+				yield [control(c, y+z) for c in chs]
 				yield gen.sleep(1)
 
 			yield [close_ch(c) for c in chs]
