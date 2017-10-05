@@ -502,21 +502,21 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.
-                started = set()
+                started_set = set()
                 tm = time.time()
                 yield [
                     self.start(
                         app,
                         command.state[app].profile, command.state_version,
                         tm,
-                        started)
+                        started_set)
                     for app in command.to_run if app in command.state
                 ]
 
                 if command.is_state_updated or command.to_run:
                     # Send control to every app in state, except known for
                     # start up fail.
-                    failed_to_start_set = command.to_run - started
+                    failed_to_start_set = command.to_run - started_set
                     if failed_to_start_set:
                         self.info(
                             'control command will be skipped for '

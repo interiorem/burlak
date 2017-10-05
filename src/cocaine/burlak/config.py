@@ -45,6 +45,7 @@ class Config(object):
 
     DEFAULT_EXPIRE_STOPPED_SEC = 600
 
+    # Default is skip all console logging.
     DEFAULT_CONSOLE_LOGGER_LEVEL = int(ConsoleLogger.ERROR) + 1
 
     # TODO: make schema work with tools config
