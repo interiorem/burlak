@@ -488,6 +488,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 )
 
                 yield channels_cache.close_and_remove(command.to_stop)
+                # TODO: add timeout config
+                channels_cache.touch_app_cache(600)
 
                 if self.context.config.stop_apps:  # False by default
                     tm = time.time()
