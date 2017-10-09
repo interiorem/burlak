@@ -468,7 +468,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def blessing_road(self):
-        channels_cache = ChannelsCache(self, self.node_service_ctl)
+        channels_cache = ChannelsCache(self)
 
         while self.should_run():
             try:
@@ -486,10 +486,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         command.to_run,
                     )
                 )
-
-                yield channels_cache.close_and_remove(command.to_stop)
-                # TODO: add timeout config
-                channels_cache.touch_app_cache(600)
 
                 if self.context.config.stop_apps:  # False by default
                     tm = time.time()
@@ -524,6 +520,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                             'control command will be skipped for '
                             'failed to start apps {}'
                             .format(failed_to_start_set))
+
+                    yield channels_cache.update(command.state, command.to_stop)
 
                     tm = time.time()
                     yield [
