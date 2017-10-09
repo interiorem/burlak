@@ -21,7 +21,8 @@ from tornado import gen
 from .chcache import ChannelsCache, close_tx_safe
 from .logger import ConsoleLogger, VoidLogger
 
-CONTROL_RETRY_ATTEMPTS = 10
+
+CONTROL_RETRY_ATTEMPTS = 5
 
 DEFAULT_RETRY_TIMEOUT_SEC = 10
 DEFAULT_UNKNOWN_VERSIONS = 1
@@ -521,7 +522,10 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                             'failed to start apps {}'
                             .format(failed_to_start_set))
 
-                    yield channels_cache.update(command.state, command.to_stop)
+                    yield channels_cache.update(
+                        command.to_stop,
+                        command.to_run - failed_to_start_set,
+                        self.context.config.expire_cached_app_sec)
 
                     tm = time.time()
                     yield [

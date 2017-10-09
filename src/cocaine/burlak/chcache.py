@@ -27,12 +27,16 @@ def close_tx_safe(ch, logger=None):  # pragma nocover
 
 
 class _AppsCache(object):
+    '''App services cache with handy control channel creation method
+    '''
+
     Record = namedtuple('Record', [
         'application',
-        'make_timestamp',
+        'touch_timestamp',
     ])
 
-    def __init__(self):
+    def __init__(self, logger):
+        self.logger = logger
         self.apps = dict()
 
     @gen.coroutine
@@ -41,18 +45,26 @@ class _AppsCache(object):
         raise gen.Return(ch)
 
     def _get(self, app):
-        if app not in self.apps:
-            self.apps[app] = _AppsCache.Record(Service(app), time.time())
+        now = time.time()
+        app_service = Service(app) \
+            if app not in self.apps else self.apps[app].application
 
-        return self.apps[app].application
+        self.apps[app] = _AppsCache.Record(app_service, now)
+        return app_service
 
-    def remove_old(self, older_then):
+    def remove_old(self, expire_from_now):
         '''Removes all records accessed before `older_then`'''
+        older_then = time.time() - expire_from_now
+
         to_remove = [
             app
             for app, record in self.apps.iteritems()
-            if record.access_time < older_then
+            if record.touch_timestamp < older_then
         ]
+
+        self.logger.debug(
+            'removing elder applications from cach: {}'
+            .format(to_remove))
 
         self.remove(to_remove)
         return len(to_remove)
@@ -62,18 +74,14 @@ class _AppsCache(object):
             if app in self.apps:
                 del self.apps[app]
 
-    def keep(self, to_keep):
-        '''Remove apps not in `to_keep` list'''
-        self.remove(set(self.apps.iterkeys()) - set(to_keep))
+    def update(self, to_add, expire_from_now=None):
+        if expire_from_now is not None:
+            self.remove_old(expire_from_now)
 
-    def update(self, apps):
-        for app in apps:
+        for app in to_add:
             self._get(app)
 
 
-#
-# TODO: exception handling, retries on error
-#
 class ChannelsCache(object):
 
     DEFAULT_UPDATE_ATTEMPTS = 3
@@ -82,7 +90,7 @@ class ChannelsCache(object):
     def __init__(self, logger):
         self.channels = dict()
         self.logger = logger
-        self.app_cache = _AppsCache()
+        self.app_cache = _AppsCache(logger)
 
     @gen.coroutine
     def close_and_remove(self, to_rem):
@@ -131,6 +139,6 @@ class ChannelsCache(object):
         raise gen.Return(ch)
 
     @gen.coroutine
-    def update(self, state, to_remove):
-        yield self.close_and_remove(to_remove)
-        self.app_cache.update(state.iterkeys())
+    def update(self, to_close, to_add, expire_from_now=None):
+        yield self.close_and_remove(to_close)
+        self.app_cache.update(to_add, expire_from_now)
