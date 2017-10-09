@@ -10,28 +10,39 @@ def func(a, x):
     return a * z * z
 
 @gen.coroutine
+def control_app(app, base_x):
+
+    ch = yield app.control()
+
+    cnt = 0
+    for val in (int(func(5, base_x + i * 0.1) + 1) for i in xrange(32)):
+        print 'sending {} val({}): {}'.format(app, cnt+1, val)
+        yield ch.tx.write(val)
+        yield gen.sleep(2)
+        cnt += 1
+
+    print 'sequence send'
+    yield gen.sleep(3)
+    yield ch.tx.close()
+
+
+@gen.coroutine
 def app_ctl():
-    echo = Service('Echo1')
+    apps = [
+        Service('Echo'),
+        Service('ppn'),
+        # Service('Echo1'),
+        # Service('Echo2'),
+        # Service('Echo3'),
+        # Service('Echo4'),
+        # Service('Echo5'),
+    ]
 
     x = 0
     while True:
-
-        ch = yield echo.control()
-        cnt = 0
-        for val in (int(func(5, x + i * 0.1) + 1) for i in xrange(32)):
-            print 'sending val({}): {}'.format(cnt+1, val)
-            yield ch.tx.write(val)
-            yield gen.sleep(3)
-            cnt += 1
-
-        print 'sequence send'
-        yield gen.sleep(5)
-        yield ch.tx.close()
-
+        yield [control_app(app, x + i) for i, app in enumerate(apps)]
         x += 0.02
+        break
 
-    raise gen.Return(data)
 
-
-res = IOLoop.current().run_sync(app_ctl)
-print 'res {}'.format(res)
+IOLoop.current().run_sync(app_ctl)
