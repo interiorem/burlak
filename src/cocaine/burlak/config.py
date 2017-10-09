@@ -17,36 +17,38 @@ CONFIG_PATHS = [
 ]
 
 
+class Defaults(object):
+    TOK_UPDATE_SEC = 10
+
+    WEB_PORT = 8877
+    WEB_PATH = ''
+
+    # TODO: make mandatory and config only
+    # UUID_PATH = '/state'
+    UUID_PATH = '/darkvoice/states'
+
+    NODE_SERVICE_NAME = 'node'
+    UNICORN_SERVICE_NAME = 'unicorn'
+
+    PROFILE_NAME = 'default'
+
+    LOCATOR_HOST = 'localhost'
+    LOCATOR_PORT = 10053
+
+    STOP_APPS_NOT_IN_STATE = False
+
+    SENTRY_DSN = ''
+
+    EXPIRE_STOPPED_SEC = 600
+    EXPIRE_CACHED_APP_SEC = 3600
+
+    # Default is skip all console logging.
+    CONSOLE_LOGGER_LEVEL = int(ConsoleLogger.ERROR) + 1
+
 #
 # Should be compatible with tools secure section
 #
 class Config(object):
-
-    DEFAULT_TOK_UPDATE_SEC = 10
-
-    DEFAULT_WEB_PORT = 8877
-    DEFAULT_WEB_PATH = ''
-
-    # TODO: make mandatory and config only
-    # DEFAULT_UUID_PATH = '/state'
-    DEFAULT_UUID_PATH = '/darkvoice/states'
-
-    DEFAULT_NODE_SERVICE_NAME = 'node'
-    DEFAULT_UNICORN_SERVICE_NAME = 'unicorn'
-
-    DEFAULT_PROFILE_NAME = 'default'
-
-    DEFAULT_LOCATOR_HOST = 'localhost'
-    DEFAULT_LOCATOR_PORT = 10053
-
-    DEFAULT_STOP_APPS_NOT_IN_STATE = False
-
-    DEFAULT_SENTRY_DSN = ''
-
-    DEFAULT_EXPIRE_STOPPED_SEC = 600
-
-    # Default is skip all console logging.
-    DEFAULT_CONSOLE_LOGGER_LEVEL = int(ConsoleLogger.ERROR) + 1
 
     # TODO: make schema work with tools config
     SCHEMA = {
@@ -76,6 +78,10 @@ class Config(object):
             'type': 'string',
             'required': False,
         },
+        'expire_cached_app_sec': {
+            'type': 'string',
+            'required': False,
+        },
         'port': {
             'type': 'integer',
             'min': 0,
@@ -101,7 +107,12 @@ class Config(object):
             'type': 'string',
             'required': False,
         },
+        # TODO: add `_sec` suffix and make app-wide update  
         'expire_stopped': {
+            'type': 'integer',
+            'required': False,
+        },
+        'expire_cached_app_sec': {
             'type': 'integer',
             'required': False,
         },
@@ -175,65 +186,70 @@ class Config(object):
         client_secret = secure_conf.get('client_secret', '')
         tok_update = secure_conf.get(
             'tok_update_sec',
-            self.DEFAULT_TOK_UPDATE_SEC)
+            Defaults.TOK_UPDATE_SEC)
 
         return mod, client_id, client_secret, tok_update
 
     @property
     def web_endpoint(self):
-        port = self._config.get('port', self.DEFAULT_WEB_PORT)
-        path = self._config.get('web_path', self.DEFAULT_WEB_PATH)
+        port = self._config.get('port', Defaults.WEB_PORT)
+        path = self._config.get('web_path', Defaults.WEB_PATH)
 
         return port, path
 
     @property
     def uuid_path(self):
-        return self._config.get('uuid_path', self.DEFAULT_UUID_PATH)
+        return self._config.get('uuid_path', Defaults.UUID_PATH)
 
     @property
     def node_name(self):
         return self._config.get(
-            'node_service_name', self.DEFAULT_NODE_SERVICE_NAME)
+            'node_service_name', Defaults.NODE_SERVICE_NAME)
 
     @property
     def unicorn_name(self):
         return self._config.get(
-            'unicorn_service_name', self.DEFAULT_UNICORN_SERVICE_NAME)
+            'unicorn_service_name', Defaults.UNICORN_SERVICE_NAME)
 
     @property
     def default_profile(self):
         return self._config.get(
-            'default_profile', self.DEFAULT_PROFILE_NAME)
+            'default_profile', Defaults.PROFILE_NAME)
 
     @property
     def locator_endpoints(self):
         return self._config.get(
             'locator_endpoints',
-            [[Config.DEFAULT_LOCATOR_HOST, Config.DEFAULT_LOCATOR_PORT], ])
+            [[Defaults.LOCATOR_HOST, Defaults.LOCATOR_PORT], ])
 
     @property
     def stop_apps(self):
         return self._config.get(
             'stop_apps',
-            Config.DEFAULT_STOP_APPS_NOT_IN_STATE)
+            Defaults.STOP_APPS_NOT_IN_STATE)
 
     @property
     def sentry_dsn(self):
-        return self._config.get('sentry_dsn', Config.DEFAULT_SENTRY_DSN)
+        return self._config.get('sentry_dsn', Defaults.SENTRY_DSN)
 
     @property
     def expire_stopped(self):
         return self._config.get(
-            'expire_stopped', Config.DEFAULT_EXPIRE_STOPPED_SEC)
+            'expire_stopped', Defaults.EXPIRE_STOPPED_SEC)
 
     @property
     def console_log_level(self):
         return self._config.get(
-            'console_log_level', Config.DEFAULT_CONSOLE_LOGGER_LEVEL)
+            'console_log_level', Defaults.CONSOLE_LOGGER_LEVEL)
 
     @console_log_level.setter
     def console_log_level(self, level):
         self._config['console_log_level'] = level
+
+    @property
+    def expire_cached_app_sec(self):
+        return self._config.get(
+            'expire_cached_app_sec', Defaults.EXPIRE_CACHED_APP_SEC)
 
     # TODO: refactor to single method?
     def err_to_logger(self, msg, to_console=False):  # pragma nocover
