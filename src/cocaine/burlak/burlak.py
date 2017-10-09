@@ -22,7 +22,7 @@ from .chcache import ChannelsCache, close_tx_safe
 from .logger import ConsoleLogger, VoidLogger
 
 
-CONTROL_RETRY_ATTEMPTS = 5
+CONTROL_RETRY_ATTEMPTS = 3
 
 DEFAULT_RETRY_TIMEOUT_SEC = 10
 DEFAULT_UNKNOWN_VERSIONS = 1
@@ -377,7 +377,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self,
             context,
             ci_state,
-            node, node_ctl,
+            node,
             control_queue, sync_queue,
             **kwargs):
         super(AppsElysium, self).__init__(context, **kwargs)
@@ -388,7 +388,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         self.ci_state = ci_state
 
         self.node_service = node
-        self.node_service_ctl = node
         self.control_queue = control_queue
         self.sync_queue = sync_queue
 
@@ -512,10 +511,11 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     for app in command.to_run if app in command.state
                 ]
 
+                failed_to_start_set = command.to_run - started_set
+
                 if command.is_state_updated or command.to_run:
                     # Send control to every app in state, except known for
                     # start up fail.
-                    failed_to_start_set = command.to_run - started_set
                     if failed_to_start_set:
                         self.info(
                             'control command will be skipped for '
