@@ -37,13 +37,14 @@ class _AppsCache(object):
 
     @gen.coroutine
     def make_control_ch(self, app):
-        ch = yield self.get(app).control()
+        ch = yield self._get(app).control()
         raise gen.Return(ch)
 
-    def get(self, app):
-        return self.apps.get(
-            app, _AppsCache.Record(Service(app), time.time())
-        ).application
+    def _get(self, app):
+        if app not in self.apps:
+            self.apps[app] = _AppsCache.Record(Service(app), time.time())
+
+        return self.apps[app].application
 
     def remove_old(self, older_then):
         '''Removes all records accessed before `older_then`'''
@@ -67,7 +68,7 @@ class _AppsCache(object):
 
     def update(self, apps):
         for app in apps:
-            self.get(app)
+            self._get(app)
 
 
 #
