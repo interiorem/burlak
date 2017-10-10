@@ -40,10 +40,10 @@ class SentryClientWrapper(object):
             return self.client.captureException(**kwargs)
         except Exception as e:  # pragma nocover
             self.logger.error(
-                'failed to send exception info to sentry: {}'.format(e))
+                'failed to send exception info to sentry: {}', e)
 
     def capture_message(self, message, **kwargs):
         try:
             return self.client.captureMessage(message, **kwargs)
         except Exception as e:  # pragma nocover
-            self.logger.error('failed to send info to sentry: {}'.format(e))
+            self.logger.error('failed to send info to sentry: {}', e)

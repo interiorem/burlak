@@ -5,16 +5,16 @@ import datetime
 
 
 class VoidLogger(object):  # pragma nocover
-    def debug(self, msg):
+    def debug(self, fmt, *args):
         pass
 
-    def info(self, msg):
+    def info(self, fmt, *args):
         pass
 
-    def warn(self, msg):
+    def warn(self, fmt, *args):
         pass
 
-    def error(self, msg):
+    def error(self, fmt, *args):
         pass
 
 
@@ -35,29 +35,29 @@ class ConsoleLogger(VoidLogger):  # pragma nocover
         self._level = ConsoleLogger.WARNING if level is None else level
         self._use_timestamp = use_timestamp
 
-    def debug(self, msg):
-        self._dump(ConsoleLogger.DEBUG, msg)
+    def debug(self, fmt, *args):
+        self._dump(ConsoleLogger.DEBUG, fmt, *args)
 
-    def info(self, msg):
-        self._dump(ConsoleLogger.INFO, msg)
+    def info(self, fmt, *args):
+        self._dump(ConsoleLogger.INFO, fmt, *args)
 
-    def warn(self, msg):
-        self._dump(ConsoleLogger.WARNING, msg)
+    def warn(self, fmt, *args):
+        self._dump(ConsoleLogger.WARNING, fmt, *args)
 
-    def error(self, msg):
-        self._dump(ConsoleLogger.ERROR, msg)
+    def error(self, fmt, *args):
+        self._dump(ConsoleLogger.ERROR, fmt, *args)
 
     def _dump_current_ts(self):
         if self._use_timestamp:
             print datetime.datetime.utcnow().strftime(ConsoleLogger.TFORMAT),
 
-    def _dump_msg(self, level, msg):
-        print('{}: {}'.format(ConsoleLogger.LEVELS[level], msg))
+    def _dump_msg(self, level, fmt, *args):
+        print(('{}: ' + fmt).format(ConsoleLogger.LEVELS[level], *args))
 
-    def _dump(self, level, msg):
+    def _dump(self, level, fmt, *args):
         if self._level <= level:
             self._dump_current_ts()
-            self._dump_msg(level, msg)
+            self._dump_msg(level, fmt, *args)
 
     @property
     def level(self):

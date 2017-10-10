@@ -113,21 +113,21 @@ class LoggerMixin(object):  # pragma nocover
             if context.logger_setup.dup_to_console \
             else VoidLogger()
 
-    def debug(self, msg):
-        self.console.debug(msg)
-        self.logger.debug(self.format, msg)
+    def debug(self, fmt, *args):
+        self.console.debug(fmt, *args)
+        self.logger.debug(self.format, fmt.format(*args))
 
-    def info(self, msg):
-        self.console.info(msg)
-        self.logger.info(self.format, msg)
+    def info(self, fmt, *args):
+        self.console.info(fmt, *args)
+        self.logger.info(self.format, fmt.format(*args))
 
-    def warn(self, msg):
-        self.console.warn(msg)
-        self.logger.warn(self.format, msg)
+    def warn(self, fmt, *args):
+        self.console.warn(fmt, *args)
+        self.logger.warn(self.format, fmt.format(*args))
 
-    def error(self, msg):
-        self.console.error(msg)
-        self.logger.error(self.format, msg)
+    def error(self, fmt, *args):
+        self.console.error(fmt, *args)
+        self.logger.error(self.format, fmt.format(*args))
 
 
 class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
@@ -172,22 +172,21 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     continue
 
                 to_listen = make_state_path(state_pfx, uuid)
-                self.info('subscribing for path {}'.format(to_listen))
+                self.info('subscribing for path {}', to_listen)
                 ch = yield unicorn.subscribe(to_listen)
 
                 while self.should_run():
                     self.debug('waiting for state subscription')
                     state, version = yield ch.rx.get()
                     self.debug(
-                        'subscribe:: got version {} state {}'
-                        .format(version, state))
+                        'subscribe:: got version {} state {}', version, state)
 
                     assert isinstance(version, int)
 
                     if not isinstance(state, dict):  # pragma nocover
                         self.error(
-                            'expected dictionary, got {}'.format(
-                                type(state).__name__))
+                            'expected dictionary, got {}',
+                            type(state).__name__)
                         self.metrics_cnt['got_broken_sate'] += 1
                         raise Exception('state is empty, resubscribe')
 
@@ -203,8 +202,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                         # state records to normal format, if not, it would be
                         # exception in StateUpdateMessage ctor.
                         self.error(
-                            'state not valid {} {}'
-                            .format(state, validator.errors))
+                            'state not valid {} {}', state, validator.errors)
                         self.metrics_cnt['not_valid_state'] += 1
 
                     yield self.input_queue.put(
@@ -212,7 +210,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
                     self.metrics_cnt['apps_in_last_state'] = len(state)
             except Exception as e:  # pragma nocover
-                self.error('failed to get state, error: "{}"'.format(e))
+                self.error('failed to get state, error: "{}"', e)
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
             finally:  # pragma nocover
                 # TODO: Is it really needed?
@@ -292,8 +290,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
                 running_apps = yield self.get_running_apps_set()
 
-                self.debug('got running apps {}'.format(running_apps))
-                self.debug('last known uuid is {}'.format(last_uuid))
+                self.debug('got running apps {}', running_apps)
+                self.debug('last known uuid is {}', last_uuid)
 
                 # Note that `StateUpdateMessage` only massage type currently
                 # supported.
@@ -303,12 +301,10 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
                     self.debug(
                         'disp::got state update with version {}: {} uuid {} '
-                        'and running apps {}'
-                        .format(state_version, state, uuid, running_apps))
+                        'and running apps {}',
+                        state_version, state, uuid, running_apps)
             except Exception as e:
-                self.error(
-                    'failed to get control message with {}'
-                    .format(e))
+                self.error('failed to get control message with {}', e)
                 self.sentry_wrapper.capture_exception()
 
             if not state:
@@ -338,10 +334,10 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
                 prev_state = state
 
-                self.debug('profile update list {}'.format(to_update))
+                self.debug('profile update list {}', to_update)
 
-            self.info("to_stop apps list {}".format(to_stop))
-            self.info("to_run apps list {}".format(to_run))
+            self.info("to_stop apps list {}", to_stop)
+            self.info("to_run apps list {}", to_run)
 
             if is_state_updated or to_run or to_stop:
 
@@ -400,15 +396,13 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             yield ch.rx.get()
         except Exception as e:
             self.error(
-                'failed to start app {} {} with err: {}'
-                .format(app, profile, e))
+                'failed to start app {} {} with err: {}', app, profile, e)
             self.metrics_cnt['errors_start_app'] += 1
             self.sentry_wrapper.capture_exception()
 
             self.ci_state.mark_failed(app, profile, state_version, tm)
         else:
-            self.info(
-                'starting app {} with profile {}'.format(app, profile))
+            self.info('starting app {} with profile {}', app, profile)
             self.metrics_cnt['apps_started'] += 1
 
             if started is not None:
@@ -425,9 +419,9 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.ci_state.mark_stopped(app, state_version, tm)
             self.metrics_cnt['apps_stopped'] += 1
 
-            self.info('app {} has been stopped'.format(app))
+            self.info('app {} has been stopped', app)
         except Exception as e:  # pragma nocover
-            self.error('failed to stop app {} with error: {}'.format(app, e))
+            self.error('failed to stop app {} with error: {}', app, e)
             self.metrics_cnt['errors_slay_app'] += 1
 
             self.sentry_wrapper.capture_exception()
@@ -436,7 +430,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     def adjust_by_channel(
             self, app, channels_cache, to_adjust, profile, state_version, tm):
 
-        self.debug('control command to {} with {}'.format(app, to_adjust))
+        self.debug('control command to {} with {}', app, to_adjust)
 
         attempts = CONTROL_RETRY_ATTEMPTS
         while attempts:
@@ -447,8 +441,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 attempts -= 1
                 self.error(
                     'failed to send control to `{}`, workers {}, '
-                    'with attempts {}, err {}'
-                    .format(app, to_adjust, attempts, e))
+                    'with attempts {}, err {}',
+                    app, to_adjust, attempts, e)
 
                 self.metrics_cnt['errors_control_app'] += 1
 
@@ -461,8 +455,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     app, to_adjust, profile, state_version, tm)
 
                 self.debug(
-                    'have adjusted workers count for app {} to {}'
-                    .format(app, to_adjust))
+                    'have adjusted workers count for app {} to {}',
+                    app, to_adjust)
 
                 break
 
@@ -478,14 +472,12 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 self.debug(
                     'control task: state {}, state_ver {}, do_adjust? {}, '
-                    'to_stop {}, to_run {}'
-                    .format(
-                        command.state,
-                        command.state_version,
-                        command.is_state_updated,
-                        command.to_stop,
-                        command.to_run,
-                    )
+                    'to_stop {}, to_run {}',
+                    command.state,
+                    command.state_version,
+                    command.is_state_updated,
+                    command.to_stop,
+                    command.to_run,
                 )
 
                 yield channels_cache.close_and_remove(command.to_stop)
@@ -523,12 +515,11 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 if failed_to_start:
                     self.warn(
                         'control command will be skipped for '
-                        'failed to start apps: {}'
-                        .format(failed_to_start))
+                        'failed to start apps: {}',
+                        failed_to_start)
 
                 self.debug(
-                    'control command will be send for apps: {}'
-                    .format(to_control))
+                    'control command will be send for apps: {}', to_control)
 
                 if to_control:
                     tm = time.time()
@@ -546,8 +537,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     self.info('state updated')
             except Exception as e:  # pragma nocover
                 self.error(
-                    'failed to exec command with error {}: {}'
-                    .format(type(e).__name__, e))
+                    'failed to exec command with error {}: {}',
+                    type(e).__name__, e)
 
                 self.sentry_wrapper.capture_exception()
 

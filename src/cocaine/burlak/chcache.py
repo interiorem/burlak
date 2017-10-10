@@ -24,7 +24,7 @@ def close_tx_safe(ch, logger=None):  # pragma nocover
         yield ch.tx.close()
     except Exception as e:
         if logger:
-            logger.error('failed to close channel {}, err {}'.format(ch, e))
+            logger.error('failed to close channel {}, err {}', ch, e)
 
 
 class _AppsCache(object):
@@ -65,16 +65,13 @@ class _AppsCache(object):
         ]
 
         self.logger.debug(
-            'removing expired applications from cache: {}'
-            .format(expired))
+            'removing expired applications from cache: {}', expired)
 
         self.remove(expired)
         return expired
 
     def remove(self, to_remove):
-        self.logger.debug(
-            'removing from apps.cache {}'
-            .format(to_remove))
+        self.logger.debug('removing from apps.cache {}', to_remove)
 
         for app in to_remove:
             if app in self.apps:
@@ -91,7 +88,7 @@ class ChannelsCache(object):
     def close_and_remove(self, to_remove):
         cnt = 0
         for app in ifilter(lambda a: a in self.channels, to_remove):
-            self.logger.debug('removing from ch.cache {}'.format(app))
+            self.logger.debug('removing from ch.cache {}', app)
             yield close_tx_safe(self.channels[app], self.logger)
             del self.channels[app]
             self.app_cache.remove([app])
@@ -100,13 +97,12 @@ class ChannelsCache(object):
 
     @gen.coroutine
     def close_and_remove_all(self):
-        yield self.close_and_remove(self.channels.iterkeys())
+        yield self.close_and_remove(self.channels.keys())
 
     @gen.coroutine
     def add_one(self, app, should_close=False):
         if should_close and app in self.channels:
-            self.logger.debug(
-                'ch chache `add_one`: closing ch for {}'.format(app))
+            self.logger.debug('ch chache `add_one`: closing ch for {}', app)
             yield close_tx_safe(self.channels[app], self.logger)
 
         self.channels[app] = yield self.app_cache.make_control_ch(app)
@@ -115,10 +111,10 @@ class ChannelsCache(object):
     @gen.coroutine
     def get_ch(self, app, should_close=False):
         if app in self.channels:
-            self.logger.debug('ch.cache.get_ch hit for {}'.format(app))
+            self.logger.debug('ch.cache.get_ch hit for {}', app)
             raise gen.Return(self.channels[app])
 
-        self.logger.debug('ch.cache.get_ch miss for {}'.format(app))
+        self.logger.debug('ch.cache.get_ch miss for {}', app)
         ch = yield self.add_one(app, should_close)
 
         raise gen.Return(ch)

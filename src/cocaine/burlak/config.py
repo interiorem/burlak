@@ -248,13 +248,17 @@ class Config(object):
         return self._config.get(
             'expire_cached_app_sec', Defaults.EXPIRE_CACHED_APP_SEC)
 
-    # TODO: refactor to single method?
+    # TODO:
+    #   refactor to single method?
+    #   make *args format
     def err_to_logger(self, msg, to_console=False):  # pragma nocover
         if self._logger:
             self._logger.error(msg)
         self.dump_to_console(msg, to_console)
 
-    # TODO: refactor to single method?
+    # TODO:
+    #   refactor to single method?
+    #   make *args format
     def info_to_logger(self, msg, to_console=False):  # pragma nocover
         if self._logger:
             self._logger.info(msg)
