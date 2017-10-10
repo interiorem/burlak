@@ -25,6 +25,10 @@ def make_mock_channel_with(*v):
     return make_future(MockChannel(*v))
 
 
+def make_mock_channels_list_with(sequence):
+    return [make_future(MockChannel(v)) for v in sequence]
+
+
 def make_logger_mock(mocker):
     logger = mocker.Mock()
 

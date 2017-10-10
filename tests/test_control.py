@@ -1,4 +1,6 @@
+# TODO: app control tests
 from cocaine.burlak import burlak
+from cocaine.burlak.chcache import _AppsCache
 from cocaine.burlak.comm_state import CommittedState
 from cocaine.burlak.config import Config
 from cocaine.burlak.context import Context, LoggerSetup
@@ -8,7 +10,7 @@ import pytest
 from tornado import queues
 
 from .common import ASYNC_TESTS_TIMEOUT, \
-    make_logger_mock, make_mock_channel_with
+    make_logger_mock, make_mock_channel_with, make_mock_channels_list_with
 
 
 to_stop_apps = [
@@ -35,15 +37,27 @@ to_run_apps = [
 ]
 
 
+def count_apps(list_of_dict):
+    return sum(map(len, (d for d in list_of_dict)))
+
+
 @pytest.fixture
 def elysium(mocker):
-    node = mocker.Mock()
-    node.start_app = mocker.Mock(return_value=make_mock_channel_with(0))
-    node.pause_app = mocker.Mock(return_value=make_mock_channel_with(0))
-    node.control = mocker.Mock(return_value=make_mock_channel_with(0))
 
     config = Config()
     sentry_wrapper = mocker.Mock()
+
+    mocker.patch.object(
+        _AppsCache,
+        'make_control_ch',
+        return_value=make_mock_channel_with(0))
+
+    node = mocker.Mock()
+    node.start_app = mocker.Mock(
+        side_effect=make_mock_channels_list_with(
+            xrange(count_apps(to_run_apps))
+        )
+    )
 
     return burlak.AppsElysium(
         Context(
@@ -53,8 +67,8 @@ def elysium(mocker):
             sentry_wrapper
         ),
         CommittedState(),
-        node, node,
-        queues.Queue(), queues.Queue())
+        node,
+        queues.Queue())
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
@@ -71,6 +85,12 @@ def test_stop(elysium, mocker):
         )
 
     elysium.context.config._config['stop_apps'] = True
+    elysium.node_service.pause_app = mocker.Mock(
+        side_effect=make_mock_channels_list_with(
+            xrange(count_apps(to_stop_apps))
+        )
+    )
+
     yield elysium.blessing_road()
 
     for apps_list in to_stop_apps:
@@ -94,13 +114,18 @@ def test_stop_apps_disabled(elysium, mocker):
             burlak.DispatchMessage(dict(), -1, False, set(stop_apps), set())
         )
 
+    elysium.node_service.pause_app = mocker.Mock(
+        side_effect=make_mock_channels_list_with(
+            xrange(count_apps(to_stop_apps))
+        )
+    )
+
     yield elysium.blessing_road()
     assert elysium.node_service.pause_app.call_count == 0
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_run(elysium, mocker):
-
     stop_side_effect = [True for _ in to_run_apps]
     stop_side_effect.append(False)
     mocker.patch.object(
@@ -111,9 +136,6 @@ def test_run(elysium, mocker):
             burlak.DispatchMessage(
                 run_apps, -1, False, set(), set(run_apps.iterkeys()))
         )
-
-    elysium.node_service.start_app = mocker.Mock(
-        return_value=make_mock_channel_with(0))
 
     yield elysium.blessing_road()
 
@@ -126,13 +148,7 @@ def test_run(elysium, mocker):
 
     assert \
         elysium.node_service.start_app.call_count == \
-        sum(map(len, to_run_apps))
-
-    # TODO: fix
-    # As control channels are taken from cache now we need count only unique
-    # apps names.
-    # assert elysium.node_service_ctl.control.call_count == \
-    #     len(set(app for command in to_run_apps for app in command))
+        count_apps(to_run_apps)
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
@@ -158,14 +174,15 @@ def test_control(elysium, mocker):
                 record.profile
             )
 
-            assert elysium.node_service.control.called_with(app)
+            assert _AppsCache.make_control_ch.called_with(app)
 
     assert \
         elysium.node_service.start_app.call_count == \
-        sum(map(len, to_run_apps))
-    # assert \
-    #     elysium.node_service_ctl.control.call_count == \
-    #     len(set(app for command in to_run_apps for app in command))
+        count_apps(to_run_apps)
+
+    assert \
+        _AppsCache.make_control_ch.call_count == \
+        len(set(app for task in to_run_apps for app in task))
 
 
 #
@@ -185,7 +202,7 @@ def test_control_exceptions(elysium, mocker):
                 run_apps, -1, True, set(), set(run_apps.iterkeys()))
         )
 
-    excpt_sequence = [
+    except_sequence = [
         0,
         Exception('broken', 'connect1'),
         0,
@@ -194,9 +211,15 @@ def test_control_exceptions(elysium, mocker):
         0,
     ]
 
-    elysium.node_service.control = mocker.Mock(
-        side_effect=[make_mock_channel_with(r) for r in excpt_sequence]
-    )
+    except_count = 0
+    for it in except_sequence:
+        if isinstance(it, Exception):
+            except_count += 1
+
+    mocker.patch.object(
+        _AppsCache,
+        'make_control_ch',
+        side_effect=[make_mock_channel_with(v) for v in except_sequence])
 
     yield elysium.blessing_road()
 
@@ -207,18 +230,19 @@ def test_control_exceptions(elysium, mocker):
                 record.profile
             )
 
-            assert elysium.node_service.control.called_with(app)
+            assert _AppsCache.make_control_ch.called_with(app)
 
     assert \
         elysium.node_service.start_app.call_count == \
         sum(map(len, to_run_apps))
-    # assert \
-    #     elysium.node_service_ctl.control.call_count == \
-    #     len(set(app for command in to_run_apps for app in command))
+    assert \
+        _AppsCache.make_control_ch.call_count == \
+        len(set(app for task in to_run_apps for app in task))
 
 
+# TODO: redactor
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
-def test_gapped_control(elysium, mocker):
+def skipped_test_gapped_control(elysium, mocker):
     '''Test for malformed state and to_run list combination'''
     stop_side_effect = [True for _ in to_run_apps]
     stop_side_effect.append(False)
@@ -258,11 +282,12 @@ def test_gapped_control(elysium, mocker):
 
     for state in gapped_states:
         for app, record in state.iteritems():
-            assert elysium.node_service.control.called_with(app)
+            assert _AppsCache.make_control_ch.called_with(app)
 
     assert \
         elysium.node_service.start_app.call_count == \
         sum(map(len, gapped_states))
-    # assert \
-    #     elysium.node_service.control.call_count == \
-    #     len(set(app for command in gapped_states for app in command))
+
+    assert \
+        _AppsCache.make_control_ch.call_count == \
+        len(set(app for task in to_run_apps for app in task))
