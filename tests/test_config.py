@@ -1,18 +1,19 @@
 from cocaine.burlak import Config, ConsoleLogger
+from cocaine.burlak.config import Defaults
 
 import pytest
 
 
 good_secret_conf = [
     ('tests/assets/conf1.yaml',
-        'test1', 100500, 'top secret', Config.DEFAULT_TOK_UPDATE_SEC),
+        'test1', 100500, 'top secret', Defaults.TOK_UPDATE_SEC),
     ('tests/assets/conf2.yaml',
         'tvm', 42, 'not as secret at all', 600),
 ]
 
 empty_conf = 'tests/assets/empty.conf.yaml'
 
-default_secure = ('promisc', 0, '', Config.DEFAULT_TOK_UPDATE_SEC)
+default_secure = ('promisc', 0, '', Defaults.TOK_UPDATE_SEC)
 
 
 @pytest.mark.parametrize(
@@ -69,7 +70,7 @@ def test_empty_config():
 @pytest.mark.parametrize(
     'config,expect_port,expect_web_path,expect_uuid_path',
     [
-        ('tests/assets/conf1.yaml', 100500, '', Config.DEFAULT_UUID_PATH),
+        ('tests/assets/conf1.yaml', 100500, '', Defaults.UUID_PATH),
         ('tests/assets/conf2.yaml', 8877, '/to-heaven', '/some/deep/location'),
     ]
 )
@@ -104,7 +105,7 @@ def test_service_names(config, expect_unicorn_name, expect_node_name):
     [
         (
             'tests/assets/conf1.yaml', 'default', False,
-            Config.DEFAULT_EXPIRE_STOPPED_SEC, 100
+            Defaults.EXPIRE_STOPPED_SEC, 100
         ),
         (
             'tests/assets/conf2.yaml',
@@ -146,7 +147,7 @@ def test_sentry_dsn(config, expect_dsn):
     'config,expect_loc_endp',
     [
         ('tests/assets/conf1.yaml',
-            [[Config.DEFAULT_LOCATOR_HOST, Config.DEFAULT_LOCATOR_PORT], ]),
+            [[Defaults.LOCATOR_HOST, Defaults.LOCATOR_PORT], ]),
         ('tests/assets/conf2.yaml', [['host1', 100500], ['host2', 42]]),
     ]
 )

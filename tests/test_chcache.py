@@ -1,4 +1,5 @@
 from cocaine.burlak import ChannelsCache
+from cocaine.burlak.chcache import _AppsCache
 
 import pytest
 
@@ -11,10 +12,13 @@ apps_list = ['app{}'.format(i) for i in xrange(4)]
 @pytest.fixture
 def ch_cache(mocker):
     logger = mocker.Mock()
-    node = mocker.Mock()
-    node.control = mocker.Mock(return_value=make_mock_channel_with(0))
 
-    return ChannelsCache(logger, node)
+    mocker.patch.object(
+        _AppsCache,
+        'make_control_ch',
+        return_value=make_mock_channel_with(0))
+
+    return ChannelsCache(logger)
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
