@@ -45,6 +45,7 @@ class Defaults(object):
     # Default is skip all console logging.
     CONSOLE_LOGGER_LEVEL = int(ConsoleLogger.ERROR) + 1
 
+
 #
 # Should be compatible with tools secure section
 #
@@ -75,10 +76,6 @@ class Config(object):
             'required': False,
         },
         'node_service_name': {
-            'type': 'string',
-            'required': False,
-        },
-        'expire_cached_app_sec': {
             'type': 'string',
             'required': False,
         },

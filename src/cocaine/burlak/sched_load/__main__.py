@@ -63,7 +63,7 @@ def verify_state(input_state, result_state):
                 .format(app, prof, orca_state['profile']))
 
     if errors:
-        raise Exception(errors)
+        raise Exception(';'.join(errors))
     else:
         print('state verified at {}'.format(int(time.time())))
 

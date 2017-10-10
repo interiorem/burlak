@@ -6,10 +6,9 @@
 import time
 
 from collections import namedtuple
+from itertools import ifilter
 
 from cocaine.services import Service
-
-from itertools import ifilter
 
 from tornado import gen
 
@@ -25,8 +24,7 @@ def close_tx_safe(ch, logger=None):  # pragma nocover
         yield ch.tx.close()
     except Exception as e:
         if logger:
-            logger.error('failed to close channel {}, err {}'
-            .format(ch, e))
+            logger.error('failed to close channel {}, err {}'.format(ch, e))
 
 
 class _AppsCache(object):
@@ -75,7 +73,7 @@ class _AppsCache(object):
 
     def remove(self, to_remove):
         self.logger.debug(
-            'trying to remove from apps cache {}'
+            'removing from apps.cache {}'
             .format(to_remove))
 
         for app in to_remove:
@@ -93,7 +91,7 @@ class ChannelsCache(object):
     def close_and_remove(self, to_remove):
         cnt = 0
         for app in ifilter(lambda a: a in self.channels, to_remove):
-            self.logger.debug('removing from cache {}'.format(app))
+            self.logger.debug('removing from ch.cache {}'.format(app))
             yield close_tx_safe(self.channels[app], self.logger)
             del self.channels[app]
             self.app_cache.remove([app])

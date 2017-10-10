@@ -292,7 +292,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
                 running_apps = yield self.get_running_apps_set()
 
-                self.debug('got running apps list {}'.format(running_apps))
+                self.debug('got running apps {}'.format(running_apps))
                 self.debug('last known uuid is {}'.format(last_uuid))
 
                 # Note that `StateUpdateMessage` only massage type currently
@@ -412,7 +412,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.metrics_cnt['apps_started'] += 1
 
             if started is not None:
-                started_set.add(app)
+                started.add(app)
 
     @gen.coroutine
     def slay(self, app, state_version, tm):
@@ -436,7 +436,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     def adjust_by_channel(
             self, app, channels_cache, to_adjust, profile, state_version, tm):
 
-        self.debug('control command to {} with {}...'.format(app, to_adjust))
+        self.debug('control command to {} with {}'.format(app, to_adjust))
 
         attempts = CONTROL_RETRY_ATTEMPTS
         while attempts:
@@ -520,10 +520,12 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     if command.is_state_updated else started
                 failed_to_start = command.to_run - started
 
-                self.warn(
-                    'control command will be skipped for '
-                    'failed to start apps: {}'
-                    .format(failed_to_start))
+                if failed_to_start:
+                    self.warn(
+                        'control command will be skipped for '
+                        'failed to start apps: {}'
+                        .format(failed_to_start))
+
                 self.debug(
                     'control command will be send for apps: {}'
                     .format(to_control))
