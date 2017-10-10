@@ -223,7 +223,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             context,
             node,
             ci_state,
-            input_queue, control_queue, sync_queue,
+            input_queue, control_queue,
             poll_interval_sec,
             **kwargs):
         super(StateAggregator, self).__init__(context, **kwargs)
@@ -235,7 +235,6 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
         self.input_queue = input_queue
         self.control_queue = control_queue
-        self.sync_queue = sync_queue
 
         self.poll_interval_sec = poll_interval_sec
 
@@ -351,20 +350,6 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 self.metrics_cnt['to_run_commands'] += len(to_run)
                 self.metrics_cnt['to_stop_commands'] += len(to_stop)
 
-                # try:
-                #     # Wait for command completion to avoid races in
-                #     # node service.
-                #     self.debug('waiting for command execution completion...')
-                #     yield self.sync_queue.get(
-                #         timeout=timedelta(seconds=SYNC_COMPLETION_TIMEOUT_SEC))
-                #     self.sync_queue.task_done()
-                #     self.debug('state update command completed')
-                # except gen.TimeoutError:
-                #     self.error(
-                #         'fatal error: '
-                #         'command execution completion timeout')
-                #     self.sentry_wrapper.capture_exception()
-
 
 class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     '''Controls life-time of applications based on supplied state
@@ -374,7 +359,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             context,
             ci_state,
             node,
-            control_queue, sync_queue,
+            control_queue,
             **kwargs):
         super(AppsElysium, self).__init__(context, **kwargs)
 
@@ -385,7 +370,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
         self.node_service = node
         self.control_queue = control_queue
-        self.sync_queue = sync_queue
 
     @gen.coroutine
     def start(self, app, profile, state_version, tm, started=None):
@@ -444,7 +428,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     'with attempts {}, err {}',
                     app, to_adjust, attempts, e)
 
-                self.metrics_cnt['errors_control_app'] += 1
+                self.metrics_cnt['errors_of_control'] += 1
 
                 self.sentry_wrapper.capture_exception()
 
@@ -541,10 +525,4 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     type(e).__name__, e)
 
                 self.sentry_wrapper.capture_exception()
-
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
-            # finally:
-            #     self.debug('sending sync...')
-            #     self.control_queue.task_done()
-            #     yield self.sync_queue.put(True)
-            #     self.debug('send sync ack')

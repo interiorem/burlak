@@ -65,8 +65,8 @@ def main(
     if console_log_level is not None:
         config.console_log_level = console_log_level
 
-    input_queue, control_queue, sync_queue = \
-        (queues.Queue() for _ in xrange(3))
+    input_queue, control_queue = \
+        (queues.Queue() for _ in xrange(2))
     logger = Logger(config.locator_endpoints)
 
     unicorn = SecureServiceFabric.make_secure_adaptor(
@@ -94,12 +94,11 @@ def main(
         context,
         node,
         committed_state,
-        input_queue, control_queue, sync_queue,
+        input_queue, control_queue,
         apps_poll_interval)
 
     apps_elysium = burlak.AppsElysium(
-        context, committed_state, node,
-        control_queue, sync_queue)
+        context, committed_state, node, control_queue)
 
     if not uuid_prefix:
         uuid_prefix = config.uuid_path
@@ -116,7 +115,7 @@ def main(
         lambda: acquirer.subscribe_to_state_updates(
             unicorn, node, uniresis, uuid_prefix))
 
-    qs = dict(input=input_queue, control=control_queue, sync=sync_queue)
+    qs = dict(input=input_queue, control=control_queue)
     units = dict(
         state_acquisition=acquirer,
         state_dispatch=state_processor,
