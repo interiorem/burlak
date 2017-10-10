@@ -9,6 +9,8 @@ from collections import namedtuple
 
 from cocaine.services import Service
 
+from itertools import ifilter
+
 from tornado import gen
 
 
@@ -23,7 +25,8 @@ def close_tx_safe(ch, logger=None):  # pragma nocover
         yield ch.tx.close()
     except Exception as e:
         if logger:
-            logger.error('failed to close channel, err {}'.format(e))
+            logger.error('failed to close channel {}, err {}'
+            .format(ch, e))
 
 
 class _AppsCache(object):
@@ -52,77 +55,61 @@ class _AppsCache(object):
         self.apps[app] = _AppsCache.Record(app_service, now)
         return app_service
 
+    # TODO: unused, even deprecated, remove someday
     def remove_old(self, expire_from_now):
         '''Removes all records accessed before `older_then`'''
         older_then = time.time() - expire_from_now
 
-        to_remove = [
+        expired = [
             app
             for app, record in self.apps.iteritems()
             if record.touch_timestamp < older_then
         ]
 
         self.logger.debug(
-            'removing elder applications from cach: {}'
-            .format(to_remove))
+            'removing expired applications from cache: {}'
+            .format(expired))
 
-        self.remove(to_remove)
-        return len(to_remove)
+        self.remove(expired)
+        return expired
 
     def remove(self, to_remove):
+        self.logger.debug(
+            'trying to remove from apps cache {}'
+            .format(to_remove))
+
         for app in to_remove:
             if app in self.apps:
                 del self.apps[app]
 
-    def update(self, to_add, expire_from_now=None):
-        if expire_from_now is not None:
-            self.remove_old(expire_from_now)
-
-        for app in to_add:
-            self._get(app)
-
 
 class ChannelsCache(object):
-
-    DEFAULT_UPDATE_ATTEMPTS = 3
-    DEFAULT_UPDATE_TIMEOUT_SEC = 5
-
     def __init__(self, logger):
         self.channels = dict()
         self.logger = logger
         self.app_cache = _AppsCache(logger)
 
     @gen.coroutine
-    def close_and_remove(self, to_rem):
+    def close_and_remove(self, to_remove):
         cnt = 0
-        for app in to_rem:
-            result = yield self.close_one(app)
-            if result:
-                cnt += 1
+        for app in ifilter(lambda a: a in self.channels, to_remove):
+            self.logger.debug('removing from cache {}'.format(app))
+            yield close_tx_safe(self.channels[app], self.logger)
+            del self.channels[app]
+            self.app_cache.remove([app])
 
         raise gen.Return(cnt)
 
     @gen.coroutine
     def close_and_remove_all(self):
-        yield self.close_and_remove(list(self.channels.iterkeys()))
-
-    @gen.coroutine
-    def close_one(self, app):
-        if app in self.channels:
-            self.logger.debug('removing from cache {}'.format(app))
-            yield close_tx_safe(self.channels[app])
-            del self.channels[app]
-            self.app_cache.remove([app])
-            raise gen.Return(True)
-
-        raise gen.Return(False)
+        yield self.close_and_remove(self.channels.iterkeys())
 
     @gen.coroutine
     def add_one(self, app, should_close=False):
         if should_close and app in self.channels:
             self.logger.debug(
                 'ch chache `add_one`: closing ch for {}'.format(app))
-            yield close_tx_safe(self.channels[app])
+            yield close_tx_safe(self.channels[app], self.logger)
 
         self.channels[app] = yield self.app_cache.make_control_ch(app)
         raise gen.Return(self.channels[app])
@@ -137,8 +124,3 @@ class ChannelsCache(object):
         ch = yield self.add_one(app, should_close)
 
         raise gen.Return(ch)
-
-    @gen.coroutine
-    def update(self, to_close, to_add, expire_from_now=None):
-        yield self.close_and_remove(to_close)
-        self.app_cache.update(to_add, expire_from_now)

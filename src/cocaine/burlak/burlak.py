@@ -330,7 +330,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
             last_uuid = uuid
 
-            if is_state_updated:  # check for porfiles change
+            if is_state_updated:  # check for profiles change
                 to_update = self.make_prof_update_set(prev_state, state)
 
                 to_run.update(to_update)
@@ -355,19 +355,19 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 self.metrics_cnt['to_run_commands'] += len(to_run)
                 self.metrics_cnt['to_stop_commands'] += len(to_stop)
 
-                try:
-                    # Wait for command completion to avoid races in
-                    # node service.
-                    self.debug('waiting for command execution completion...')
-                    yield self.sync_queue.get(
-                        timeout=timedelta(seconds=SYNC_COMPLETION_TIMEOUT_SEC))
-                    self.sync_queue.task_done()
-                    self.debug('state update command completed')
-                except gen.TimeoutError:
-                    self.error(
-                        'fatal error: '
-                        'command execution completion timeout')
-                    self.sentry_wrapper.capture_exception()
+                # try:
+                #     # Wait for command completion to avoid races in
+                #     # node service.
+                #     self.debug('waiting for command execution completion...')
+                #     yield self.sync_queue.get(
+                #         timeout=timedelta(seconds=SYNC_COMPLETION_TIMEOUT_SEC))
+                #     self.sync_queue.task_done()
+                #     self.debug('state update command completed')
+                # except gen.TimeoutError:
+                #     self.error(
+                #         'fatal error: '
+                #         'command execution completion timeout')
+                #     self.sentry_wrapper.capture_exception()
 
 
 class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
@@ -392,7 +392,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         self.sync_queue = sync_queue
 
     @gen.coroutine
-    def start(self, app, profile, state_version, tm, started_set=None):
+    def start(self, app, profile, state_version, tm, started=None):
         '''Trying to start application with specified profile
         '''
         try:
@@ -411,7 +411,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 'starting app {} with profile {}'.format(app, profile))
             self.metrics_cnt['apps_started'] += 1
 
-            if started_set is not None:
+            if started is not None:
                 started_set.add(app)
 
     @gen.coroutine
@@ -454,7 +454,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 self.sentry_wrapper.capture_exception()
 
-                yield channels_cache.close_one(app)
+                yield channels_cache.close_and_remove([app])
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
             else:
                 self.ci_state.mark_running(
@@ -474,6 +474,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             try:
                 self.debug('waiting for control command...')
                 command = yield self.control_queue.get()
+                self.control_queue.task_done()
 
                 self.debug(
                     'control task: state {}, state_ver {}, do_adjust? {}, '
@@ -486,6 +487,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         command.to_run,
                     )
                 )
+
+                yield channels_cache.close_and_remove(command.to_stop)
 
                 if self.context.config.stop_apps:  # False by default
                     tm = time.time()
@@ -500,33 +503,32 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.
-                started_set = set()
+                started = set()
                 tm = time.time()
                 yield [
                     self.start(
                         app,
                         command.state[app].profile, command.state_version,
                         tm,
-                        started_set)
+                        started)
                     for app in command.to_run if app in command.state
                 ]
 
-                failed_to_start_set = command.to_run - started_set
+                # Send control to every app in state, except known for
+                # start up fail.
+                to_control = set(command.state.iterkeys()) \
+                    if command.is_state_updated else started
+                failed_to_start = command.to_run - started
 
-                if command.is_state_updated or command.to_run:
-                    # Send control to every app in state, except known for
-                    # start up fail.
-                    if failed_to_start_set:
-                        self.info(
-                            'control command will be skipped for '
-                            'failed to start apps {}'
-                            .format(failed_to_start_set))
+                self.warn(
+                    'control command will be skipped for '
+                    'failed to start apps: {}'
+                    .format(failed_to_start))
+                self.debug(
+                    'control command will be send for apps: {}'
+                    .format(to_control))
 
-                    yield channels_cache.update(
-                        command.to_stop,
-                        command.to_run - failed_to_start_set,
-                        self.context.config.expire_cached_app_sec)
-
+                if to_control:
                     tm = time.time()
                     yield [
                         self.adjust_by_channel(
@@ -534,7 +536,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                             int(state_record.workers), state_record.profile,
                             command.state_version, tm)
                         for app, state_record in command.state.iteritems()
-                        if app not in failed_to_start_set
+                        if app in to_control and
+                        app not in failed_to_start
                     ]
 
                     self.metrics_cnt['state_updates'] += 1
@@ -547,8 +550,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 self.sentry_wrapper.capture_exception()
 
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
-            finally:
-                self.debug('sending sync...')
-                self.control_queue.task_done()
-                yield self.sync_queue.put(True)
-                self.debug('send sync ack')
+            # finally:
+            #     self.debug('sending sync...')
+            #     self.control_queue.task_done()
+            #     yield self.sync_queue.put(True)
+            #     self.debug('send sync ack')

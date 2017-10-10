@@ -107,7 +107,7 @@ class Config(object):
             'type': 'string',
             'required': False,
         },
-        # TODO: add `_sec` suffix and make app-wide update  
+        # TODO: add `_sec` suffix and make app-wide update
         'expire_stopped': {
             'type': 'integer',
             'required': False,

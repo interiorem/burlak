@@ -1,5 +1,6 @@
-# TODO: Tests.
-#
+# TODO:
+#  - Tests.
+#  - Make API more user friendly: def warn(fmt, *args):
 import datetime
 
 
@@ -41,7 +42,7 @@ class ConsoleLogger(VoidLogger):  # pragma nocover
         self._dump(ConsoleLogger.INFO, msg)
 
     def warn(self, msg):
-        self._dump(ConsoleLogger.WARN, msg)
+        self._dump(ConsoleLogger.WARNING, msg)
 
     def error(self, msg):
         self._dump(ConsoleLogger.ERROR, msg)
