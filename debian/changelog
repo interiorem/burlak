@@ -1,3 +1,21 @@
+cocaine-orca (0.1.8) unstable; urgency=medium
+
+  * Major update.
+  * Global transition from node::control to app::control:
+      - introduction of apps cache
+      - update of config parameters
+  * Refactoring: ConsoleLogger api simplification.
+  * Fix for non-updated state. No control was sent to workers in case
+    of runtime failure, after agent reconnection and receiving of the
+    same state from scheduler.
+  * Separate submodule for SharedStatus.
+  * Status handler and SharedStatus checkpoints.
+  * Refactoring of dispatch task.
+  * Removing of redundant sync queue.
+  * Tests updates.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Mon, 11 Oct 2017 16:41:33 +0300
+
 cocaine-orca (0.1.7-12) unstable; urgency=medium
 
   * Hot fix: console_log_level from command line is more important then

@@ -1,6 +1,7 @@
 #
 # TODO:
 #   - timing metrics
+#   - invalidate caches on runtime disconnection
 #
 # DONE:
 #   - console logger wrapper
