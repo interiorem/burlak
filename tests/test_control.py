@@ -44,7 +44,7 @@ def count_apps(list_of_dict):
 @pytest.fixture
 def elysium(mocker):
 
-    config = Config()
+    config = Config(mocker.Mock())
     sentry_wrapper = mocker.Mock()
 
     mocker.patch.object(
