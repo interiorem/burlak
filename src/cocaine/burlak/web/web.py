@@ -6,8 +6,8 @@ from tornado import web
 
 
 def make_web_app(
-        prefix, uptime, uniresis, committed_state, qs, units, version):
-    return web.Application([
+        prefix, port, uptime, uniresis, committed_state, qs, units, version):
+    app = web.Application([
         (prefix + r'/state', StateHandler,
             dict(committed_state=committed_state)),
         (prefix + r'/metrics', MetricsHandler,
@@ -20,6 +20,11 @@ def make_web_app(
                 uptime=uptime,
                 version=version)),
     ], debug=False)
+
+    if port is not None:
+        app.listen(port)
+
+    return app
 
 
 class Uptime(object):  # pragma nocover

@@ -45,6 +45,9 @@ class Defaults(object):
     # Default is skip all console logging.
     CONSOLE_LOGGER_LEVEL = int(ConsoleLogger.ERROR) + 1
 
+    STATUS_WEB_PATH = r'/status'
+    STATUS_PORT = 9878
+
 
 #
 # Should be compatible with tools secure section
@@ -115,6 +118,16 @@ class Config(object):
         },
         'console_log_level': {  # see ConsoleLogger.LEVELS for valie values
             'type': 'integer',
+            'required': False,
+        },
+        'status_web_path': {
+            'type': 'string',
+            'required': False,
+        },
+        'status_port': {
+            'type': 'integer',
+            'min': 0,
+            'max': 2**16,
             'required': False,
         },
         'locator_endpoints': {
@@ -247,6 +260,14 @@ class Config(object):
     def expire_cached_app_sec(self):
         return self._config.get(
             'expire_cached_app_sec', Defaults.EXPIRE_CACHED_APP_SEC)
+
+    @property
+    def status_web_path(self):
+        return self._config.get('status_web_path', Defaults.STATUS_WEB_PATH)
+
+    @property
+    def status_port(self):
+        return self._config.get('status_port', Defaults.STATUS_PORT)
 
     # TODO:
     #   refactor to single method?

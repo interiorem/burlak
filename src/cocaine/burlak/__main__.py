@@ -19,6 +19,7 @@ from tornado.ioloop import IOLoop
 from .comm_state import CommittedState
 from .config import Config
 from .context import Context, LoggerSetup
+from .mokak.mokak import SharedStatus, make_status_web_handler
 from .helpers import SecureServiceFabric
 from .sentry import SentryClientWrapper
 from .uniresis import catchup_an_uniresis
@@ -80,14 +81,15 @@ def main(
 
     sentry_wrapper = SentryClientWrapper(
         logger, dsn=config.sentry_dsn, revision=__version__)
+    committed_state = CommittedState()
+    shared_status = SharedStatus()
 
     context = Context(
         LoggerSetup(logger, dup_to_console),
         config,
         __version__,
-        sentry_wrapper)
-
-    committed_state = CommittedState()
+        sentry_wrapper,
+        shared_status)
 
     acquirer = burlak.StateAcquirer(context, input_queue)
     state_processor = burlak.StateAggregator(
@@ -128,9 +130,11 @@ def main(
 
     # TODO: use non-default address
     uptime = Uptime()
-    app = make_web_app(
-        prefix, uptime, uniresis, committed_state, qs, units, __version__)
-    app.listen(port)
+    web_app = make_web_app( # noqa F841
+        prefix, port, uptime, uniresis, committed_state, qs, units,
+        __version__)
+    status_app = make_status_web_handler( # noqa F841
+        shared_status, config.status_web_path, config.status_port)
 
     click.secho('orca is starting...', fg='green')
     IOLoop.current().start()
