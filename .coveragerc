@@ -4,3 +4,4 @@ omit =
     src/cocaine/burlak/ver.py
     src/cocaine/burlak/helpers/*
     src/cocaine/burlak/sched_load/*
+    src/cocaine/burlak/mokak/*
