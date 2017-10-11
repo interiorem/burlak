@@ -1,0 +1,3 @@
+[submodule "src/cocaine/burlak/external/mokak"]
+	path = src/cocaine/burlak/mokak
+	url = https://github.com/karitra/mokak.git
