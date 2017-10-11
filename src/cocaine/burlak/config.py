@@ -54,6 +54,8 @@ class Defaults(object):
 #
 class Config(object):
 
+    TASK_NAME = 'config'
+
     # TODO: make schema work with tools config
     SCHEMA = {
         'secure': {
@@ -143,16 +145,19 @@ class Config(object):
         },
     }
 
-    def __init__(self, logger=None):
+    def __init__(self, shared_status, logger=None):
         self._config = dict()
         self._validator = cerberus.Validator(self.SCHEMA, allow_unknown=True)
         self._logger = logger
+
+        self._status = shared_status.register(Config.TASK_NAME)
 
     def _validate_raise(self, config):
         if not self._validator.validate(config):  # pragma nocover
             raise Exception('incorrect config format')
 
     def update(self, paths=CONFIG_PATHS):
+        self._status.mark_ok('reading config')
         parsed = []
         for conf in paths:
             try:
@@ -172,13 +177,15 @@ class Config(object):
                     True)
 
         if not parsed:  # pragma nocover
-            self.info_to_logger(
-                'no config was found in file(s), using defaults.',
-                True)
+            info_message = 'no config was found in file(s), using defaults.'
+            self.info_to_logger(info_message, True)
+            self._status.mark_ok(info_message)
         else:
             self.info_to_logger(
                 'config has been updated from file(s) {}'.format(parsed),
                 True)
+            self._status.mark_ok(
+                'config has been updated from {} file(s)'.format(len(parsed)))
 
         return len(parsed)
 

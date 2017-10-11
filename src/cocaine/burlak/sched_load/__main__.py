@@ -22,6 +22,7 @@ import yaml
 
 from ..config import Config
 from ..helpers.secadaptor import SecureServiceFabric
+from ..mokak.mokak import SharedStatus
 from ..uniresis import catchup_an_uniresis
 
 
@@ -172,7 +173,7 @@ def main(
         uuid_prefix, uniresis_stub_uuid, to_sleep, state_file, verify_url,
         max_workers, proportion):
 
-    config = Config()
+    config = Config(SharedStatus())
     config.update()
 
     def load_state(fname):

@@ -60,7 +60,10 @@ def main(
         dup_to_console,
         console_log_level):
 
-    config = Config()
+    committed_state = CommittedState()
+    shared_status = SharedStatus()
+
+    config = Config(shared_status)
     config.update()
 
     if console_log_level is not None:
@@ -81,8 +84,6 @@ def main(
 
     sentry_wrapper = SentryClientWrapper(
         logger, dsn=config.sentry_dsn, revision=__version__)
-    committed_state = CommittedState()
-    shared_status = SharedStatus()
 
     context = Context(
         LoggerSetup(logger, dup_to_console),

@@ -132,6 +132,8 @@ class LoggerMixin(object):  # pragma nocover
 
 class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
+    TASK_NAME = 'state_subscriber'
+
     STATE_SCHEMA = {
         'state': {
             'type': 'dict',
@@ -155,6 +157,8 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
         super(StateAcquirer, self).__init__(context, **kwargs)
         self.input_queue = input_queue
 
+        self.status = context.shared_status.register(StateAcquirer.TASK_NAME)
+
     @gen.coroutine
     def subscribe_to_state_updates(self, unicorn, node, uniresis, state_pfx):
         validator = Validator(StateAcquirer.STATE_SCHEMA)
@@ -162,24 +166,33 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
         ch = None
         while self.should_run():
             try:
+                self.status.mark_ok('getting uuid')
+
                 self.debug('retrieving uuid from uniresis')
                 uuid = yield uniresis.uuid()
 
                 # TODO: validate uuid
                 if not uuid:  # pragma nocover
                     self.error('got broken uuid')
+                    self.status.mark_warn('got empty uuid')
                     yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
                     continue
 
                 to_listen = make_state_path(state_pfx, uuid)
+
+                self.status.mark_ok('subscribing for state')
                 self.info('subscribing for path {}', to_listen)
                 ch = yield unicorn.subscribe(to_listen)
 
                 while self.should_run():
-                    self.debug('waiting for state subscription')
+                    info_message = 'waiting for state updates'
+                    self.status.mark_ok(info_message)
+                    self.debug(info_message)
+
                     state, version = yield ch.rx.get()
                     self.debug(
                         'subscribe:: got version {} state {}', version, state)
+                    self.status.mark_ok('processing state')
 
                     assert isinstance(version, int)
 
@@ -188,7 +201,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                             'expected dictionary, got {}',
                             type(state).__name__)
                         self.metrics_cnt['got_broken_sate'] += 1
-                        raise Exception('state is empty, resubscribe')
+                        raise Exception('state is empty, resubscribing')
 
                     #
                     # Bench results:
@@ -204,6 +217,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                         self.error(
                             'state not valid {} {}', state, validator.errors)
                         self.metrics_cnt['not_valid_state'] += 1
+                        self.status.mark_warn('state not valid')
 
                     yield self.input_queue.put(
                         StateUpdateMessage(state, version, uuid))
@@ -211,6 +225,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     self.metrics_cnt['apps_in_last_state'] = len(state)
             except Exception as e:  # pragma nocover
                 self.error('failed to get state, error: "{}"', e)
+                self.status.mark_warn('failed to get state')
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
             finally:  # pragma nocover
                 # TODO: Is it really needed?
@@ -218,6 +233,8 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
 
 class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
+    TASK_NAME = 'state_processor'
+
     def __init__(
             self,
             context,
@@ -239,6 +256,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         self.poll_interval_sec = poll_interval_sec
 
         self.ci_state = ci_state
+
+        self.status = context.shared_status.register(StateAggregator.TASK_NAME)
 
     def make_prof_update_set(self, prev_state, state):
         to_update = []
@@ -270,6 +289,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
         last_uuid = None
         while self.should_run():
+            self.status.mark_ok('listening on incoming queue')
 
             is_state_updated = False
             msg = None
@@ -284,6 +304,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 self.input_queue.task_done()
 
             try:
+                self.status.mark_ok('getting running apps list')
+
                 self.ci_state.remove_old_stopped(
                     self.context.config.expire_stopped)
 
@@ -312,6 +334,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     'skipping control iteration')
                 continue
 
+            self.status.mark_ok('processing state records')
+
             update_state_apps_set = set(state.iterkeys())
 
             to_run = update_state_apps_set - running_apps
@@ -339,6 +363,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             self.info("to_run apps list {}", to_run)
 
             if is_state_updated or to_run or to_stop:
+                self.status.mark_ok('sending processed state to dispatch')
 
                 yield self.control_queue.put(
                     DispatchMessage(
@@ -354,6 +379,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     '''Controls life-time of applications based on supplied state
     '''
+    TASK_NAME = 'tasks_dispatch'
+
     def __init__(
             self,
             context,
@@ -370,6 +397,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
         self.node_service = node
         self.control_queue = control_queue
+
+        self.status = context.shared_status.register(AppsElysium.TASK_NAME)
 
     @gen.coroutine
     def start(self, app, profile, state_version, tm, started=None):
@@ -389,6 +418,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.info('starting app {} with profile {}', app, profile)
             self.metrics_cnt['apps_started'] += 1
 
+            self.status.mark_warn('failed to start application')
             if started is not None:
                 started.add(app)
 
@@ -409,6 +439,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.metrics_cnt['errors_slay_app'] += 1
 
             self.sentry_wrapper.capture_exception()
+            self.status.mark_warn('failed to stop application')
 
     @gen.coroutine
     def adjust_by_channel(
@@ -427,6 +458,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     'failed to send control to `{}`, workers {}, '
                     'with attempts {}, err {}',
                     app, to_adjust, attempts, e)
+
+                self.status.mark_crit('failed to send control command')
 
                 self.metrics_cnt['errors_of_control'] += 1
 
@@ -450,7 +483,10 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
         while self.should_run():
             try:
-                self.debug('waiting for control command...')
+                info_message = 'waiting for control command'
+                self.debug(info_message)
+                self.status.mark_ok(info_message)
+
                 command = yield self.control_queue.get()
                 self.control_queue.task_done()
 
@@ -463,10 +499,12 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     command.to_stop,
                     command.to_run,
                 )
+                self.status.mark_ok('processing control command')
 
                 yield channels_cache.close_and_remove(command.to_stop)
 
                 if self.context.config.stop_apps:  # False by default
+                    self.status.mark_ok('stopping apps')
                     tm = time.time()
                     yield [
                         self.slay(app, command.state_version, tm)
@@ -479,6 +517,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.
+                self.status.mark_ok('starting apps')
                 started = set()
                 tm = time.time()
                 yield [
@@ -506,6 +545,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     'control command will be send for apps: {}', to_control)
 
                 if to_control:
+                    self.status.mark_ok('adjusting workers count')
                     tm = time.time()
                     yield [
                         self.adjust_by_channel(
@@ -523,6 +563,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 self.error(
                     'failed to exec command with error {}: {}',
                     type(e).__name__, e)
-
                 self.sentry_wrapper.capture_exception()
+                self.status.mark_warn('failed to execute control command')
+
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
