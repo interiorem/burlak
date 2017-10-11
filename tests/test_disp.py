@@ -63,7 +63,8 @@ def disp(mocker):
             LoggerSetup(make_logger_mock(mocker), False),
             config,
             '0',
-            sentry_wrapper
+            sentry_wrapper,
+            mocker.Mock(),
         ),
         node,
         CommittedState(),

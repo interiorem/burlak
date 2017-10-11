@@ -19,8 +19,8 @@ from tornado.ioloop import IOLoop
 from .comm_state import CommittedState
 from .config import Config
 from .context import Context, LoggerSetup
-from .mokak.mokak import SharedStatus, make_status_web_handler
 from .helpers import SecureServiceFabric
+from .mokak.mokak import SharedStatus, make_status_web_handler
 from .sentry import SentryClientWrapper
 from .uniresis import catchup_an_uniresis
 from .web import Uptime, make_web_app

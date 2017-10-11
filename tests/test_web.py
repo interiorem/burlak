@@ -39,7 +39,7 @@ class MetricsMock(burlak.MetricsMixin):
 
 
 @pytest.fixture
-def app(mocker):
+def app(http_port, mocker):
     input_queue = tornado.queues.Queue()
     adjust_queue = tornado.queues.Queue()
     stop_queue = tornado.queues.Queue()
@@ -73,7 +73,8 @@ def app(mocker):
     uptime.uptime = mocker.Mock(return_value=TEST_UPTIME)
 
     return make_web_app(
-        '', uptime, uniresis, committed_state, qs, units, TEST_VERSION)
+        '', None, uptime, uniresis, committed_state, qs, units,
+        TEST_VERSION)
 
 
 @pytest.mark.gen_test
