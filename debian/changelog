@@ -14,7 +14,7 @@ cocaine-orca (0.1.8) unstable; urgency=medium
   * Removing of redundant sync queue.
   * Tests updates.
 
- -- Alex Karev <karapuz@yandex-team.ru>  Mon, 11 Oct 2017 16:41:33 +0300
+ -- Alex Karev <karapuz@yandex-team.ru>  Wed, 11 Oct 2017 16:41:33 +0300
 
 cocaine-orca (0.1.7-12) unstable; urgency=medium
 

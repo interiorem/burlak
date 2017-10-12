@@ -178,10 +178,10 @@ class Config(object):
 
         if not parsed:  # pragma nocover
             info_message = 'no config was found in file(s), using defaults.'
-            self.info_to_logger(info_message, True)
+            self._info_to_logger(info_message, True)
             self._status.mark_ok(info_message)
         else:
-            self.info_to_logger(
+            self._info_to_logger(
                 'config has been updated from file(s) {}'.format(parsed),
                 True)
             self._status.mark_ok(
@@ -282,16 +282,16 @@ class Config(object):
     def err_to_logger(self, msg, to_console=False):  # pragma nocover
         if self._logger:
             self._logger.error(msg)
-        self.dump_to_console(msg, to_console)
+        self._dump_to_console(msg, to_console)
 
     # TODO:
     #   refactor to single method?
     #   make *args format
-    def info_to_logger(self, msg, to_console=False):  # pragma nocover
+    def _info_to_logger(self, msg, to_console=False):  # pragma nocover
         if self._logger:
             self._logger.info(msg)
-        self.dump_to_console(msg, to_console)
+        self._dump_to_console(msg, to_console)
 
-    def dump_to_console(self, msg, to_console=False):  # pragma nocovers
+    def _dump_to_console(self, msg, to_console=False):  # pragma nocovers
         if to_console:
             print (msg)

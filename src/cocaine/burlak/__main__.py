@@ -34,6 +34,7 @@ except ImportError:
 
 # TODO: get from config!
 APP_LIST_POLL_INTERVAL = 15
+MODULE_NAME = 'cocaine.orca'
 
 
 @click.command()
@@ -61,7 +62,7 @@ def main(
         console_log_level):
 
     committed_state = CommittedState()
-    shared_status = SharedStatus()
+    shared_status = SharedStatus(name=MODULE_NAME)
 
     config = Config(shared_status)
     config.update()
