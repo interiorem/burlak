@@ -409,17 +409,16 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             ch = yield self.node_service.start_app(app, profile)
             yield ch.rx.get()
         except Exception as e:
+            self.metrics_cnt['errors_start_app'] += 1
             self.error(
                 'failed to start app {} {} with err: {}', app, profile, e)
-            self.metrics_cnt['errors_start_app'] += 1
+            self.status.mark_warn('failed to start application')
             self.sentry_wrapper.capture_exception()
-
             self.ci_state.mark_failed(app, profile, state_version, tm)
         else:
             self.info('starting app {} with profile {}', app, profile)
             self.metrics_cnt['apps_started'] += 1
 
-            self.status.mark_warn('failed to start application')
             if started is not None:
                 started.add(app)
 
@@ -461,9 +460,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     app, to_adjust, attempts, e)
 
                 self.status.mark_crit('failed to send control command')
-
                 self.metrics_cnt['errors_of_control'] += 1
-
                 self.sentry_wrapper.capture_exception()
 
                 yield channels_cache.close_and_remove([app])
