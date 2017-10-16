@@ -40,7 +40,6 @@ class Defaults(object):
     SENTRY_DSN = ''
 
     EXPIRE_STOPPED_SEC = 600
-    EXPIRE_CACHED_APP_SEC = 3600
 
     # Default is skip all console logging.
     CONSOLE_LOGGER_LEVEL = int(ConsoleLogger.ERROR) + 1
@@ -111,10 +110,6 @@ class Config(object):
         },
         # TODO: add `_sec` suffix and make app-wide update
         'expire_stopped': {
-            'type': 'integer',
-            'required': False,
-        },
-        'expire_cached_app_sec': {
             'type': 'integer',
             'required': False,
         },
@@ -262,11 +257,6 @@ class Config(object):
     @console_log_level.setter
     def console_log_level(self, level):
         self._config['console_log_level'] = level
-
-    @property
-    def expire_cached_app_sec(self):
-        return self._config.get(
-            'expire_cached_app_sec', Defaults.EXPIRE_CACHED_APP_SEC)
 
     @property
     def status_web_path(self):

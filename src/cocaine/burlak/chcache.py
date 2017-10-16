@@ -53,29 +53,15 @@ class _AppsCache(object):
         self.apps[app] = _AppsCache.Record(app_service, now)
         return app_service
 
-    # TODO: unused, even deprecated, remove someday
-    def remove_old(self, expire_from_now):
-        '''Removes all records accessed before `older_then`'''
-        older_then = time.time() - expire_from_now
-
-        expired = [
-            app
-            for app, record in self.apps.iteritems()
-            if record.touch_timestamp < older_then
-        ]
-
-        self.logger.debug(
-            'removing expired applications from cache: {}', expired)
-
-        self.remove(expired)
-        return expired
-
     def remove(self, to_remove):
         self.logger.debug('removing from apps.cache {}', to_remove)
 
         for app in to_remove:
             if app in self.apps:
                 del self.apps[app]
+
+    def __len__(self):
+        return len(self.apps)
 
 
 class ChannelsCache(object):
