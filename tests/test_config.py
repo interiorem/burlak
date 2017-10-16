@@ -130,6 +130,22 @@ def test_misc_options(
     assert cfg.default_profile == expect_profile
     assert cfg.stop_apps == expect_stop_apps
     assert cfg.expire_stopped == expect_expire_stopped
+    assert cfg.console_log_level == expect_log_level
+
+
+@pytest.mark.parametrize(
+    'config,status_web_path,status_port',
+    [
+        ('tests/assets/conf1.yaml', r'/status', 10042),
+        ('tests/assets/conf2.yaml', r'/boo', 9878),
+    ]
+)
+def test_extra_misc(config, status_web_path, status_port):
+    cfg = Config(shared_status)
+    cfg.update([config])
+
+    assert cfg.status_web_path == status_web_path
+    assert cfg.status_port == status_port
 
 
 @pytest.mark.parametrize(
@@ -159,3 +175,12 @@ def test_locator_endpoints(config, expect_loc_endp):
     cfg.update([config])
 
     assert cfg.locator_endpoints == expect_loc_endp
+
+
+def test_console_log_level_setter():
+    console_level = 100500
+
+    cfg = Config(shared_status)
+    cfg.console_log_level = console_level
+
+    assert cfg.console_log_level == console_level

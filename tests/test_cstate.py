@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from cocaine.burlak.comm_state import CommittedState
 
 import pytest
@@ -25,12 +27,15 @@ mixed_state = dict(
 )
 
 
-def init_state(ci, state):
-    for k, (st, wrk, prof, ver, ts) in state.iteritems():
+@pytest.fixture
+def init_state(cstate):
+    for k, (st, wrk, prof, ver, ts) in mixed_state.iteritems():
         if st == 'STOPPED':
-            ci.mark_stopped(k, ver, ts)
+            cstate.mark_stopped(k, ver, ts)
         elif st == 'STARTED':
-            ci.mark_running(k, wrk, prof, ver, ts)
+            cstate.mark_running(k, wrk, prof, ver, ts)
+
+    return cstate
 
 
 @pytest.fixture
@@ -52,19 +57,18 @@ def test_stop_states(cstate):
     assert cstate.as_dict() == all_stopped_state
 
 
-def test_mixed_states(cstate):
-    init_state(cstate, mixed_state)
-    assert cstate.as_dict() == mixed_state
+def test_mixed_states(init_state):
+    assert init_state.as_dict() == mixed_state
 
 
-def test_expire_stopped(cstate, mocker):
+def test_expire_stopped(init_state, mocker):
     expire = 11
     now = 60
 
-    mix = mixed_state.copy()
-    init_state(cstate, mix)
+    mix = dict(mixed_state)
+
     mocker.patch('time.time', return_value=now)
-    cstate.remove_old_stopped(expire)
+    init_state.remove_old_stopped(expire)
 
     to_remove = [
         app for app, state in mix.iteritems()
@@ -76,4 +80,32 @@ def test_expire_stopped(cstate, mocker):
     for app in to_remove:
         del mix[app]
 
-    assert cstate.as_dict() == mix
+    assert init_state.as_dict() == mix
+    assert init_state.as_named_dict() == \
+        {
+            app: OrderedDict([
+                    ('state', state[0]),
+                    ('workers', state[1]),
+                    ('profile', state[2]),
+                    ('state_version', state[3]),
+                    ('time_stamp', state[4]),
+                ]) for app, state in mix.iteritems()
+        }
+
+
+@pytest.mark.parametrize(
+    'app, profile, version, tm',
+    [
+        ('app2', 'some1', 1, 2),
+        ('app3', 'some4', 3, 4),
+    ])
+def test_marke_failed(init_state, app, profile, version, tm):
+    init_state.mark_failed(app, profile, version, tm)
+    assert init_state.as_named_dict()[app] == \
+        OrderedDict([
+            ('state', 'FAILED'),
+            ('workers', 0),
+            ('profile', profile),
+            ('state_version', version),
+            ('time_stamp', tm),
+        ])

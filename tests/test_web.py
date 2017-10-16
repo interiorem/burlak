@@ -15,6 +15,7 @@ from .common import make_future
 TEST_UUID = 'some_correct_uuid'
 TEST_VERSION = 0.1
 TEST_UPTIME = 100500
+TEST_PORT = 10042
 
 test_state = {
     'app1': CommittedState.Record('STOPPED', 100500, 1, 3, 100500),
@@ -39,7 +40,7 @@ class MetricsMock(burlak.MetricsMixin):
 
 
 @pytest.fixture
-def app(http_port, mocker):
+def app(mocker):
     input_queue = tornado.queues.Queue()
     adjust_queue = tornado.queues.Queue()
     stop_queue = tornado.queues.Queue()
@@ -73,7 +74,7 @@ def app(http_port, mocker):
     uptime.uptime = mocker.Mock(return_value=TEST_UPTIME)
 
     return make_web_app(
-        '', None, uptime, uniresis, committed_state, qs, units,
+        '', TEST_PORT, uptime, uniresis, committed_state, qs, units,
         TEST_VERSION)
 
 
