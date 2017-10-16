@@ -40,6 +40,7 @@ class MetricsHandler(web.RequestHandler):
         self.queues = queues
         self.units = units
 
+    @gen.coroutine
     def get(self):
         metrics = {
             'queues_fill': {
@@ -60,6 +61,7 @@ class StateHandler(web.RequestHandler):
     def initialize(self, committed_state):
         self.committed_state = committed_state
 
+    @gen.coroutine
     def get(self):
         last_state = self.committed_state.as_named_dict()
         request = self.get_arguments('app')
