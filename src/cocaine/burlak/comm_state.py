@@ -32,6 +32,9 @@ class CommittedState(object):
     def as_named_dict(self):
         return {app: rec._asdict() for app, rec in self.state.iteritems()}
 
+    def reset(self):
+        self.state.clear()
+
     def mark_running(self, app, workers, profile, state_version, tm):
         self.state.update(
             {
