@@ -14,6 +14,7 @@ from .common import make_future
 
 TEST_UUID = 'some_correct_uuid'
 TEST_VERSION = 0.1
+TEST_STATE_VERSION = 42
 TEST_UPTIME = 100500
 TEST_PORT = 10042
 
@@ -21,6 +22,7 @@ test_state = {
     'app1': CommittedState.Record('STOPPED', 100500, 1, 3, 100500),
     'app2': CommittedState.Record('RUNNING', 100501, 2, 2, 100501),
     'app3': CommittedState.Record('STOPPED', 100502, 3, 1, 100502),
+    'app4': CommittedState.Record('FAILED', 100502, 3, 1, 100502),
 }
 
 
@@ -59,6 +61,8 @@ def app(mocker):
             for app, record in test_state.iteritems()
         }
     )
+
+    committed_state.version = TEST_STATE_VERSION
 
     qs = dict(input=input_queue, adjust=adjust_queue, stop=stop_queue)
     units = dict(
@@ -128,3 +132,17 @@ def test_get_uuid(http_client, base_url):
             'uptime': TEST_UPTIME,
             'version': TEST_VERSION,
         }
+
+
+@pytest.mark.gen_test
+def test_get_failed(http_client, base_url):
+    response = yield http_client.fetch(base_url + '/failed')
+
+    failed = [
+        app for app, record in test_state.iteritems()
+        if record.state_version == TEST_STATE_VERSION and
+        record.state == 'FAILED'
+    ]
+
+    assert response.code == 200
+    assert json.loads(response.body).get('failed', []) == failed

@@ -10,6 +10,8 @@ def make_web_app(
     app = web.Application([
         (prefix + r'/state', StateHandler,
             dict(committed_state=committed_state)),
+        (prefix + r'/failed', FailedStateHandle,
+            dict(committed_state=committed_state)),
         (prefix + r'/metrics', MetricsHandler,
             dict(queues=qs, units=units)),
         # Used for testing/debugging, not for production, even could
@@ -75,6 +77,23 @@ class StateHandler(web.RequestHandler):
             result = last_state
 
         self.write(result)
+        self.flush()
+
+
+class FailedStateHandle(web.RequestHandler):
+    def initialize(self, committed_state):
+        self.committed_state = committed_state
+
+    @gen.coroutine
+    def get(self):
+        version = self.committed_state.version
+
+        failed = [
+            app for app, state in self.committed_state.failed.iteritems()
+            if state.state_version == version
+        ]
+
+        self.write(dict(failed=failed, version=version))
         self.flush()
 
 

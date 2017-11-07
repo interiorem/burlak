@@ -499,6 +499,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 )
                 self.status.mark_ok('processing control command')
 
+                self.ci_state.version = command.state_version
+
                 yield channels_cache.close_and_remove(command.to_stop)
 
                 if self.context.config.stop_apps:  # False by default

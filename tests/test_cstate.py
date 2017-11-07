@@ -99,8 +99,9 @@ def test_expire_stopped(init_state, mocker):
         ('app2', 'some1', 1, 2),
         ('app3', 'some4', 3, 4),
     ])
-def test_marke_failed(init_state, app, profile, version, tm):
+def test_mark_failed(init_state, app, profile, version, tm):
     init_state.mark_failed(app, profile, version, tm)
+
     assert init_state.as_named_dict()[app] == \
         OrderedDict([
             ('state', 'FAILED'),
@@ -109,3 +110,10 @@ def test_marke_failed(init_state, app, profile, version, tm):
             ('state_version', version),
             ('time_stamp', tm),
         ])
+
+    assert app in init_state.failed
+
+
+def test_version(init_state):
+    init_state.version = 100500
+    assert init_state.version == 100500

@@ -24,6 +24,7 @@ class CommittedState(object):
 
     def __init__(self):
         self.state = dict()
+        self.last_state_version = 0
 
     def as_dict(self):
         return self.state
@@ -77,3 +78,18 @@ class CommittedState(object):
 
         for app in to_remove:
             del self.state[app]
+
+    @property
+    def failed(self):
+        return {
+            app: state for app, state in self.state.iteritems()
+            if state.state == 'FAILED'
+        }
+
+    @property
+    def version(self):
+        return self.last_state_version
+
+    @version.setter
+    def version(self, version):
+        self.last_state_version = version
