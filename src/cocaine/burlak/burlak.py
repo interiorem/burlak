@@ -420,7 +420,10 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.error(
                 'failed to start app {} {} with err: {}', app, profile, e)
             self.status.mark_warn('failed to start application')
-            self.sentry_wrapper.capture_exception()
+
+            sentry_message = "can't start app {}, reason: {}".format(app, e)
+            self.sentry_wrapper.capture_exception(message=sentry_message)
+
             self.ci_state.mark_failed(app, profile, state_version, tm)
         else:
             self.info('starting app {} with profile {}', app, profile)
