@@ -1,4 +1,4 @@
-cocaine-orca (0.1.9) UNRELEASED; urgency=medium
+cocaine-orca (0.1.9) unstable; urgency=medium
 
   * `Failed` web handle.
 
