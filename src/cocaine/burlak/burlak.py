@@ -156,8 +156,8 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
     def __init__(
             self, context, input_queue, **kwargs):
         super(StateAcquirer, self).__init__(context, **kwargs)
-        self.input_queue = input_queue
 
+        self.input_queue = input_queue
         self.status = context.shared_status.register(StateAcquirer.TASK_NAME)
 
     @gen.coroutine
@@ -328,6 +328,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             except Exception as e:
                 self.error('failed to get control message with {}', e)
                 self.sentry_wrapper.capture_exception()
+
+            # Note that in general following code shouldn't raise.
 
             if not state:
                 self.info(
