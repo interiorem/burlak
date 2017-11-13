@@ -19,3 +19,5 @@ sentry_dsn: https://100400@some.sentry.org
 expire_stopped: 42
 
 status_web_path: /boo
+
+input_queue_size: 42

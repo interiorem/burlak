@@ -8,3 +8,5 @@ port: 100500
 
 console_log_level: 100
 status_port: 10042
+
+apps_poll_interval_sec: 100500

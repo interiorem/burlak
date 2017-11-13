@@ -140,12 +140,27 @@ def test_misc_options(
         ('tests/assets/conf2.yaml', r'/boo', 9878),
     ]
 )
-def test_extra_misc(config, status_web_path, status_port):
+def test_extra1(config, status_web_path, status_port):
     cfg = Config(shared_status)
     cfg.update([config])
 
     assert cfg.status_web_path == status_web_path
     assert cfg.status_port == status_port
+
+
+@pytest.mark.parametrize(
+    'config,apps_poll_interval_sec,input_queue_size',
+    [
+        ('tests/assets/conf1.yaml', 100500, 1024),
+        ('tests/assets/conf2.yaml', 15, 42),
+    ]
+)
+def test_extra2(config, apps_poll_interval_sec, input_queue_size):
+    cfg = Config(shared_status)
+    cfg.update([config])
+
+    assert cfg.apps_poll_interval_sec == apps_poll_interval_sec
+    assert cfg.input_queue_size == input_queue_size
 
 
 @pytest.mark.parametrize(
