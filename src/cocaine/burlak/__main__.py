@@ -32,10 +32,6 @@ except ImportError:
     __version__ = 'unknown'
 
 
-# TODO: get from config!
-APP_LIST_POLL_INTERVAL = 15
-INPUT_QUEUE_SIZE = 1024
-
 MODULE_NAME = 'cocaine.orca'
 
 
@@ -43,8 +39,7 @@ MODULE_NAME = 'cocaine.orca'
 @click.option(
     '--uuid-prefix', help='state prefix (unicorn path)')
 @click.option(
-    '--apps-poll-interval',
-    default=APP_LIST_POLL_INTERVAL, help='default profile for app running')
+    '--apps-poll-interval', help='running apps list poll interval (seconds)')
 @click.option('--port', type=int, help='web iface port')
 @click.option(
     '--uniresis-stub-uuid', help='use uniresis stub with provided uuid')
@@ -72,7 +67,7 @@ def main(
     if console_log_level is not None:
         config.console_log_level = console_log_level
 
-    input_queue = queues.Queue(INPUT_QUEUE_SIZE)
+    input_queue = queues.Queue(config.input_queue_size)
     control_queue = queues.Queue()
 
     logger = Logger(config.locator_endpoints)
@@ -95,6 +90,9 @@ def main(
         __version__,
         sentry_wrapper,
         shared_status)
+
+    if not apps_poll_interval:
+        apps_poll_interval = config.apps_poll_interval_sec
 
     acquirer = burlak.StateAcquirer(context, input_queue)
     state_processor = burlak.StateAggregator(

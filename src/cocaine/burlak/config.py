@@ -47,6 +47,9 @@ class Defaults(object):
     STATUS_WEB_PATH = r'/status'
     STATUS_PORT = 9878
 
+    APPS_POLL_INTERVAL_SEC = 15
+    INPUT_QUEUE_SIZE = 1024
+
 
 #
 # Should be compatible with tools secure section
@@ -125,6 +128,16 @@ class Config(object):
             'type': 'integer',
             'min': 0,
             'max': 2**16,
+            'required': False,
+        },
+        'apps_poll_interval_sec': {
+            'type': 'integer',
+            'min': 0,
+            'required': False,
+        },
+        'input_queue_size': {
+            'type': 'integer',
+            'min': 0,
             'required': False,
         },
         'locator_endpoints': {
@@ -253,6 +266,16 @@ class Config(object):
     def console_log_level(self):
         return self._config.get(
             'console_log_level', Defaults.CONSOLE_LOGGER_LEVEL)
+
+    @property
+    def apps_poll_interval_sec(self):
+        return self._config.get(
+            'apps_poll_interval_sec', Defaults.APPS_POLL_INTERVAL_SEC)
+
+    @property
+    def input_queue_size(self):
+        return self._config.get(
+            'input_queue_size', Defaults.INPUT_QUEUE_SIZE)
 
     @console_log_level.setter
     def console_log_level(self, level):
