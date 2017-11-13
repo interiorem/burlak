@@ -183,6 +183,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
                 self.status.mark_ok('subscribing for state')
                 self.info('subscribing for path {}', to_listen)
+
                 ch = yield unicorn.subscribe(to_listen)
 
                 while self.should_run():
