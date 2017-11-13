@@ -60,6 +60,18 @@ class Config(object):
 
     # TODO: make schema work with tools config
     SCHEMA = {
+        'locator': {
+            'type': 'dict',
+            'required': False,
+            'schema': {
+                'host': {'type': 'string'},
+                'port': {
+                    'type': 'integer',
+                    'min': 0,
+                    'max': 2**16
+                }
+            }
+        },
         'secure': {
             'type': 'dict',
             'required': False,
@@ -243,9 +255,17 @@ class Config(object):
 
     @property
     def locator_endpoints(self):
+        default_host = Defaults.LOCATOR_HOST
+        default_port = Defaults.LOCATOR_PORT
+
+        locator_section = self._config.get('locator')
+        if locator_section and isinstance(locator_section, dict):
+            default_host = locator_section.get('host', Defaults.LOCATOR_HOST)
+            default_port = locator_section.get('port', Defaults.LOCATOR_PORT)
+
         return self._config.get(
             'locator_endpoints',
-            [[Defaults.LOCATOR_HOST, Defaults.LOCATOR_PORT], ])
+            [[default_host, default_port], ])
 
     @property
     def stop_apps(self):

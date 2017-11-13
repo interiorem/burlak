@@ -183,6 +183,7 @@ def test_sentry_dsn(config, expect_dsn):
         ('tests/assets/conf1.yaml',
             [[Defaults.LOCATOR_HOST, Defaults.LOCATOR_PORT], ]),
         ('tests/assets/conf2.yaml', [['host1', 100500], ['host2', 42]]),
+        ('tests/assets/conf3.yaml', [[Defaults.LOCATOR_HOST, 10042]])
     ]
 )
 def test_locator_endpoints(config, expect_loc_endp):
