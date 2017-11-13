@@ -34,6 +34,8 @@ except ImportError:
 
 # TODO: get from config!
 APP_LIST_POLL_INTERVAL = 15
+INPUT_QUEUE_SIZE = 1024
+
 MODULE_NAME = 'cocaine.orca'
 
 
@@ -70,8 +72,9 @@ def main(
     if console_log_level is not None:
         config.console_log_level = console_log_level
 
-    input_queue, control_queue = \
-        (queues.Queue() for _ in xrange(2))
+    input_queue = queues.Queue(INPUT_QUEUE_SIZE)
+    control_queue = queues.Queue()
+
     logger = Logger(config.locator_endpoints)
 
     unicorn = SecureServiceFabric.make_secure_adaptor(
