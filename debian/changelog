@@ -1,8 +1,15 @@
+cocaine-orca (0.1.10) unstable; urgency=medium
+
+  * Locator config from tools.
+  * Move application poll interval and queue size to config. 
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Mon, 13 Nov 2017 18:07:23 +0300
+
 cocaine-orca (0.1.9) unstable; urgency=medium
 
   * `Failed` web handle.
 
- -- karapuz <karapuz@karapuz-ub14>  Wed, 08 Nov 2017 13:16:30 +0300
+ -- Alex Karev <karapuz@yandex-team.ru>  Wed, 08 Nov 2017 13:16:30 +0300
 
 cocaine-orca (0.1.8) unstable; urgency=medium
 
