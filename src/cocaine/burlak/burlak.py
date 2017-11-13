@@ -161,7 +161,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
         self.status = context.shared_status.register(StateAcquirer.TASK_NAME)
 
     @gen.coroutine
-    def subscribe_to_state_updates(self, unicorn, node, uniresis, state_pfx):
+    def subscribe_to_state_updates(self, unicorn, uniresis, state_pfx):
         validator = Validator(StateAcquirer.STATE_SCHEMA)
 
         ch = None

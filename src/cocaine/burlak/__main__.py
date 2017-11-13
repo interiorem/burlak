@@ -118,7 +118,7 @@ def main(
     #     lambda: acquirer.poll_running_apps_list(node_list))
     io_loop.spawn_callback(
         lambda: acquirer.subscribe_to_state_updates(
-            unicorn, node, uniresis, uuid_prefix))
+            unicorn, uniresis, uuid_prefix))
 
     qs = dict(input=input_queue, control=control_queue)
     units = dict(
