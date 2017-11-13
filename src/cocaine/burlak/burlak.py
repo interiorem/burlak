@@ -300,7 +300,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             try:
                 msg = yield self.input_queue.get(
                     timeout=timedelta(seconds=self.poll_interval_sec))
-            except gen.TimeoutError:
+            except gen.TimeoutError:  # pragma nocover
                 self.debug('input_queue timeout')
             else:
                 self.input_queue.task_done()
@@ -546,7 +546,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     if command.is_state_updated else started
                 failed_to_start = command.to_run - started
 
-                if failed_to_start:
+                if failed_to_start:  # pragma nocover
                     self.warn(
                         'control command will be skipped for '
                         'failed to start apps: {}',
