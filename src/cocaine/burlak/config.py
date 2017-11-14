@@ -255,8 +255,8 @@ class Config(object):
 
     @property
     def locator_endpoints(self):
-        default_host = Defaults.LOCATOR_HOST
-        default_port = Defaults.LOCATOR_PORT
+        default_host, default_port = \
+            Defaults.LOCATOR_HOST, Defaults.LOCATOR_PORT
 
         locator_section = self._config.get('locator')
         if locator_section and isinstance(locator_section, dict):
