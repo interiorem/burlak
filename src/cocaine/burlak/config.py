@@ -39,7 +39,7 @@ class Defaults(object):
 
     SENTRY_DSN = ''
 
-    EXPIRE_STOPPED_SEC = 600
+    EXPIRE_STOPPED_SEC = 1800
 
     # Default is skip all console logging.
     CONSOLE_LOGGER_LEVEL = int(ConsoleLogger.ERROR) + 1
@@ -47,7 +47,7 @@ class Defaults(object):
     STATUS_WEB_PATH = r'/status'
     STATUS_PORT = 9878
 
-    APPS_POLL_INTERVAL_SEC = 15
+    APPS_POLL_INTERVAL_SEC = 30
     INPUT_QUEUE_SIZE = 1024
 
 
