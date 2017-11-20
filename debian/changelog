@@ -1,3 +1,14 @@
+cocaine-orca (0.1.11) unstable; urgency=medium
+
+  * Max rss memory usage metrics + partly getrusage metrics.
+  * API version in web handlers paths.
+  * Support of legacy web handlers (without /v1 prefix).
+  * Separate system metrics gatherer.
+  * `incoming_state` web handler for last acquired scheduler state viewing.
+  * Extended state web handler with global version.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Mon, 20 Nov 2017 15:19:39 +0300
+
 cocaine-orca (0.1.10) unstable; urgency=medium
 
   * Locator config from tools.
