@@ -103,21 +103,35 @@ def test_get_metrics(http_client, base_url, mocker):
     )
 
 
+@pytest.mark.parametrize(
+    'state_path',
+    [
+        r'/state',
+        make_url('', API_V1, r'state'),
+    ]
+)
 @pytest.mark.gen_test
-def test_get_state(http_client, base_url):
+def test_get_state(http_client, base_url, state_path):
     response = yield http_client.fetch(
-        base_url + make_url('', API_V1, r'state'))
+        base_url + state_path)
 
     assert response.code == 200
     assert json.loads(response.body) == \
         {app: record._asdict() for app, record in test_state.iteritems()}
 
 
+@pytest.mark.parametrize(
+    'state_path',
+    [
+        '/state?app={}',
+        make_url('', API_V1, 'state?app={}'),
+    ]
+)
 @pytest.mark.gen_test
-def test_get_state_by_app(http_client, base_url):
+def test_get_state_by_app(http_client, base_url, state_path):
     for app in test_state:
         response = yield http_client.fetch(
-            base_url + make_url('', API_V1, 'state?app={}'.format(app)))
+            base_url + state_path.format(app))
 
         assert response.code == 200
         print 'app {} body {}'.format(app, response.body)
@@ -142,10 +156,17 @@ def test_get_info(http_client, base_url):
         }
 
 
+@pytest.mark.parametrize(
+    'failed_path',
+    [
+        r'/failed',
+        make_url('', API_V1, r'failed'),
+    ]
+)
 @pytest.mark.gen_test
-def test_get_failed(http_client, base_url):
+def test_get_failed(http_client, base_url, failed_path):
     response = yield http_client.fetch(
-        base_url + make_url('', API_V1, r'failed'))
+        base_url + failed_path)
 
     failed = [
         app for app, record in test_state.iteritems()
