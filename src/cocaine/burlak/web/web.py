@@ -5,22 +5,35 @@ from tornado import gen
 from tornado import web
 
 
-def make_web_app(
+API_V1 = r'v1'
+
+
+def make_url(prefix, version, path):
+    return '{}/{}/{}'.format(prefix, version, path)
+
+
+def make_web_app_v1(
         prefix, port, uptime, uniresis, committed_state, qs, units, version):
+
     app = web.Application([
-        (prefix + r'/state', StateHandler,
+        (make_url(prefix, API_V1, r'state'), StateHandler,
             dict(committed_state=committed_state)),
-        (prefix + r'/failed', FailedStateHandle,
+        (make_url(prefix, API_V1, r'failed'), FailedStateHandle,
             dict(committed_state=committed_state)),
-        (prefix + r'/metrics', MetricsHandler,
+        (make_url(prefix, API_V1, r'metrics'), MetricsHandler,
             dict(queues=qs, units=units)),
+        #
         # Used for testing/debugging, not for production, even could
         # cause problem if suspicious code will know node uuid.
+        #
+        # Doesn't contain version within path as it could only way to
+        # obtain one.
         (prefix + r'/info', SelfUUID,
             dict(
                 uniresis_proxy=uniresis,
                 uptime=uptime,
-                version=version)),
+                version=version,
+                api=API_V1)),
     ], debug=False)
 
     if port is not None:
@@ -98,10 +111,11 @@ class FailedStateHandle(web.RequestHandler):
 
 
 class SelfUUID(web.RequestHandler):
-    def initialize(self, uniresis_proxy, uptime, version):
+    def initialize(self, uniresis_proxy, uptime, version, api):
         self.uniresis_proxy = uniresis_proxy
         self.uptime = uptime
         self.version = version
+        self.api = api
 
     @gen.coroutine
     def get(self):
@@ -115,5 +129,6 @@ class SelfUUID(web.RequestHandler):
             'uuid': uuid,
             'uptime': self.uptime.uptime(),
             'version': self.version,
+            'api': self.api
         })
         self.flush()

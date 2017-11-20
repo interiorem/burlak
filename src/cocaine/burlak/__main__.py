@@ -23,7 +23,8 @@ from .helpers import SecureServiceFabric
 from .mokak.mokak import SharedStatus, make_status_web_handler
 from .sentry import SentryClientWrapper
 from .uniresis import catchup_an_uniresis
-from .web import Uptime, make_web_app
+from .web import Uptime, make_web_app_v1
+
 
 try:
     from .ver import __version__
@@ -133,7 +134,7 @@ def main(
 
     # TODO: use non-default address
     uptime = Uptime()
-    web_app = make_web_app( # noqa F841
+    web_app = make_web_app_v1( # noqa F841
         prefix, port, uptime, uniresis, committed_state, qs, units,
         __version__)
     status_app = make_status_web_handler( # noqa F841
