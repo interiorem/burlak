@@ -2,7 +2,7 @@ import json
 
 from cocaine.burlak import burlak
 from cocaine.burlak.comm_state import CommittedState
-from cocaine.burlak.web import make_web_app
+from cocaine.burlak.web import API_V1, make_url, make_web_app_v1
 
 import mock
 import pytest
@@ -77,7 +77,7 @@ def app(mocker):
     uptime = mocker.Mock()
     uptime.uptime = mocker.Mock(return_value=TEST_UPTIME)
 
-    return make_web_app(
+    return make_web_app_v1(
         '', TEST_PORT, uptime, uniresis, committed_state, qs, units,
         TEST_VERSION)
 
@@ -87,7 +87,9 @@ def test_get_metrics(http_client, base_url, mocker):
 
     mocker.patch('os.getloadavg', return_value=[1, 2, 3])
 
-    response = yield http_client.fetch(base_url + '/metrics')
+    response = yield http_client.fetch(
+        base_url + make_url('', API_V1, r'metrics'))
+
     assert response.code == 200
     assert json.loads(response.body) == dict(
         queues_fill=dict(input=1, adjust=2, stop=3),
@@ -103,7 +105,8 @@ def test_get_metrics(http_client, base_url, mocker):
 
 @pytest.mark.gen_test
 def test_get_state(http_client, base_url):
-    response = yield http_client.fetch(base_url + '/state')
+    response = yield http_client.fetch(
+        base_url + make_url('', API_V1, r'state'))
 
     assert response.code == 200
     assert json.loads(response.body) == \
@@ -114,16 +117,20 @@ def test_get_state(http_client, base_url):
 def test_get_state_by_app(http_client, base_url):
     for app in test_state:
         response = yield http_client.fetch(
-            base_url + '/state?app={}'.format(app))
+            base_url + make_url('', API_V1, 'state?app={}'.format(app)))
 
         assert response.code == 200
         print 'app {} body {}'.format(app, response.body)
         assert json.loads(response.body) == {app: test_state[app]._asdict()}
 
 
+#
+# Note that info handle doesn't have API version.
+#
 @pytest.mark.gen_test
-def test_get_uuid(http_client, base_url):
-    response = yield http_client.fetch(base_url + '/info')
+def test_get_info(http_client, base_url):
+    response = yield http_client.fetch(
+        base_url + r'/info')
 
     assert response.code == 200
     assert json.loads(response.body) == \
@@ -131,12 +138,14 @@ def test_get_uuid(http_client, base_url):
             'uuid': TEST_UUID,
             'uptime': TEST_UPTIME,
             'version': TEST_VERSION,
+            'api': API_V1,
         }
 
 
 @pytest.mark.gen_test
 def test_get_failed(http_client, base_url):
-    response = yield http_client.fetch(base_url + '/failed')
+    response = yield http_client.fetch(
+        base_url + make_url('', API_V1, r'failed'))
 
     failed = [
         app for app, record in test_state.iteritems()
