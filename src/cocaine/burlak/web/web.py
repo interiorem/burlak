@@ -18,7 +18,11 @@ def make_web_app_v1(
     app = web.Application([
         (make_url(prefix, API_V1, r'state'), StateHandler,
             dict(committed_state=committed_state)),
+        (prefix + r'/state', StateHandler,
+            dict(committed_state=committed_state)),
         (make_url(prefix, API_V1, r'failed'), FailedStateHandle,
+            dict(committed_state=committed_state)),
+        (prefix + r'/failed', FailedStateHandle,
             dict(committed_state=committed_state)),
         (make_url(prefix, API_V1, r'metrics'), MetricsHandler,
             dict(queues=qs, units=units)),
