@@ -1,6 +1,9 @@
 #
 # System/process metrics gatherer
 #
+# TODO:
+#  may be procfs based stats someday
+#
 import os
 import resource
 from collections import namedtuple
