@@ -4,7 +4,7 @@ from collections import namedtuple
 
 from cocaine.burlak import burlak
 from cocaine.burlak.comm_state import CommittedState
-from cocaine.burlak.sys_metrics import SystemMetricsGatherer
+from cocaine.burlak.sys_metrics import SysMetricsGatherer
 from cocaine.burlak.web import API_V1, make_url, make_web_app_v1
 
 import mock
@@ -26,6 +26,7 @@ TEST_MAXRSS_MB = TEST_MAXRSS_KB / 1024.0
 
 TEST_UTIME = 100500
 TEST_STIME = 42
+
 
 RUsage = namedtuple('RUsage', [
     'ru_maxrss',
@@ -87,7 +88,7 @@ def app(mocker):
 
     committed_state.version = TEST_STATE_VERSION
 
-    metrics_gatherer = SystemMetricsGatherer()
+    metrics_gatherer = SysMetricsGatherer()
     metrics_gatherer.as_dict = mocker.Mock(return_value=system_metrics)
 
     qs = dict(input=input_queue, adjust=adjust_queue, stop=stop_queue)
