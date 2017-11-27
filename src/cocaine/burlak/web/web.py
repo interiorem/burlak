@@ -1,8 +1,4 @@
-import os
-import resource
 import time
-
-from collections import namedtuple
 
 from tornado import gen
 from tornado import web
@@ -10,29 +6,14 @@ from tornado import web
 
 API_V1 = r'v1'
 
-RUsage = namedtuple('RUsage', [
-    'maxrss_mb',
-    'utime',
-    'stime',
-])
-
 
 def make_url(prefix, version, path):
     return '{}/{}/{}'.format(prefix, version, path)
 
 
-def _get_rusage_partly():
-    usage = resource.getrusage(resource.RUSAGE_SELF)
-
-    return RUsage(
-        usage.ru_maxrss / 1024.0,  # kB according man page,
-        usage.ru_utime,
-        usage.ru_stime,
-    )
-
-
 def make_web_app_v1(
-        prefix, port, uptime, uniresis, committed_state, qs, units, version):
+        prefix, port, uptime, uniresis, committed_state,
+        metrics_gatherer, qs, units, version):
 
     app = web.Application([
         (make_url(prefix, API_V1, r'state'), StateHandler,
@@ -44,7 +25,7 @@ def make_web_app_v1(
         (prefix + r'/failed', FailedStateHandle,
             dict(committed_state=committed_state)),
         (make_url(prefix, API_V1, r'metrics'), MetricsHandler,
-            dict(queues=qs, units=units)),
+            dict(queues=qs, units=units, metrics_gatherer=metrics_gatherer)),
 
         #
         # Used for testing/debugging, not for production, even could
@@ -76,15 +57,13 @@ class Uptime(object):  # pragma nocover
 
 
 class MetricsHandler(web.RequestHandler):
-    def initialize(self, queues, units):
+    def initialize(self, queues, units, metrics_gatherer):
         self.queues = queues
         self.units = units
+        self.metrics_gatherer = metrics_gatherer
 
     @gen.coroutine
     def get(self):
-
-        rusage = _get_rusage_partly()
-
         metrics = {
             'queues_fill': {
                 k: v.qsize() for k, v in self.queues.iteritems()
@@ -92,12 +71,7 @@ class MetricsHandler(web.RequestHandler):
             'counters': {
                 k: v.get_count_metrics() for k, v in self.units.iteritems()
             },
-            'system': {
-                'load_avg': os.getloadavg(),
-                'maxrss_mb': rusage.maxrss_mb,
-                'utime': rusage.utime,
-                'stime': rusage.stime,
-            }
+            'system': self.metrics_gatherer.as_dict()
         }
 
         self.write(metrics)
