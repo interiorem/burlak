@@ -1,5 +1,7 @@
 import json
 
+from collections import namedtuple
+
 from cocaine.burlak import burlak
 from cocaine.burlak.comm_state import CommittedState
 from cocaine.burlak.web import API_V1, make_url, make_web_app_v1
@@ -17,6 +19,19 @@ TEST_VERSION = 0.1
 TEST_STATE_VERSION = 42
 TEST_UPTIME = 100500
 TEST_PORT = 10042
+
+TEST_MAXRSS_KB = 16 * 1024
+TEST_MAXRSS_MB = TEST_MAXRSS_KB / 1024.0
+
+TEST_UTIME = 100500
+TEST_STIME = 42
+
+RUsage = namedtuple('RUsage', [
+    'ru_maxrss',
+    'ru_utime',
+    'ru_stime'
+])
+
 
 test_state = {
     'app1': CommittedState.Record('STOPPED', 100500, 1, 3, 100500),
@@ -85,7 +100,10 @@ def app(mocker):
 @pytest.mark.gen_test
 def test_get_metrics(http_client, base_url, mocker):
 
+    rusage = RUsage(TEST_MAXRSS_KB, TEST_UTIME, TEST_STIME)
+
     mocker.patch('os.getloadavg', return_value=[1, 2, 3])
+    mocker.patch('resource.getrusage', return_value=rusage)
 
     response = yield http_client.fetch(
         base_url + make_url('', API_V1, r'metrics'))
@@ -99,7 +117,11 @@ def test_get_metrics(http_client, base_url, mocker):
             slayer=dict(a_cnt=4, b_cnt=5, c_cnt=6),
             resurrecter=dict(a_cnt=5, b_cnt=6, c_cnt=7),
         ),
-        system=dict(load_avg=[1, 2, 3])
+        system=dict(
+            load_avg=[1, 2, 3],
+            maxrss_mb=TEST_MAXRSS_MB,
+            utime=TEST_UTIME,
+            stime=TEST_STIME)
     )
 
 

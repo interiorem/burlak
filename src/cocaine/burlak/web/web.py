@@ -1,5 +1,8 @@
 import os
+import resource
 import time
+
+from collections import namedtuple
 
 from tornado import gen
 from tornado import web
@@ -7,9 +10,25 @@ from tornado import web
 
 API_V1 = r'v1'
 
+RUsage = namedtuple('RUsage', [
+    'maxrss_mb',
+    'utime',
+    'stime',
+])
+
 
 def make_url(prefix, version, path):
     return '{}/{}/{}'.format(prefix, version, path)
+
+
+def _get_rusage_partly():
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+
+    return RUsage(
+        usage.ru_maxrss / 1024.0,  # kB according man page,
+        usage.ru_utime,
+        usage.ru_stime,
+    )
 
 
 def make_web_app_v1(
@@ -26,12 +45,14 @@ def make_web_app_v1(
             dict(committed_state=committed_state)),
         (make_url(prefix, API_V1, r'metrics'), MetricsHandler,
             dict(queues=qs, units=units)),
+
         #
         # Used for testing/debugging, not for production, even could
         # cause problem if suspicious code will know node uuid.
         #
         # Doesn't contain version within path as it could only way to
         # obtain one.
+        #
         (prefix + r'/info', SelfUUID,
             dict(
                 uniresis_proxy=uniresis,
@@ -61,6 +82,9 @@ class MetricsHandler(web.RequestHandler):
 
     @gen.coroutine
     def get(self):
+
+        rusage = _get_rusage_partly()
+
         metrics = {
             'queues_fill': {
                 k: v.qsize() for k, v in self.queues.iteritems()
@@ -70,8 +94,12 @@ class MetricsHandler(web.RequestHandler):
             },
             'system': {
                 'load_avg': os.getloadavg(),
+                'maxrss_mb': rusage.maxrss_mb,
+                'utime': rusage.utime,
+                'stime': rusage.stime,
             }
         }
+
         self.write(metrics)
         self.flush()
 
