@@ -22,7 +22,7 @@ from .context import Context, LoggerSetup
 from .helpers import SecureServiceFabric
 from .mokak.mokak import SharedStatus, make_status_web_handler
 from .sentry import SentryClientWrapper
-from .sys_metrics import SystemMetricsGatherer
+from .sys_metrics import SysMetricsGatherer
 from .uniresis import catchup_an_uniresis
 from .web import Uptime, make_web_app_v1
 
@@ -133,7 +133,7 @@ def main(
     if not port:
         port = cfg_port
 
-    metrics_gatherer = SystemMetricsGatherer()
+    metrics_gatherer = SysMetricsGatherer()
     io_loop.spawn_callback(metrics_gatherer.gather)
 
     # TODO: use non-default address

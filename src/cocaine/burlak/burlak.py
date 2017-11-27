@@ -21,7 +21,7 @@ from tornado import gen
 
 from .chcache import ChannelsCache, close_tx_safe
 from .logger import ConsoleLogger, VoidLogger
-
+from .loop_sentry import LoopSentry
 
 CONTROL_RETRY_ATTEMPTS = 3
 
@@ -81,18 +81,6 @@ class StateUpdateMessage(object):
 
     def get_all(self):
         return self._state, self._version, self._uuid
-
-
-class LoopSentry(object):  # pragma nocover
-    def __init__(self, **kwargs):
-        super(LoopSentry, self).__init__(**kwargs)
-        self.run = True
-
-    def should_run(self):
-        return self.run
-
-    def halt(self):
-        self.run = False
 
 
 class MetricsMixin(object):
