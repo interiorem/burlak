@@ -27,7 +27,7 @@ def _get_rusage_partly():
 
 class SystemMetricsGatherer(object):
 
-    GATHER_INTERVAL_SEC = 0.25
+    GATHER_INTERVAL_SEC = 0.5
 
     def init(self):
         self.rusage = RUsage(0, 0, 0)

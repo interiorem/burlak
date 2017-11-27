@@ -4,6 +4,7 @@ from collections import namedtuple
 
 from cocaine.burlak import burlak
 from cocaine.burlak.comm_state import CommittedState
+from cocaine.burlak.sys_metrics import SystemMetricsGatherer
 from cocaine.burlak.web import API_V1, make_url, make_web_app_v1
 
 import mock
@@ -38,6 +39,13 @@ test_state = {
     'app2': CommittedState.Record('RUNNING', 100501, 2, 2, 100501),
     'app3': CommittedState.Record('STOPPED', 100502, 3, 1, 100502),
     'app4': CommittedState.Record('FAILED', 100502, 3, 1, 100502),
+}
+
+system_metrics = {
+    'load_avg': [1, 2, 3],
+    'maxrss_mb': TEST_MAXRSS_MB,
+    'utime': TEST_UTIME,
+    'stime': TEST_STIME,
 }
 
 
@@ -79,6 +87,9 @@ def app(mocker):
 
     committed_state.version = TEST_STATE_VERSION
 
+    metrics_gatherer = SystemMetricsGatherer()
+    metrics_gatherer.as_dict = mocker.Mock(return_value=system_metrics)
+
     qs = dict(input=input_queue, adjust=adjust_queue, stop=stop_queue)
     units = dict(
             acquisition=MetricsMock(1),
@@ -93,7 +104,9 @@ def app(mocker):
     uptime.uptime = mocker.Mock(return_value=TEST_UPTIME)
 
     return make_web_app_v1(
-        '', TEST_PORT, uptime, uniresis, committed_state, qs, units,
+        '', TEST_PORT, uptime, uniresis,
+        committed_state, metrics_gatherer,
+        qs, units,
         TEST_VERSION)
 
 
