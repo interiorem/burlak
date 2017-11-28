@@ -14,9 +14,15 @@ def make_url(prefix, version, path):
 def make_web_app_v1(
         prefix, port, uptime, uniresis, committed_state,
         metrics_gatherer, qs, units, version):
+    '''make_web_app_v1
 
+    For legacy API some handlers are exposed with API version part and without
+
+    '''
     app = web.Application([
         (make_url(prefix, API_V1, r'state'), StateHandler,
+            dict(committed_state=committed_state)),
+        (make_url(prefix, API_V1, r'incoming_state'), IncomingStateHandle,
             dict(committed_state=committed_state)),
         (prefix + r'/state', StateHandler,
             dict(committed_state=committed_state)),
@@ -114,6 +120,20 @@ class FailedStateHandle(web.RequestHandler):
 
         self.write(dict(failed=failed, version=version))
         self.flush()
+
+
+class IncomingStateHandle(web.RequestHandler):
+    '''Viewer for last state from scheduler
+
+    Used mostly for debugging
+
+    '''
+    def initialize(self, committed_state):
+        self.committed_state = committed_state
+
+    @gen.coroutine
+    def get(self):
+        self.write(self.committed_state.incoming_state)
 
 
 class SelfUUID(web.RequestHandler):

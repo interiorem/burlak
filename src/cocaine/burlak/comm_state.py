@@ -20,9 +20,17 @@ class CommittedState(object):
         'time_stamp',
     ])
 
+    IncomingState = namedtuple('IncomingState', [
+        'state',
+        'version',
+        'timestamp'
+    ])
+
     NA_PROFILE_LABEL = 'n/a'
 
     def __init__(self):
+        self.in_state = CommittedState.IncomingState(dict(), -1, 0)
+
         self.state = dict()
         self.last_state_version = 0
 
@@ -96,3 +104,21 @@ class CommittedState(object):
     @version.setter
     def version(self, version):
         self.last_state_version = version
+
+    @property
+    def incoming_state(self):
+        return self.in_state._asdict()
+
+    def set_incoming_state(self, state, version, ts=None):
+        if ts is None or not isinstance(ts, (int, long, float)):
+            ts = time.time()
+
+        # Convert per app records to dictionaries.
+        state = {
+            app: val._asdict()
+            for app, val in state.iteritems()
+        }
+
+        self.in_state = CommittedState.IncomingState(state, version, int(ts))
+
+        print 'IN STATE {}'.format(self.in_state)

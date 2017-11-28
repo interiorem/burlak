@@ -55,6 +55,9 @@ StateRecord = namedtuple('StateRecord', [
 ])
 
 
+#
+# TODO: refactor someday as hugely inefficient and redundant conversion.
+#
 def transmute_and_filter_state(input_state):
     '''Converts raw state dictionary to (app => StateRecords) mapping
     '''
@@ -309,6 +312,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 if msg and isinstance(msg, StateUpdateMessage):
                     state, state_version, uuid = msg.get_all()
                     is_state_updated = True
+
+                    self.ci_state.set_incoming_state(state, state_version)
 
                     self.debug(
                         'disp::got state update with version {}: {} uuid {} '
