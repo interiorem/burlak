@@ -110,6 +110,8 @@ class CommittedState(object):
 
     @property
     def incoming_state(self):
+        '''Used mostly for debugging.
+        '''
         return self.in_state._asdict()
 
     def set_incoming_state(self, state, version, ts=None):

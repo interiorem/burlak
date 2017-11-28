@@ -178,7 +178,7 @@ def test_get_state(http_client, base_url, is_legacy, state_path):
         {app: record._asdict() for app, record in test_state.iteritems()}
 
     if not is_legacy:
-        assert loaded_state.get('state_version') == TEST_STATE_VERSION
+        assert loaded_state.get('version') == TEST_STATE_VERSION
 
 
 @pytest.mark.parametrize(

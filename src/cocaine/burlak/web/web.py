@@ -128,8 +128,8 @@ class StateV1Handler(web.RequestHandler):
         self.write(
             dict(
                 state=result,
-                state_version=last_version,
-                state_timestamp=last_timestamp
+                version=last_version,
+                timestamp=last_timestamp
             )
         )
 
