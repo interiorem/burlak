@@ -16,10 +16,15 @@ from .common import make_future
 
 
 TEST_UUID = 'some_correct_uuid'
+
 TEST_VERSION = 0.1
+
 TEST_STATE_VERSION = 42
+TEST_INCOMING_STATE_VERSION = TEST_STATE_VERSION + 1
+
 TEST_UPTIME = 100500
 TEST_PORT = 10042
+TEST_TS = 13
 
 TEST_MAXRSS_KB = 16 * 1024
 TEST_MAXRSS_MB = TEST_MAXRSS_KB / 1024.0
@@ -34,12 +39,23 @@ RUsage = namedtuple('RUsage', [
     'ru_stime'
 ])
 
+StateRecord = namedtuple('StateRecord', [
+    'workers',
+    'profile'
+])
 
 test_state = {
     'app1': CommittedState.Record('STOPPED', 100500, 1, 3, 100500),
     'app2': CommittedState.Record('RUNNING', 100501, 2, 2, 100501),
     'app3': CommittedState.Record('STOPPED', 100502, 3, 1, 100502),
     'app4': CommittedState.Record('FAILED', 100502, 3, 1, 100502),
+}
+
+incoming_state = {
+    'app1': StateRecord(4, 'one'),
+    'app2': StateRecord(3, 'two'),
+    'app3': StateRecord(2, 'three'),
+    'app4': StateRecord(1, 'four'),
 }
 
 system_metrics = {
@@ -86,6 +102,8 @@ def app(mocker):
         }
     )
 
+    committed_state.set_incoming_state(
+        incoming_state, TEST_INCOMING_STATE_VERSION, TEST_TS)
     committed_state.version = TEST_STATE_VERSION
 
     metrics_gatherer = SysMetricsGatherer()
@@ -140,38 +158,64 @@ def test_get_metrics(http_client, base_url, mocker):
 
 
 @pytest.mark.parametrize(
-    'state_path',
+    'is_legacy, state_path',
     [
-        r'/state',
-        make_url('', API_V1, r'state'),
+        (True, r'/state'),
+        (False, make_url('', API_V1, r'state')),
     ]
 )
 @pytest.mark.gen_test
-def test_get_state(http_client, base_url, state_path):
+def test_get_state(http_client, base_url, is_legacy, state_path):
     response = yield http_client.fetch(
         base_url + state_path)
 
+    loaded_state = json.loads(response.body)
+
+    state = loaded_state if is_legacy else loaded_state.get('state', {})
+
     assert response.code == 200
-    assert json.loads(response.body) == \
+    assert state == \
         {app: record._asdict() for app, record in test_state.iteritems()}
+
+    if not is_legacy:
+        assert loaded_state.get('state_version') == TEST_STATE_VERSION
 
 
 @pytest.mark.parametrize(
-    'state_path',
+    'is_legacy, state_path',
     [
-        '/state?app={}',
-        make_url('', API_V1, 'state?app={}'),
+        (True, '/state?app={}'),
+        (False, make_url('', API_V1, 'state?app={}')),
     ]
 )
 @pytest.mark.gen_test
-def test_get_state_by_app(http_client, base_url, state_path):
+def test_get_state_by_app(http_client, base_url, is_legacy, state_path):
     for app in test_state:
         response = yield http_client.fetch(
             base_url + state_path.format(app))
 
+        loaded_state = json.loads(response.body)
+        state = loaded_state if is_legacy else loaded_state.get('state', {})
+
         assert response.code == 200
         print 'app {} body {}'.format(app, response.body)
-        assert json.loads(response.body) == {app: test_state[app]._asdict()}
+        assert state == {app: test_state[app]._asdict()}
+
+
+@pytest.mark.gen_test
+def test_incoming_state(http_client, base_url):
+    response = yield http_client.fetch(
+        base_url + make_url('', API_V1, 'incoming_state'))
+
+    in_state = json.loads(response.body)
+
+    assert response.code == 200
+    assert in_state.get('state', {}) == {
+        k: v._asdict() for k, v in incoming_state.iteritems()
+    }
+
+    assert in_state.get('version', -1) == TEST_INCOMING_STATE_VERSION
+    assert in_state.get('timestamp', -1) == TEST_TS
 
 
 #
