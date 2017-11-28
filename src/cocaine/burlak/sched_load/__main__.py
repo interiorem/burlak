@@ -132,8 +132,11 @@ def state_pusher(
 
             if verify_url:
                 response = yield httpclient.AsyncHTTPClient().fetch(verify_url)
-                print 'orca state: {}'.format(response.body)
-                verify_state(state, json.loads(response.body))
+                remote_state = json.loads(response.body)
+                print 'orca state: {}'.format(remote_state)
+                state_record = remote_state.get("state")
+                if state_record:
+                    verify_state(state, state_record)
 
         except Exception as e:
             print('error: {}'.format(e))
