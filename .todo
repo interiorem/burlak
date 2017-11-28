@@ -17,4 +17,7 @@ Cluster:
     ✔ ways to identify cluster name/type, e.g. testing, production. Hint: YANDEX_ENVIRONMENT variable @done(2017-10-16 19:59) @project(Cluster)
 
 Init:
-    ☐ shouldn't be in `run` state after install
+    ☐ Shouldn't be in `run` state after install
+
+State:
+    ☐ Report failure reason.
