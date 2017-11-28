@@ -344,12 +344,14 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     'for same uuid, skipping control step')
                 is_state_updated = False
 
-            if last_uuid != uuid:
+            if is_state_updated and last_uuid != uuid:
                 # uuid changed, it means we've reconnected,
-                # reset committed state
+                # reset committed state.
+                self.debug(
+                    'uuid was updated from {} to {}'.format(last_uuid, uuid))
                 self.ci_state.reset()
 
-            last_uuid = uuid
+                last_uuid = uuid
 
             if is_state_updated:  # check for profiles change
                 to_update = self.make_prof_update_set(prev_state, state)

@@ -33,6 +33,8 @@ class CommittedState(object):
 
         self.state = dict()
         self.last_state_version = 0
+        # for now time when version was updated.
+        self.updated_timestamp = 0
 
     def as_dict(self):
         return self.state
@@ -103,6 +105,7 @@ class CommittedState(object):
 
     @version.setter
     def version(self, version):
+        self.updated_at = time.time()
         self.last_state_version = version
 
     @property
@@ -122,3 +125,11 @@ class CommittedState(object):
         self.in_state = CommittedState.IncomingState(state, version, int(ts))
 
         print 'IN STATE {}'.format(self.in_state)
+
+    @property
+    def updated_at(self):
+        return self.updated_timestamp
+
+    @updated_at.setter
+    def updated_at(self, ts):
+        self.updated_timestamp = int(ts)

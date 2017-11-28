@@ -20,7 +20,7 @@ def make_web_app_v1(
 
     '''
     app = web.Application([
-        (make_url(prefix, API_V1, r'state'), StateHandler,
+        (make_url(prefix, API_V1, r'state'), StateV1Handler,
             dict(committed_state=committed_state)),
         (make_url(prefix, API_V1, r'incoming_state'), IncomingStateHandle,
             dict(committed_state=committed_state)),
@@ -102,6 +102,37 @@ class StateHandler(web.RequestHandler):
             result = last_state
 
         self.write(result)
+        self.flush()
+
+
+class StateV1Handler(web.RequestHandler):
+    def initialize(self, committed_state):
+        self.committed_state = committed_state
+
+    @gen.coroutine
+    def get(self):
+        last_state = self.committed_state.as_named_dict()
+        last_version = self.committed_state.version
+        last_timestamp = self.committed_state.updated_at
+
+        request = self.get_arguments('app')
+
+        result = dict()
+        if request:
+            for app in request:
+                if app in last_state:
+                    result[app] = last_state[app]
+        else:
+            result = last_state
+
+        self.write(
+            dict(
+                state=result,
+                state_version=last_version,
+                state_timestamp=last_timestamp
+            )
+        )
+
         self.flush()
 
 

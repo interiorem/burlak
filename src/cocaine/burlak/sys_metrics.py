@@ -32,7 +32,7 @@ def _get_rusage_partly():
 
 class SysMetricsGatherer(LoopSentry):
 
-    GATHER_INTERVAL_SEC = 0.5
+    GATHER_INTERVAL_SEC = 1.0
 
     def __init__(self, **kwargs):
         super(SysMetricsGatherer, self).__init__(**kwargs)
@@ -42,6 +42,16 @@ class SysMetricsGatherer(LoopSentry):
 
     @gen.coroutine
     def gather(self):
+        '''
+            Timings on DELL Latitude 7470
+
+            resource.getrusage(...)
+                1000000 loops, best of 3: 0.505 usec per loop
+
+            os.getloadavg()
+                100000 loops, best of 3: 2.89 usec per loop
+
+        '''
         while(self.should_run()):
             self.rusage = _get_rusage_partly()
             self.load_avg = os.getloadavg()
