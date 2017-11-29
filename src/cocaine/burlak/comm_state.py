@@ -6,10 +6,13 @@ from collections import namedtuple
 class Defaults(object):
 
     NA_PROFILE_LABEL = 'n/a'
+
     SUCCESS_DESCRIPTION = 'ok'
     STOPPED_DESCRIPTION = 'stopped'
     PENDING_STOP_DESCRIPTION = 'pending stop'
     FAILED_DESCRIPTION = 'unknown, study logs'
+
+    INIT_STATE_VERSION = 0
 
 
 class CommittedState(object):
@@ -40,7 +43,7 @@ class CommittedState(object):
         self.in_state = CommittedState.IncomingState(dict(), -1, 0)
 
         self.state = dict()
-        self.last_state_version = 0
+        self.last_state_version = Defaults.INIT_STATE_VERSION
         # for now time when version was updated.
         self.updated_timestamp = 0
 
@@ -52,6 +55,7 @@ class CommittedState(object):
 
     def reset(self):
         self.state.clear()
+        self.version = Defaults.INIT_STATE_VERSION
 
     def mark_running(self, app, workers, profile, state_version, tm):
         self.state.update(
