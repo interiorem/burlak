@@ -8,6 +8,7 @@ class Defaults(object):
     NA_PROFILE_LABEL = 'n/a'
     SUCCESS_DESCRIPTION = 'ok'
     STOPPED_DESCRIPTION = 'stopped'
+    PENDING_STOP_DESCRIPTION = 'pending stop'
     FAILED_DESCRIPTION = 'unknown, study logs'
 
 
@@ -16,7 +17,7 @@ class CommittedState(object):
     State record format:
         <app name> : (<STATE>, <WORKERS COUNT>, <TIMESTAMP>)
 
-        <STATE> - (STARTED|STOPPED)
+        <STATE> - (STARTED|STOPPED|FAILED|PENDING_STOP)
         <TIMESTAMP> - last state update time
     """
 
@@ -157,3 +158,27 @@ class CommittedState(object):
     @updated_at.setter
     def updated_at(self, ts):
         self.updated_timestamp = int(ts)
+
+    def mark_pending_stop(self, app, state_version, tm):
+        _, workers, profile, _, _, _ = self.state.get(
+            app,
+            CommittedState.Record(
+                '',
+                0,
+                Defaults.NA_PROFILE_LABEL,
+                0,
+                Defaults.PENDING_STOP_DESCRIPTION,
+                0
+            )
+        )
+
+        self.state.update(
+            {
+                app: CommittedState.Record(
+                    'PENDING_STOP',
+                    workers,
+                    profile,
+                    state_version,
+                    Defaults.PENDING_STOP_DESCRIPTION,
+                    int(tm))
+            })

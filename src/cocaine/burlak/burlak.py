@@ -481,6 +481,11 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 break
 
+    def mark_pending_stop(self, to_stop, state_version):
+        now = time.time()
+        for app in to_stop:
+            self.ci_state.mark_pending_stop(app, state_version, now)
+
     @gen.coroutine
     def blessing_road(self):
         channels_cache = ChannelsCache(self)
@@ -520,6 +525,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     self.info(
                         'to_stop list not empty, '
                         'but stop_apps flag is disabled')
+                    self.mark_pending_stop(
+                        command.to_stop, command.state_version)
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.
