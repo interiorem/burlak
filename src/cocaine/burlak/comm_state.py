@@ -109,10 +109,25 @@ class CommittedState(object):
             })
 
     def remove_old_stopped(self, expire_span):
+        self.remove_old_records(expire_span, ('STOPPED',))
+
+    def remove_expired(self, expire_span):
+        '''Removes all non-RUNNING records
+        '''
+        self.remove_old_records(
+            expire_span,
+            (
+                'FAILED',
+                'STOPPED',
+                'PENDING_STOP',
+            )
+        )
+
+    def remove_old_records(self, expire_span, in_state):
         now = time.time()
         to_remove = [
             app for app, last_state in self.state.iteritems()
-            if last_state.state == 'STOPPED'
+            if last_state.state in in_state
             and last_state.time_stamp < now - expire_span
         ]
 

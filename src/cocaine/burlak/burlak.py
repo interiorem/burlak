@@ -299,7 +299,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             try:
                 self.status.mark_ok('getting running apps list')
 
-                self.ci_state.remove_old_stopped(
+                self.ci_state.remove_expired(
                     self.context.config.expire_stopped)
 
                 running_apps = yield self.get_running_apps_set()
