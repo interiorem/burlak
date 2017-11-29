@@ -39,7 +39,7 @@ class Defaults(object):
 
     SENTRY_DSN = ''
 
-    EXPIRE_STOPPED_SEC = 1200
+    EXPIRE_STOPPED_SEC = 900
 
     # Default is skip all console logging.
     CONSOLE_LOGGER_LEVEL = int(ConsoleLogger.ERROR) + 1
