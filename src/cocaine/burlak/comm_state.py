@@ -6,7 +6,7 @@ from collections import namedtuple
 class Defaults(object):
 
     NA_PROFILE_LABEL = 'n/a'
-    SUCCESS_DESCRIPTION = 'success'
+    SUCCESS_DESCRIPTION = 'ok'
     STOPPED_DESCRIPTION = 'stopped'
     FAILED_DESCRIPTION = 'unknown, study logs'
 

@@ -1,3 +1,9 @@
+cocaine-orca (0.1.12) unstable; urgency=medium
+
+  * About state per app description in state web handler.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Wed, 29 Nov 2017 13:45:01 +0300
+
 cocaine-orca (0.1.11) unstable; urgency=medium
 
   * Max rss memory usage metrics + partly getrusage metrics.
