@@ -12,6 +12,7 @@ Tests:
 Metrics:
     ☐ timing metrics.
     ✔ system metrics. LA done, Mem would be coslty. @done(2017-10-16 20:00) @project(Metrics)
+    ☐ web metricts, e.g. request count, may be rps someday.
 
 Cluster:
     ✔ ways to identify cluster name/type, e.g. testing, production. Hint: YANDEX_ENVIRONMENT variable @done(2017-10-16 19:59) @project(Cluster)
