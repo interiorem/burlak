@@ -45,10 +45,10 @@ StateRecord = namedtuple('StateRecord', [
 ])
 
 test_state = {
-    'app1': CommittedState.Record('STOPPED', 100500, 1, 3, 100500),
-    'app2': CommittedState.Record('RUNNING', 100501, 2, 2, 100501),
-    'app3': CommittedState.Record('STOPPED', 100502, 3, 1, 100502),
-    'app4': CommittedState.Record('FAILED', 100502, 3, 1, 100502),
+    'app1': CommittedState.Record('STOPPED', 100500, 1, 3, 'stopped', 100500),
+    'app2': CommittedState.Record('RUNNING', 100501, 2, 2, 'ok', 100501),
+    'app3': CommittedState.Record('STOPPED', 100502, 3, 1, 'stopped', 100502),
+    'app4': CommittedState.Record('FAILED', 100502, 3, 1, 'error', 100502),
 }
 
 incoming_state = {

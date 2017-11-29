@@ -1,35 +1,56 @@
 from collections import OrderedDict
 
-from cocaine.burlak.comm_state import CommittedState
+from cocaine.burlak.comm_state import CommittedState, Defaults
 
 import pytest
 
 
 all_runnung_state = dict(
-    app1=('STARTED', 1, 'a', 3, 2),
-    app2=('STARTED', 2, 'b', 2, 2),
-    app3=('STARTED', 3, 'c', 1, 2),
+    app1=('STARTED', 1, 'a', 3, Defaults.SUCCESS_DESCRIPTION, 2),
+    app2=('STARTED', 2, 'b', 2, Defaults.SUCCESS_DESCRIPTION, 2),
+    app3=('STARTED', 3, 'c', 1, Defaults.SUCCESS_DESCRIPTION, 2),
 )
 
 all_stopped_state = dict(
-    app1=('STOPPED', 0, CommittedState.NA_PROFILE_LABEL, 1, 2),
-    app2=('STOPPED', 0, CommittedState.NA_PROFILE_LABEL, 2, 2),
-    app3=('STOPPED', 0, CommittedState.NA_PROFILE_LABEL, 3, 2),
+    app1=(
+        'STOPPED', 0,
+        Defaults.NA_PROFILE_LABEL, 1, Defaults.STOPPED_DESCRIPTION, 2
+    ),
+    app2=(
+        'STOPPED', 0,
+        Defaults.NA_PROFILE_LABEL, 2, Defaults.STOPPED_DESCRIPTION, 2
+    ),
+    app3=(
+        'STOPPED', 0,
+        Defaults.NA_PROFILE_LABEL, 3, Defaults.STOPPED_DESCRIPTION, 2
+    ),
 )
 
 mixed_state = dict(
-    app1=('STARTED', 1, 'a', 3, 2),
-    app2=('STOPPED', 0, CommittedState.NA_PROFILE_LABEL, 1, 20),
-    app3=('STARTED', 3, 'b', 2, 2),
-    app4=('STOPPED', 0, CommittedState.NA_PROFILE_LABEL, 2, 2),
-    app5=('STARTED', 3, 'c', 1, 5),
-    app6=('STOPPED', 0, CommittedState.NA_PROFILE_LABEL, 3, 50),
+    app1=(
+        'STARTED', 1,
+        'a', 3, Defaults.SUCCESS_DESCRIPTION, 2),
+    app2=(
+        'STOPPED', 0,
+        Defaults.NA_PROFILE_LABEL, 1, Defaults.STOPPED_DESCRIPTION, 20),
+    app3=(
+        'STARTED', 3,
+        'b', 2, Defaults.SUCCESS_DESCRIPTION, 2),
+    app4=(
+        'STOPPED', 0,
+        Defaults.NA_PROFILE_LABEL, 2, Defaults.STOPPED_DESCRIPTION, 2),
+    app5=(
+        'STARTED', 3,
+        'c', 1, Defaults.SUCCESS_DESCRIPTION, 5),
+    app6=(
+        'STOPPED', 0,
+        Defaults.NA_PROFILE_LABEL, 3, Defaults.STOPPED_DESCRIPTION, 50),
 )
 
 
 @pytest.fixture
 def init_state(cstate):
-    for k, (st, wrk, prof, ver, ts) in mixed_state.iteritems():
+    for k, (st, wrk, prof, ver, _, ts) in mixed_state.iteritems():
         if st == 'STOPPED':
             cstate.mark_stopped(k, ver, ts)
         elif st == 'STARTED':
@@ -44,14 +65,14 @@ def cstate():
 
 
 def test_started_states(cstate):
-    for k, (st, wrk, prof, ver, ts) in all_runnung_state.iteritems():
+    for k, (st, wrk, prof, ver, _, ts) in all_runnung_state.iteritems():
         cstate.mark_running(k, wrk, prof, ver, ts)
 
     assert cstate.as_dict() == all_runnung_state
 
 
 def test_stop_states(cstate):
-    for k, (_, wrk, _, ver, ts) in all_stopped_state.iteritems():
+    for k, (_, wrk, _, ver, _, ts) in all_stopped_state.iteritems():
         cstate.mark_stopped(k, ver, ts)
 
     assert cstate.as_dict() == all_stopped_state
@@ -88,7 +109,8 @@ def test_expire_stopped(init_state, mocker):
                     ('workers', state[1]),
                     ('profile', state[2]),
                     ('state_version', state[3]),
-                    ('time_stamp', state[4]),
+                    ('about_state', state[4]),
+                    ('time_stamp', state[5]),
                 ]) for app, state in mix.iteritems()
         }
 
@@ -108,6 +130,7 @@ def test_mark_failed(init_state, app, profile, version, tm):
             ('workers', 0),
             ('profile', profile),
             ('state_version', version),
+            ('about_state', Defaults.FAILED_DESCRIPTION),
             ('time_stamp', tm),
         ])
 
