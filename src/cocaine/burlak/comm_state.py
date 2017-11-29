@@ -3,6 +3,14 @@ import time
 from collections import namedtuple
 
 
+class Defaults(object):
+
+    NA_PROFILE_LABEL = 'n/a'
+    SUCCESS_DESCRIPTION = 'success'
+    STOPPED_DESCRIPTION = 'stopped'
+    FAILED_DESCRIPTION = 'unknown, study logs'
+
+
 class CommittedState(object):
     """
     State record format:
@@ -17,6 +25,7 @@ class CommittedState(object):
         'workers',
         'profile',
         'state_version',
+        'about_state',
         'time_stamp',
     ])
 
@@ -25,8 +34,6 @@ class CommittedState(object):
         'version',
         'timestamp'
     ])
-
-    NA_PROFILE_LABEL = 'n/a'
 
     def __init__(self):
         self.in_state = CommittedState.IncomingState(dict(), -1, 0)
@@ -53,10 +60,14 @@ class CommittedState(object):
                     workers,
                     profile,
                     state_version,
+                    Defaults.SUCCESS_DESCRIPTION,
                     int(tm))
             })
 
-    def mark_failed(self, app, profile, state_version, tm):
+    def mark_failed(self, app, profile, state_version, tm, reason=None):
+        if reason is None:
+            reason = Defaults.FAILED_DESCRIPTION
+
         self.state.update(
             {
                 app: CommittedState.Record(
@@ -64,12 +75,22 @@ class CommittedState(object):
                     0,
                     profile,
                     state_version,
+                    reason,
                     int(tm))
             })
 
     def mark_stopped(self, app, state_version, tm):
-        _, workers, profile, _, _ = self.state.get(
-            app, CommittedState.Record('', 0, self.NA_PROFILE_LABEL, 0, 0))
+        _, workers, profile, _, description, _ = self.state.get(
+            app,
+            CommittedState.Record(
+                '',
+                0,
+                Defaults.NA_PROFILE_LABEL,
+                0,
+                Defaults.STOPPED_DESCRIPTION,
+                0
+            )
+        )
 
         self.state.update(
             {
@@ -78,6 +99,7 @@ class CommittedState(object):
                     workers,
                     profile,
                     state_version,
+                    description,
                     int(tm)),
             })
 
