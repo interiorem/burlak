@@ -7,7 +7,7 @@ class Defaults(object):
 
     NA_PROFILE_LABEL = 'n/a'
 
-    SUCCESS_DESCRIPTION = 'ok'
+    SUCCESS_DESCRIPTION = 'success'
     STOPPED_DESCRIPTION = 'stopped'
     PENDING_STOP_DESCRIPTION = 'pending stop'
     FAILED_DESCRIPTION = 'unknown, study logs'
