@@ -168,8 +168,6 @@ class CommittedState(object):
 
         self.in_state = CommittedState.IncomingState(state, version, int(ts))
 
-        print 'IN STATE {}'.format(self.in_state)
-
     @property
     def updated_at(self):
         return self.updated_timestamp
