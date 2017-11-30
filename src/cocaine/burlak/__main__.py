@@ -136,18 +136,21 @@ def main(
     metrics_gatherer = SysMetricsGatherer()
     io_loop.spawn_callback(metrics_gatherer.gather)
 
-    # TODO: use non-default address
-    uptime = Uptime()
-    web_app = make_web_app_v1( # noqa F841
-        prefix, port, uptime, uniresis,
-        committed_state, metrics_gatherer,
-        qs, units,
-        __version__)
-    status_app = make_status_web_handler( # noqa F841
-        shared_status, config.status_web_path, config.status_port)
+    try:
+        uptime = Uptime()
+        web_app = make_web_app_v1( # noqa F841
+            prefix, port, uptime, uniresis,
+            committed_state, metrics_gatherer,
+            qs, units,
+            __version__)
+        status_app = make_status_web_handler( # noqa F841
+            shared_status, config.status_web_path, config.status_port)
 
-    click.secho('orca is starting...', fg='green')
-    IOLoop.current().start()
+        IOLoop.current().start()
+
+        click.secho('orca is starting...', fg='green')
+    except Exception as e:
+        click.secho('error while spawning service: {}'.format(e), fg='red')
 
 
 if __name__ == '__main__':
