@@ -25,7 +25,7 @@ from .loop_sentry import LoopSentry
 
 CONTROL_RETRY_ATTEMPTS = 3
 
-DEFAULT_RETRY_TIMEOUT_SEC = 10
+DEFAULT_RETRY_TIMEOUT_SEC = 15
 DEFAULT_UNKNOWN_VERSIONS = 1
 
 DEFAULT_RETRY_ATTEMPTS = 4
@@ -84,6 +84,10 @@ class StateUpdateMessage(object):
 
     def get_all(self):
         return self._state, self._version, self._uuid
+
+
+class ResetCStateMessage(object):
+    pass
 
 
 class MetricsMixin(object):
@@ -217,9 +221,17 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
                     self.metrics_cnt['apps_in_last_state'] = len(state)
             except Exception as e:  # pragma nocover
-                self.error('failed to get state, error: "{}"', e)
-                self.status.mark_warn('failed to get state')
-                yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
+
+                try:
+                    yield self.input_queue.put(ResetCStateMessage())
+
+                    self.status.mark_warn('failed to get state')
+                    self.error('failed to get state, error: "{}"', e)
+                except Exception:
+                    pass
+                finally:
+                    yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
+
             finally:  # pragma nocover
                 # TODO: Is it really needed?
                 yield close_tx_safe(ch)
@@ -309,16 +321,21 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
                 # Note that `StateUpdateMessage` only massage type currently
                 # supported.
-                if msg and isinstance(msg, StateUpdateMessage):
+                if isinstance(msg, StateUpdateMessage):
                     state, state_version, uuid = msg.get_all()
                     is_state_updated = True
 
                     self.ci_state.set_incoming_state(state, state_version)
 
                     self.debug(
-                        'disp::got state update with version {}: {} uuid {} '
-                        'and running apps {}',
+                        'disp::got state update with version {}: '
+                        '{} uuid {} and running apps {}',
                         state_version, state, uuid, running_apps)
+
+                elif isinstance(msg, ResetCStateMessage):
+                    self.ci_state.reset()
+                    self.debug('reset committed state signal')
+
             except Exception as e:
                 self.error('failed to get control message with {}', e)
                 self.sentry_wrapper.capture_exception()
@@ -344,15 +361,6 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     'for same uuid, skipping control step')
                 is_state_updated = False
 
-            if is_state_updated and last_uuid != uuid:
-                # uuid changed, it means we've reconnected,
-                # reset committed state.
-                self.debug(
-                    'uuid was updated from {} to {}'.format(last_uuid, uuid))
-                self.ci_state.reset()
-
-                last_uuid = uuid
-
             if is_state_updated:  # check for profiles change
                 to_update = self.make_prof_update_set(prev_state, state)
 
@@ -360,6 +368,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 to_stop.update(to_update)
 
                 prev_state = state
+                last_uuid = uuid
 
                 self.debug('profile update list {}', to_update)
 
