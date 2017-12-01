@@ -4,7 +4,7 @@
 # TODO: more tests
 #
 def flatten_dict(d, separtor='.'):
-    ''' flatten_dict
+    '''flatten_dict
 
     Return plain list of tuples with concatinated paths to leafs.
 

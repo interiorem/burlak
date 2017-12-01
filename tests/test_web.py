@@ -4,6 +4,7 @@ from collections import namedtuple
 
 from cocaine.burlak import burlak
 from cocaine.burlak.comm_state import CommittedState
+from cocaine.burlak.helpers import flatten_dict, flatten_dict_rec
 from cocaine.burlak.sys_metrics import SysMetricsGatherer
 from cocaine.burlak.web import API_V1, make_url, make_web_app_v1
 
@@ -129,6 +130,22 @@ def app(mocker):
         TEST_VERSION)
 
 
+TEST_METRICS = dict(
+    queues_fill=dict(input=1, adjust=2, stop=3),
+    counters=dict(
+        acquisition=dict(a_cnt=2, b_cnt=3, c_cnt=4),
+        state=dict(a_cnt=3, b_cnt=4, c_cnt=5),
+        slayer=dict(a_cnt=4, b_cnt=5, c_cnt=6),
+        resurrecter=dict(a_cnt=5, b_cnt=6, c_cnt=7),
+    ),
+    system=dict(
+        load_avg=[1, 2, 3],
+        maxrss_mb=TEST_MAXRSS_MB,
+        utime=TEST_UTIME,
+        stime=TEST_STIME)
+)
+
+
 @pytest.mark.gen_test
 def test_get_metrics(http_client, base_url, mocker):
 
@@ -141,20 +158,26 @@ def test_get_metrics(http_client, base_url, mocker):
         base_url + make_url('', API_V1, r'metrics'))
 
     assert response.code == 200
-    assert json.loads(response.body) == dict(
-        queues_fill=dict(input=1, adjust=2, stop=3),
-        counters=dict(
-            acquisition=dict(a_cnt=2, b_cnt=3, c_cnt=4),
-            state=dict(a_cnt=3, b_cnt=4, c_cnt=5),
-            slayer=dict(a_cnt=4, b_cnt=5, c_cnt=6),
-            resurrecter=dict(a_cnt=5, b_cnt=6, c_cnt=7),
-        ),
-        system=dict(
-            load_avg=[1, 2, 3],
-            maxrss_mb=TEST_MAXRSS_MB,
-            utime=TEST_UTIME,
-            stime=TEST_STIME)
-    )
+    assert json.loads(response.body) == TEST_METRICS
+
+
+@pytest.mark.gen_test
+def test_get_metrics_flatten(http_client, base_url, mocker):
+
+    rusage = RUsage(TEST_MAXRSS_KB, TEST_UTIME, TEST_STIME)
+
+    mocker.patch('os.getloadavg', return_value=[1, 2, 3])
+    mocker.patch('resource.getrusage', return_value=rusage)
+
+    response = yield http_client.fetch(
+        base_url + make_url('', API_V1, r'metrics') + '?flatten')
+
+    metrics = json.loads(response.body)
+
+    assert response.code == 200
+
+    assert metrics == dict(flatten_dict(TEST_METRICS))
+    assert metrics == dict(flatten_dict_rec(TEST_METRICS))
 
 
 @pytest.mark.parametrize(
