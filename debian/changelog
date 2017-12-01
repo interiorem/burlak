@@ -1,3 +1,16 @@
+cocaine-orca (0.1.14) unstable; urgency=medium
+
+  * `pending_stop_in_state` config flag: whether to add queued to stop
+     apps into exported state or not (default: `off`).
+  * `Flatten` metrics output.
+  * `Reset committed state` message on Cocaine runtime disconnection.
+  * Tuning of default values for expired records removal in committed state:
+    15 minutes now.
+  * Remove apps from exported state if `stop_apps` and `pending_stop_in_state`
+    flags are off.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Fri, 01 Dec 2017 15:52:59 +0300
+
 cocaine-orca (0.1.13) unstable; urgency=medium
 
   * `Pending stop` state: app should be stopped, but `stop_app`

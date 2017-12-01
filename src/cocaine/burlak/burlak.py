@@ -1,9 +1,9 @@
 #
 # TODO:
-#   - timing metrics
 #   - invalidate caches on runtime disconnection
 #
 # DONE:
+#   - timing metrics (seemingly working now)
 #   - console logger wrapper
 #   - use cerberus validator on inputed state
 #   - take start_app 'profile' from, emmm... state?
