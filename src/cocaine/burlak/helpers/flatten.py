@@ -3,7 +3,7 @@
 #
 # TODO: more tests
 #
-def flatten_dict(d):
+def flatten_dict(d, separtor='.'):
     ''' flatten_dict
 
     Return plain list of tuples with concatinated paths to leafs.
@@ -22,7 +22,7 @@ def flatten_dict(d):
         if item and isinstance(item, dict):
             node_stack.extend([(path + [k], v) for k, v in item.iteritems()])
         else:
-            result.append(('.'.join(path), item))
+            result.append((separtor.join(path), item))
 
     return result
 
@@ -30,7 +30,7 @@ def flatten_dict(d):
 #
 # Note: not tested at all!
 #
-def flatten_dict_rec(d):
+def flatten_dict_rec(d, separtor='.'):
 
     def flatten_dict_rec_impl(d, current_path, result):
         if not (d and isinstance(d, dict)):
@@ -44,7 +44,7 @@ def flatten_dict_rec(d):
 
                 flatten_dict_rec_impl(v, new_path, result)
             else:
-                result.append(('.'.join(current_path + [k]), v))
+                result.append((separtor.join(current_path + [k]), v))
 
     current_path = []
     result = []
@@ -52,18 +52,3 @@ def flatten_dict_rec(d):
     flatten_dict_rec_impl(d, current_path, result)
 
     return result
-
-
-d = dict(a=1,b=2,c=dict(z=100,x=500,y=60,d=dict(q=42)), d=dict(r=dict()))
-
-print 'result(s) for d = {}'.format(d)
-
-result_rec = flatten_dict_rec(d)
-result_rec
-print '   rec: \t{}'.format(result_rec)
-
-result = flatten_dict(d)
-result.sort()
-print 'nonrec: \t{}'.format(result)
-
-print dict(result_rec) == dict(result)
