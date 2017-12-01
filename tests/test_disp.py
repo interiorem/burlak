@@ -85,7 +85,10 @@ def init_state():
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_state_input(disp, mocker):
+
     stop_side_effect = [True for _ in state_input]
+    stop_side_effect.append(True)  # reset state message
+
     stop_side_effect.append(False)
 
     mocker.patch.object(
@@ -102,6 +105,8 @@ def test_state_input(disp, mocker):
         yield disp.input_queue.put(
             burlak.StateUpdateMessage(state, version, uuid=''))
         running_apps_list.append(running_list)
+
+    yield disp.input_queue.put(burlak.ResetCStateMessage())
 
     disp.node_service.list = mocker.Mock(
         return_value=make_mock_channel_with(*running_apps_list))
