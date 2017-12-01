@@ -54,9 +54,14 @@ class SysMetricsGatherer(LoopSentry):
         '''
         while(self.should_run()):
             self.rusage = _get_rusage_partly()
-            self.load_avg = os.getloadavg()
+            self.load_avg = self._load_avg_as_dict()
 
             yield gen.sleep(SysMetricsGatherer.GATHER_INTERVAL_SEC)
+
+    def _load_avg_as_dict(self):
+        m1, m5, m15 = os.getloadavg()
+
+        return dict(m1=m1, m5=m5, m15=m15)
 
     def as_dict(self):
         return dict(
