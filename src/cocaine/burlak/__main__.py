@@ -146,9 +146,8 @@ def main(
         status_app = make_status_web_handler( # noqa F841
             shared_status, config.status_web_path, config.status_port)
 
-        IOLoop.current().start()
-
         click.secho('orca is starting...', fg='green')
+        IOLoop.current().start()
     except Exception as e:
         click.secho('error while spawning service: {}'.format(e), fg='red')
 
