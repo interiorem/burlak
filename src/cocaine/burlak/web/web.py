@@ -3,6 +3,8 @@ import time
 from tornado import gen
 from tornado import web
 
+from ..helpers import flatten_dict
+
 
 API_V1 = r'v1'
 
@@ -70,6 +72,9 @@ class MetricsHandler(web.RequestHandler):
 
     @gen.coroutine
     def get(self):
+
+        flatten = self.get_argument('flatten', default=None)
+
         metrics = {
             'queues_fill': {
                 k: v.qsize() for k, v in self.queues.iteritems()
@@ -79,6 +84,9 @@ class MetricsHandler(web.RequestHandler):
             },
             'system': self.metrics_gatherer.as_dict()
         }
+
+        if flatten is not None:
+            metrics = dict(flatten_dict(metrics))
 
         self.write(metrics)
         self.flush()
@@ -182,10 +190,13 @@ class SelfUUID(web.RequestHandler):
         except Exception:  # pragma nocover
             pass
 
-        self.write({
-            'uuid': uuid,
-            'uptime': self.uptime.uptime(),
-            'version': self.version,
-            'api': self.api
-        })
+        self.write(
+            dict(
+                uuid=uuid,
+                uptime=self.uptime.uptime(),
+                version=self.version,
+                api=self.api
+            )
+        )
+
         self.flush()
