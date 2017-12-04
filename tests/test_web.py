@@ -33,6 +33,8 @@ TEST_MAXRSS_MB = TEST_MAXRSS_KB / 1024.0
 TEST_UTIME = 100500
 TEST_STIME = 42
 
+TEST_OS_LA = [1, 2, 3]
+
 
 RUsage = namedtuple('RUsage', [
     'ru_maxrss',
@@ -60,7 +62,7 @@ incoming_state = {
 }
 
 system_metrics = {
-    'load_avg': [1, 2, 3],
+    'load_avg': dict(m1=1, m5=2, m15=3),
     'maxrss_mb': TEST_MAXRSS_MB,
     'utime': TEST_UTIME,
     'stime': TEST_STIME,
@@ -107,6 +109,11 @@ def app(mocker):
         incoming_state, TEST_INCOMING_STATE_VERSION, TEST_TS)
     committed_state.version = TEST_STATE_VERSION
 
+    rusage = RUsage(TEST_MAXRSS_KB, TEST_UTIME, TEST_STIME)
+
+    mocker.patch('os.getloadavg', return_value=TEST_OS_LA)
+    mocker.patch('resource.getrusage', return_value=rusage)
+
     metrics_gatherer = SysMetricsGatherer()
     metrics_gatherer.as_dict = mocker.Mock(return_value=system_metrics)
 
@@ -139,7 +146,7 @@ TEST_METRICS = dict(
         resurrecter=dict(a_cnt=5, b_cnt=6, c_cnt=7),
     ),
     system=dict(
-        load_avg=[1, 2, 3],
+        load_avg=dict(m1=1, m5=2, m15=3),
         maxrss_mb=TEST_MAXRSS_MB,
         utime=TEST_UTIME,
         stime=TEST_STIME)
@@ -148,11 +155,6 @@ TEST_METRICS = dict(
 
 @pytest.mark.gen_test
 def test_get_metrics(http_client, base_url, mocker):
-
-    rusage = RUsage(TEST_MAXRSS_KB, TEST_UTIME, TEST_STIME)
-
-    mocker.patch('os.getloadavg', return_value=[1, 2, 3])
-    mocker.patch('resource.getrusage', return_value=rusage)
 
     response = yield http_client.fetch(
         base_url + make_url('', API_V1, r'metrics'))
@@ -163,11 +165,6 @@ def test_get_metrics(http_client, base_url, mocker):
 
 @pytest.mark.gen_test
 def test_get_metrics_flatten(http_client, base_url, mocker):
-
-    rusage = RUsage(TEST_MAXRSS_KB, TEST_UTIME, TEST_STIME)
-
-    mocker.patch('os.getloadavg', return_value=[1, 2, 3])
-    mocker.patch('resource.getrusage', return_value=rusage)
 
     response = yield http_client.fetch(
         base_url + make_url('', API_V1, r'metrics') + '?flatten')

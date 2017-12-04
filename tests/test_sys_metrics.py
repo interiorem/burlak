@@ -14,7 +14,8 @@ TEST_MAXRSS_MB = TEST_MAXRSS_KB / 1024.0
 TEST_UTIME = 100500
 TEST_STIME = 42
 
-TEST_LA = [1, 2, 3]
+TEST_OS_LA = [1, 2, 3]
+TEST_LA = dict(m1=1, m5=2, m15=3)
 
 
 ResourceUsage = namedtuple('ResourceUsage', [
@@ -25,7 +26,8 @@ ResourceUsage = namedtuple('ResourceUsage', [
 
 
 @pytest.fixture
-def metrics_gatherer():
+def metrics_gatherer(mocker):
+    mocker.patch('os.getloadavg', return_value=TEST_OS_LA)
     return SysMetricsGatherer()
 
 
@@ -36,7 +38,6 @@ def test_gather(metrics_gatherer, mocker):
         'should_run',
         side_effect=[True, False])
 
-    mocker.patch('os.getloadavg', return_value=TEST_LA)
     mocker.patch(
         'resource.getrusage',
         return_value=ResourceUsage(TEST_MAXRSS_KB, TEST_UTIME, TEST_STIME))
@@ -52,9 +53,9 @@ def test_gather(metrics_gatherer, mocker):
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
-def test_as_dict(metrics_gatherer):
+def test_as_dict(metrics_gatherer, mocker):
     assert metrics_gatherer.as_dict() == dict(
-        load_avg=[0.0 for _ in xrange(0, 3)],
+        load_avg=TEST_LA,
         maxrss_mb=0.0,
         utime=0.0,
         stime=0.0

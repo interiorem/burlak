@@ -60,7 +60,6 @@ class SysMetricsGatherer(LoopSentry):
 
     def _load_avg_as_dict(self):
         m1, m5, m15 = os.getloadavg()
-
         return dict(m1=m1, m5=m5, m15=m15)
 
     def as_dict(self):
