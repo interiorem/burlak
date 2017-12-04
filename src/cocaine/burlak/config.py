@@ -36,6 +36,7 @@ class Defaults(object):
     LOCATOR_PORT = 10053
 
     STOP_APPS_NOT_IN_STATE = False
+    PENDING_STOP_IN_STATE = False
 
     SENTRY_DSN = ''
 
@@ -116,6 +117,10 @@ class Config(object):
             'required': False,
         },
         'stop_apps': {
+            'type': 'boolean',
+            'required': False,
+        },
+        'pending_stop_in_state': {
             'type': 'boolean',
             'required': False,
         },
@@ -296,6 +301,15 @@ class Config(object):
     def input_queue_size(self):
         return self._config.get(
             'input_queue_size', Defaults.INPUT_QUEUE_SIZE)
+
+    @property
+    def pending_stop_in_state(self):
+        return self._config.get(
+            'pending_stop_in_state', Defaults.PENDING_STOP_IN_STATE)
+
+    @pending_stop_in_state.setter
+    def pending_stop_in_state(self, flag):
+        self._config['pending_stop_in_state'] = flag
 
     @console_log_level.setter
     def console_log_level(self, level):

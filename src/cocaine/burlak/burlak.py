@@ -524,18 +524,23 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 yield channels_cache.close_and_remove(command.to_stop)
 
                 if self.context.config.stop_apps:  # False by default
+
                     self.status.mark_ok('stopping apps')
                     tm = time.time()
                     yield [
                         self.slay(app, command.state_version, tm)
                         for app in command.to_stop
                     ]
+
                 elif command.to_stop:
                     self.info(
                         'to_stop list not empty, '
                         'but stop_apps flag is disabled')
-                    self.mark_pending_stop(
-                        command.to_stop, command.state_version)
+
+                    # Default false.
+                    if self.context.config.pending_stop_in_state:
+                        self.mark_pending_stop(
+                            command.to_stop, command.state_version)
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.

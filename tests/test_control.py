@@ -102,13 +102,22 @@ def test_stop(elysium, mocker):
         sum(map(len, to_stop_apps))
 
 
+@pytest.mark.parametrize(
+    'log_pending_stop',
+    [
+        True,
+        False
+    ]
+)
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
-def test_stop_apps_disabled(elysium, mocker):
+def test_stop_apps_disabled(elysium, mocker, log_pending_stop):
     stop_side_effect = [True for _ in to_stop_apps]
     stop_side_effect.append(False)
 
     mocker.patch.object(
         burlak.LoopSentry, 'should_run', side_effect=stop_side_effect)
+
+    elysium.context.config.pending_stop_in_state = log_pending_stop
 
     for stop_apps in to_stop_apps:
         yield elysium.control_queue.put(
@@ -285,10 +294,8 @@ def skipped_test_gapped_control(elysium, mocker):
         for app, record in state.iteritems():
             assert _AppsCache.make_control_ch.called_with(app)
 
-    assert \
-        elysium.node_service.start_app.call_count == \
+    assert elysium.node_service.start_app.call_count == \
         sum(map(len, gapped_states))
 
-    assert \
-        _AppsCache.make_control_ch.call_count == \
+    assert _AppsCache.make_control_ch.call_count == \
         len(set(app for task in to_run_apps for app in task))
