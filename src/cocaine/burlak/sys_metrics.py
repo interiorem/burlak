@@ -38,7 +38,7 @@ class SysMetricsGatherer(LoopSentry):
         super(SysMetricsGatherer, self).__init__(**kwargs)
 
         self.rusage = RUsage(0.0, 0.0, 0.0)
-        self.load_avg = [0.0 for _ in xrange(0, 3)]
+        self.load_avg = self._load_avg_as_dict()
 
     @gen.coroutine
     def gather(self):
