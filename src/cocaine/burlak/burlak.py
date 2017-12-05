@@ -86,7 +86,7 @@ class StateUpdateMessage(object):
         return self._state, self._version, self._uuid
 
 
-class ResetCStateMessage(object):
+class ResetStateMessage(object):
     pass
 
 
@@ -222,15 +222,12 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     self.metrics_cnt['apps_in_last_state'] = len(state)
             except Exception as e:  # pragma nocover
 
-                try:
-                    yield self.input_queue.put(ResetCStateMessage())
+                yield self.input_queue.put(ResetStateMessage())
 
-                    self.status.mark_warn('failed to get state')
-                    self.error('failed to get state, error: "{}"', e)
-                except Exception:
-                    pass
-                finally:
-                    yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
+                self.status.mark_warn('failed to get state')
+                self.error('failed to get state, error: "{}"', e)
+
+                yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
 
             finally:  # pragma nocover
                 # TODO: Is it really needed?
@@ -314,11 +311,6 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 self.ci_state.remove_expired(
                     self.context.config.expire_stopped)
 
-                running_apps = yield self.get_running_apps_set()
-
-                self.debug('got running apps {}', running_apps)
-                self.debug('last known uuid is {}', last_uuid)
-
                 # Note that `StateUpdateMessage` only massage type currently
                 # supported.
                 if isinstance(msg, StateUpdateMessage):
@@ -328,24 +320,26 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     self.ci_state.set_incoming_state(state, state_version)
 
                     self.debug(
-                        'disp::got state update with version {}: '
-                        '{} uuid {} and running apps {}',
-                        state_version, state, uuid, running_apps)
-
-                elif isinstance(msg, ResetCStateMessage):
+                        'disp::got state update with version {} uuid {}: {}',
+                        state_version, uuid, state)
+                elif isinstance(msg, ResetStateMessage):
+                    state.clear()
                     self.ci_state.reset()
-                    self.debug('reset committed state signal')
+                    self.debug('reset state signal')
+
+                running_apps = yield self.get_running_apps_set()
+
+                self.debug('got running apps {}', running_apps)
+                self.debug('last known uuid is {}', last_uuid)
 
             except Exception as e:
                 self.error('failed to get control message with {}', e)
                 self.sentry_wrapper.capture_exception()
 
-            # Note that in general following code shouldn't raise.
-
+            # Note that in general following code (up to the end of the
+            # method) shouldn't raise.
             if not state:
-                self.info(
-                    'state not known yet, '
-                    'skipping control iteration')
+                self.info('state not known yet, skipping control iteration')
                 continue
 
             self.status.mark_ok('processing state records')

@@ -106,7 +106,7 @@ def test_state_input(disp, mocker):
             burlak.StateUpdateMessage(state, version, uuid=''))
         running_apps_list.append(running_list)
 
-    yield disp.input_queue.put(burlak.ResetCStateMessage())
+    yield disp.input_queue.put(burlak.ResetStateMessage())
 
     disp.node_service.list = mocker.Mock(
         return_value=make_mock_channel_with(*running_apps_list))
