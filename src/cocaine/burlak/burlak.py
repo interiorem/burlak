@@ -13,10 +13,11 @@
 #   - secure service for 'unicorn'
 #
 import time
-
 from collections import defaultdict, namedtuple
 from datetime import timedelta
+
 from cerberus import Validator
+
 from tornado import gen
 
 from .chcache import ChannelsCache, close_tx_safe
@@ -528,13 +529,17 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 elif command.to_stop:
                     self.info(
-                        'to_stop list not empty, '
-                        'but stop_apps flag is disabled')
+                        'to_stop list not empty, but stop_apps flag is off, '
+                        'skipping `stop apps` stage')
 
-                    # Default false.
+                    # Default is `false`.
                     if self.context.config.pending_stop_in_state:
+                        self.debug('mark prohibited to_stop apps in state')
                         self.mark_pending_stop(
                             command.to_stop, command.state_version)
+                    else:
+                        self.debug('remove prohibited to_stop apps from state')
+                        self.ci_state.remove_listed(command.to_stop)
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.
