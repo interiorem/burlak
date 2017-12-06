@@ -109,7 +109,7 @@ def test_expire_stopped(init_state, mocker):
                     ('workers', state[1]),
                     ('profile', state[2]),
                     ('state_version', state[3]),
-                    ('about_state', state[4]),
+                    ('state_description', state[4]),
                     ('time_stamp', state[5]),
                 ]) for app, state in mix.iteritems()
         }
@@ -130,7 +130,7 @@ def test_mark_failed(init_state, app, profile, version, tm):
             ('workers', 0),
             ('profile', profile),
             ('state_version', version),
-            ('about_state', Defaults.FAILED_DESCRIPTION),
+            ('state_description', Defaults.FAILED_DESCRIPTION),
             ('time_stamp', tm),
         ])
 
