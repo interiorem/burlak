@@ -1,6 +1,5 @@
 from cocaine.burlak import ChannelsCache
 from cocaine.burlak.chcache import _AppsCache
-
 from cocaine.services import Service
 
 import pytest

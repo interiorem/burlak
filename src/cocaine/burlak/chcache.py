@@ -4,7 +4,6 @@
 #   - metrics
 #
 import time
-
 from collections import namedtuple
 from itertools import ifilter
 

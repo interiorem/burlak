@@ -8,7 +8,6 @@ TODO: verify send state by /state handlers
 import json
 import random
 import time
-
 from math import ceil, cos, sin
 
 import click

@@ -1,5 +1,4 @@
 import json
-
 from collections import namedtuple
 
 from cocaine.burlak import burlak
@@ -9,6 +8,7 @@ from cocaine.burlak.sys_metrics import SysMetricsGatherer
 from cocaine.burlak.web import API_V1, make_url, make_web_app_v1
 
 import mock
+
 import pytest
 
 import tornado.queues

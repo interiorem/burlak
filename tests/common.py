@@ -2,6 +2,7 @@
 Mostly copy-pasted from darkvoice/tests/common.py
 '''
 import mock
+
 from tornado.concurrent import Future
 
 
