@@ -417,9 +417,10 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             yield ch.rx.get()
         except Exception as e:
             self.metrics_cnt['errors_start_app'] += 1
+            self.status.mark_warn('failed to start application')
+
             self.error(
                 'failed to start app {} {} with err: {}', app, profile, e)
-            self.status.mark_warn('failed to start application')
 
             sentry_message = "can't start app {}, reason: {}".format(app, e)
             self.sentry_wrapper.capture_exception(message=sentry_message)
@@ -464,14 +465,19 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 yield ch.tx.write(to_adjust)
             except Exception as e:
                 attempts -= 1
-                self.error(
-                    'failed to send control to `{}`, workers {}, '
-                    'with attempts {}, err {}',
-                    app, to_adjust, attempts, e)
+
+                error_message = \
+                    'send control has been failed for app `{}`, workers {}, ' \
+                    'attempts left {}, error: {}' \
+                    .format(app, to_adjust, attempts, e)
+                self.error(error_message)
 
                 self.status.mark_crit('failed to send control command')
                 self.metrics_cnt['errors_of_control'] += 1
                 self.sentry_wrapper.capture_exception()
+
+                self.ci_state.mark_failed(
+                    app, profile, state_version, tm, error_message)
 
                 yield channels_cache.close_and_remove([app])
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
