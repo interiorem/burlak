@@ -6,13 +6,13 @@ App start/stop:
     ☐ Read initial apps profiles somewhere in sync(atomic) way (seems can't be done yet).
 
 Tests:
-    ☐ Remake test after massive refactoring.
+    ✔ Remake test after massive refactoring. @done(2017-12-06 13:24) @project(Tests)
     ☐ tests for exceptions cases.
 
 Metrics:
     ☐ timing metrics.
-    ✔ system metrics. LA done, Mem would be coslty. @done(2017-10-16 20:00) @project(Metrics)
     ☐ web metricts, e.g. request count, may be rps someday.
+    ✔ system metrics. LA done, Mem would be coslty, but maxrss was added. @done(2017-10-16 20:00) @project(Metrics)
 
 Cluster:
     ✔ ways to identify cluster name/type, e.g. testing, production. Hint: YANDEX_ENVIRONMENT variable @done(2017-10-16 19:59) @project(Cluster)
