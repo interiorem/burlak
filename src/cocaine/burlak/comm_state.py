@@ -44,6 +44,7 @@ class CommittedState(object):
 
         self.state = dict()
         self.last_state_version = Defaults.INIT_STATE_VERSION
+
         # for now time when version was updated.
         self.updated_timestamp = 0
 
@@ -122,6 +123,13 @@ class CommittedState(object):
                 'PENDING_STOP',
             )
         )
+
+    def remove(self, app):
+        self.state.pop(app, {})
+
+    def remove_listed(self, apps):
+        for a in apps:
+            self.remove(a)
 
     def remove_old_records(self, expire_span, in_state):
         now = time.time()
