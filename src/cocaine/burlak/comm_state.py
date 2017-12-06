@@ -29,7 +29,7 @@ class CommittedState(object):
         'workers',
         'profile',
         'state_version',
-        'about_state',
+        'state_description',
         'time_stamp',
     ])
 
