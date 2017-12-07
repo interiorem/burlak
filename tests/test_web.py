@@ -149,7 +149,17 @@ TEST_METRICS = dict(
         load_avg=dict(m1=1, m5=2, m15=3),
         maxrss_mb=TEST_MAXRSS_MB,
         utime=TEST_UTIME,
-        stime=TEST_STIME)
+        stime=TEST_STIME),
+    committed_state=dict(
+        running_apps_count=sum(
+            1 for record in test_state.itervalues()
+            if record.state == 'STARTED'
+        ),
+        workers_count=sum(
+            record.workers for record in test_state.itervalues()
+            if record.state == 'STARTED'
+        ),
+    ),
 )
 
 

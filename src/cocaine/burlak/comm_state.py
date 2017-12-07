@@ -206,4 +206,26 @@ class CommittedState(object):
                     state_version,
                     Defaults.PENDING_STOP_DESCRIPTION,
                     int(tm))
-            })
+            }
+        )
+
+    def running_apps_count(self):
+        return sum(
+            1 for _ in self.generate_subset(lambda x: x.state == 'STARTED')
+        )
+
+    def workers_count(self):
+        try:
+            return sum(
+                int(record.workers)
+                for _, record in self.generate_subset(
+                    lambda x: x.state == 'STARTED'
+                )
+            )
+        except Exception:  # pragma nocover
+            return 0
+
+    def generate_subset(self, predicate):
+        for app, record in self.as_dict().iteritems():
+            if predicate(record):
+                yield (app, record)

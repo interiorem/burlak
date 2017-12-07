@@ -140,3 +140,20 @@ def test_mark_failed(init_state, app, profile, version, tm):
 def test_version(init_state):
     init_state.version = 100500
     assert init_state.version == 100500
+
+
+def test_running_apps_count(init_state):
+    assert init_state.running_apps_count() == \
+        sum(
+                1 for record in init_state.as_dict().itervalues()
+                if record.state == 'STARTED'
+        )
+
+
+def test_workers_count(init_state):
+    assert init_state.workers_count() == \
+        sum(
+            record.workers
+            for record in init_state.as_dict().itervalues()
+            if record.state == 'STARTED'
+        )

@@ -32,8 +32,16 @@ def make_web_app_v1(
             dict(committed_state=committed_state)),
         (prefix + r'/failed', FailedStateHandle,
             dict(committed_state=committed_state)),
-        (make_url(prefix, API_V1, r'metrics'), MetricsHandler,
-            dict(queues=qs, units=units, metrics_gatherer=metrics_gatherer)),
+        (
+            make_url(prefix, API_V1, r'metrics'),
+            MetricsHandler,
+            dict(
+                committed_state=committed_state,
+                queues=qs,
+                units=units,
+                metrics_gatherer=metrics_gatherer,
+            )
+        ),
 
         #
         # Used for testing/debugging, not for production, even could
@@ -65,7 +73,8 @@ class Uptime(object):  # pragma nocover
 
 
 class MetricsHandler(web.RequestHandler):
-    def initialize(self, queues, units, metrics_gatherer):
+    def initialize(self, committed_state, queues, units, metrics_gatherer):
+        self.committed_state = committed_state
         self.queues = queues
         self.units = units
         self.metrics_gatherer = metrics_gatherer
@@ -82,7 +91,12 @@ class MetricsHandler(web.RequestHandler):
             'counters': {
                 k: v.get_count_metrics() for k, v in self.units.iteritems()
             },
-            'system': self.metrics_gatherer.as_dict()
+            'system': self.metrics_gatherer.as_dict(),
+            'committed_state': {
+                'running_apps_count':
+                    self.committed_state.running_apps_count(),
+                'workers_count': self.committed_state.workers_count(),
+            },
         }
 
         if flatten is not None:
