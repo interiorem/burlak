@@ -572,6 +572,15 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         for app in command.to_stop
                     ]
 
+                    if not self.context.config.stop_by_control:
+                        # Close after `slay` method, but don't touch channels
+                        # cache after `stop_by_control`.
+                        yield channels_cache.close_and_remove(command.to_stop)
+                    else:
+                        # TODO: danger zone!
+                        # Huge amount of channels could be leaked forever.
+                        pass
+
                 elif command.to_stop:
                     self.info(
                         'to_stop list not empty, but stop_apps flag is off, '
@@ -586,7 +595,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         self.debug('remove prohibited to_stop apps from state')
                         self.ci_state.remove_listed(command.to_stop)
 
-                yield channels_cache.close_and_remove(command.to_stop)
+                    yield channels_cache.close_and_remove(command.to_stop)
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.
