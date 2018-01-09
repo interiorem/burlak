@@ -52,6 +52,8 @@ class Defaults(object):
     APPS_POLL_INTERVAL_SEC = 30
     INPUT_QUEUE_SIZE = 1024
 
+    STOP_BY_CONTROL = True
+
 
 #
 # Should be compatible with tools secure section
@@ -118,6 +120,10 @@ class Config(object):
             'required': False,
         },
         'stop_apps': {
+            'type': 'boolean',
+            'required': False,
+        },
+        'stop_by_control': {
             'type': 'boolean',
             'required': False,
         },
@@ -278,6 +284,10 @@ class Config(object):
         return self._config.get(
             'stop_apps',
             Defaults.STOP_APPS_NOT_IN_STATE)
+
+    @property
+    def stop_by_control(self):
+        return self._config.get('stop_by_control', Defaults.STOP_BY_CONTROL)
 
     @property
     def sentry_dsn(self):

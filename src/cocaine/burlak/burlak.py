@@ -30,7 +30,7 @@ DEFAULT_RETRY_TIMEOUT_SEC = 15
 DEFAULT_UNKNOWN_VERSIONS = 1
 
 DEFAULT_RETRY_ATTEMPTS = 4
-DEFAULT_RETRY_EXP_BASE_SEC = 2
+DEFAULT_RETRY_EXP_BASE_SEC = 4
 
 SYNC_COMPLETION_TIMEOUT_SEC = 600
 
@@ -434,7 +434,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 started.add(app)
 
     @gen.coroutine
-    def slay(self, app, state_version, tm):
+    def slay(self, app, state_version, tm, *unused):
         '''Stop/pause application
         '''
         try:
@@ -453,8 +453,34 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.status.mark_warn('failed to stop application')
 
     @gen.coroutine
+    def stop_by_control(self, app, state_version, tm, channels_cache):
+        '''Stop application with app.control(0)
+        '''
+        try:
+            yield self.adjust_by_channel(
+                app,
+                '',
+                channels_cache,
+                0,
+                state_version,
+                tm)
+
+            self.ci_state.mark_stopped(app, state_version, tm)
+            self.metrics_cnt['apps_stopped_by_control'] += 1
+
+            self.info('app {} has been stopped with control', app)
+        except Exception as e:  # pragma nocover
+            self.error(
+                'failed to stop app {} by control with error: {}', app, e)
+
+            self.metrics_cnt['errors_stop_app_by_control'] += 1
+
+            self.sentry_wrapper.capture_exception()
+            self.status.mark_warn('failed to stop application by control')
+
+    @gen.coroutine
     def adjust_by_channel(
-            self, app, channels_cache, to_adjust, profile, state_version, tm):
+            self, app, profile, channels_cache, to_adjust, state_version, tm):
 
         self.debug('control command to {} with {}', app, to_adjust)
 
@@ -470,6 +496,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     'send control has been failed for app `{}`, workers {}, ' \
                     'attempts left {}, error: {}' \
                     .format(app, to_adjust, attempts, e)
+
                 self.error(error_message)
 
                 self.status.mark_crit('failed to send control command')
@@ -480,7 +507,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     app, profile, state_version, tm, error_message)
 
                 yield channels_cache.close_and_remove([app])
-                yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
+                yield gen.sleep(DEFAULT_RETRY_EXP_BASE_SEC)
             else:
                 self.ci_state.mark_running(
                     app, to_adjust, profile, state_version, tm)
@@ -522,14 +549,21 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 self.ci_state.version = command.state_version
 
-                yield channels_cache.close_and_remove(command.to_stop)
-
                 if self.context.config.stop_apps:  # False by default
 
                     self.status.mark_ok('stopping apps')
                     tm = time.time()
+
+                    stop_method = self.stop_by_control \
+                        if self.context.config.stop_by_control else self.slay
+
                     yield [
-                        self.slay(app, command.state_version, tm)
+                        stop_method(
+                            app,
+                            command.state_version,
+                            tm,
+                            channels_cache
+                        )
                         for app in command.to_stop
                     ]
 
@@ -546,6 +580,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     else:
                         self.debug('remove prohibited to_stop apps from state')
                         self.ci_state.remove_listed(command.to_stop)
+
+                yield channels_cache.close_and_remove(command.to_stop)
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.
@@ -581,8 +617,10 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     tm = time.time()
                     yield [
                         self.adjust_by_channel(
-                            app, channels_cache,
-                            int(state_record.workers), state_record.profile,
+                            app,
+                            state_record.profile,
+                            channels_cache,
+                            int(state_record.workers),
                             command.state_version, tm)
                         for app, state_record in command.state.iteritems()
                         if app in to_control and

@@ -1,6 +1,6 @@
 # TODO: app control tests
 from cocaine.burlak import burlak
-from cocaine.burlak.chcache import _AppsCache
+from cocaine.burlak.chcache import ChannelsCache, _AppsCache
 from cocaine.burlak.comm_state import CommittedState
 from cocaine.burlak.config import Config
 from cocaine.burlak.context import Context, LoggerSetup
@@ -86,6 +86,8 @@ def test_stop(elysium, mocker):
         )
 
     elysium.context.config._config['stop_apps'] = True
+    elysium.context.config._config['stop_by_control'] = False
+
     elysium.node_service.pause_app = mocker.Mock(
         side_effect=make_mock_channels_list_with(
             xrange(count_apps(to_stop_apps))
@@ -99,6 +101,38 @@ def test_stop(elysium, mocker):
             assert elysium.node_service.pause_app.called_with(app)
 
     assert elysium.node_service.pause_app.call_count == \
+        sum(map(len, to_stop_apps))
+
+
+@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
+def test_stop_by_control(elysium, mocker):
+    stop_side_effect = [True for _ in to_stop_apps]
+    stop_side_effect.append(False)
+
+    mocker.patch.object(
+        burlak.LoopSentry, 'should_run', side_effect=stop_side_effect)
+
+    for stop_apps in to_stop_apps:
+        yield elysium.control_queue.put(
+            burlak.DispatchMessage(dict(), -1, False, set(stop_apps), set())
+        )
+
+    elysium.context.config._config['stop_apps'] = True
+    elysium.context.config._config['stop_by_control'] = True
+
+    mocker.patch.object(
+        ChannelsCache,
+        'get_ch',
+        return_value=make_mock_channel_with(0)
+    )
+
+    yield elysium.blessing_road()
+
+    for apps_list in to_stop_apps:
+        for app in apps_list:
+            assert ChannelsCache.get_ch.called_with(app)
+
+    assert ChannelsCache.get_ch.call_count == \
         sum(map(len, to_stop_apps))
 
 
