@@ -455,6 +455,11 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     @gen.coroutine
     def stop_by_control(self, app, state_version, tm, channels_cache):
         '''Stop application with app.control(0)
+
+        TODO:
+            Apps will be periodically reported as running by RT,
+            so would be scheduled to stop periodically (channels would be open,
+            control would be send, channels would be closed).
         '''
         try:
             yield self.adjust_by_channel(
