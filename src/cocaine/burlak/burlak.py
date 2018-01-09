@@ -576,7 +576,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         # Close after `slay` method, but don't touch channels
                         # cache after `stop_by_control`.
                         yield channels_cache.close_and_remove(command.to_stop)
-                    else:
+                    else:  # pragma nocover
                         # TODO: danger zone!
                         # Huge amount of channels could be leaked forever.
                         pass
