@@ -1,3 +1,10 @@
+cocaine-orca (0.1.15) UNRELEASED; urgency=medium
+
+  * `stop_by_control`: stop app by sending control message with
+    workers count == 0.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Tue, 09 Jan 2018 15:10:14 +0300
+
 cocaine-orca (0.1.14) unstable; urgency=medium
 
   * `pending_stop_in_state` config flag: whether to add queued to stop
