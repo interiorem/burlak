@@ -52,7 +52,7 @@ class Defaults(object):
     APPS_POLL_INTERVAL_SEC = 30
     INPUT_QUEUE_SIZE = 1024
 
-    STOP_BY_CONTROL = True
+    STOP_BY_CONTROL = False
 
 
 #
