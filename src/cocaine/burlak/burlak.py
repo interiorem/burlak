@@ -453,7 +453,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.status.mark_warn('failed to stop application')
 
     @gen.coroutine
-    def stop_by_control(self, app, state_version, tm, channels_cache):
+    def stop_by_control(
+            self, app, state_version, tm, channels_cache, stopped_by_control):
         '''Stop application with app.control(0)
 
         TODO:
@@ -462,16 +463,23 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             control would be send, channels would be closed).
         '''
         try:
+            if app in stopped_by_control:
+                self.debug(
+                    'app {} in stopped list, ignoring stop command.', app)
+                return
+
             yield self.adjust_by_channel(
                 app,
                 '',
                 channels_cache,
                 0,
                 state_version,
-                tm)
+                tm,
+            )
 
             self.ci_state.mark_stopped(app, state_version, tm)
             self.metrics_cnt['apps_stopped_by_control'] += 1
+            stopped_by_control.add(app)
 
             self.info('app {} has been stopped with control', app)
         except Exception as e:  # pragma nocover
@@ -530,7 +538,10 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def blessing_road(self):
+
+        # should be
         channels_cache = ChannelsCache(self)
+        stopped_by_control = set()
 
         while self.should_run():
             try:
@@ -567,7 +578,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                             app,
                             command.state_version,
                             tm,
-                            channels_cache
+                            channels_cache,
+                            stopped_by_control
                         )
                         for app in command.to_stop
                     ]
@@ -589,6 +601,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 if not self.context.config.stop_by_control:
                     # Close after `slay` method, but don't touch channels
                     # cache after `stop_by_control`.
+                    self.debug('close and remove `to_stop` channels')
                     yield channels_cache.close_and_remove(command.to_stop)
                 else:  # pragma nocover
                     # TODO: danger zone!
@@ -613,7 +626,11 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 # start up fail.
                 to_control = set(command.state.iterkeys()) \
                     if command.is_state_updated else started
+
                 failed_to_start = command.to_run - started
+                stopped_by_control = stopped_by_control - to_control
+
+                self.debug('stopped_by_control {}', stopped_by_control)
 
                 if failed_to_start:  # pragma nocover
                     self.warn(

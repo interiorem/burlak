@@ -132,8 +132,9 @@ def test_stop_by_control(elysium, mocker):
         for app in apps_list:
             assert ChannelsCache.get_ch.called_with(app)
 
-    assert ChannelsCache.get_ch.call_count == \
-        sum(map(len, to_stop_apps))
+    assert \
+        ChannelsCache.get_ch.call_count == \
+        len({a for apps in to_stop_apps for a in apps})
 
 
 @pytest.mark.parametrize(
