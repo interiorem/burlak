@@ -47,6 +47,7 @@ DispatchMessage = namedtuple('DispatchMessage', [
     'is_state_updated',
     'to_stop',
     'to_run',
+    'runtime_reborn',
 ])
 
 
@@ -294,6 +295,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         while self.should_run():
             self.status.mark_ok('listening on incoming queue')
 
+            runtime_reborn = False
             is_state_updated = False
             msg = None
             uuid = None
@@ -324,6 +326,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                         'disp::got state update with version {} uuid {}: {}',
                         state_version, uuid, state)
                 elif isinstance(msg, ResetStateMessage):
+                    runtime_reborn = True
                     state.clear()
                     self.ci_state.reset()
                     self.debug('reset state signal')
@@ -376,7 +379,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 yield self.control_queue.put(
                     DispatchMessage(
                         state, state_version, is_state_updated,
-                        to_stop, to_run
+                        to_stop, to_run,
+                        runtime_reborn
                     )
                 )
 
@@ -554,16 +558,21 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 self.debug(
                     'control task: state {}, state_ver {}, do_adjust? {}, '
-                    'to_stop {}, to_run {}',
+                    'to_stop {}, to_run {}, runtime_reborn {}',
                     command.state,
                     command.state_version,
                     command.is_state_updated,
                     command.to_stop,
                     command.to_run,
+                    command.runtime_reborn
                 )
+
                 self.status.mark_ok('processing control command')
 
                 self.ci_state.version = command.state_version
+
+                if command.runtime_reborn:
+                    stopped_by_control = set()
 
                 if self.context.config.stop_apps:  # False by default
 

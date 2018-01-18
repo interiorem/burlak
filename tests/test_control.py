@@ -82,7 +82,9 @@ def test_stop(elysium, mocker):
 
     for stop_apps in to_stop_apps:
         yield elysium.control_queue.put(
-            burlak.DispatchMessage(dict(), -1, False, set(stop_apps), set())
+            burlak.DispatchMessage(
+                dict(), -1, False, set(stop_apps), set(), False
+            )
         )
 
     elysium.context.config._config['stop_apps'] = True
@@ -114,7 +116,9 @@ def test_stop_by_control(elysium, mocker):
 
     for stop_apps in to_stop_apps:
         yield elysium.control_queue.put(
-            burlak.DispatchMessage(dict(), -1, False, set(stop_apps), set())
+            burlak.DispatchMessage(
+                dict(), -1, False, set(stop_apps), set(), False
+            )
         )
 
     elysium.context.config._config['stop_apps'] = True
@@ -156,7 +160,9 @@ def test_stop_apps_disabled(elysium, mocker, log_pending_stop):
 
     for stop_apps in to_stop_apps:
         yield elysium.control_queue.put(
-            burlak.DispatchMessage(dict(), -1, False, set(stop_apps), set())
+            burlak.DispatchMessage(
+                dict(), -1, False, set(stop_apps), set(), False
+            )
         )
 
     elysium.node_service.pause_app = mocker.Mock(
@@ -179,7 +185,7 @@ def test_run(elysium, mocker):
     for run_apps in to_run_apps:
         yield elysium.control_queue.put(
             burlak.DispatchMessage(
-                run_apps, -1, False, set(), set(run_apps.iterkeys()))
+                run_apps, -1, False, set(), set(run_apps.iterkeys()), False)
         )
 
     yield elysium.blessing_road()
@@ -207,7 +213,7 @@ def test_control(elysium, mocker):
     for run_apps in to_run_apps:
         yield elysium.control_queue.put(
             burlak.DispatchMessage(
-                run_apps, -1, True, set(), set(run_apps.iterkeys()))
+                run_apps, -1, True, set(), set(run_apps.iterkeys()), False)
         )
 
     yield elysium.blessing_road()
@@ -244,7 +250,7 @@ def test_control_exceptions(elysium, mocker):
     for run_apps in to_run_apps:
         yield elysium.control_queue.put(
             burlak.DispatchMessage(
-                run_apps, -1, True, set(), set(run_apps.iterkeys()))
+                run_apps, -1, True, set(), set(run_apps.iterkeys()), False)
         )
 
     except_sequence = [
@@ -313,7 +319,7 @@ def skipped_test_gapped_control(elysium, mocker):
     for state, gap_state in zip(to_run_apps, gapped_states):
         yield elysium.control_queue.put(
             burlak.DispatchMessage(
-                gap_state, -1, True, set(), set(state.iterkeys()))
+                gap_state, -1, True, set(), set(state.iterkeys()), False)
         )
 
     yield elysium.blessing_road()
