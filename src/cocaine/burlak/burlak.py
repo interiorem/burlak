@@ -48,6 +48,7 @@ DispatchMessage = namedtuple('DispatchMessage', [
     'to_stop',
     'to_run',
     'runtime_reborn',
+    'workers_mismatch',
 ])
 
 
@@ -276,12 +277,47 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
         return set(to_update)
 
+    def workers_diff(self, state, running_workers):
+        '''Find mismatch between last state and current runtime state
+        '''
+        # In case if app is not in running_workers it would be started
+        # on next control iteration, so it isn't any need to mark it
+        # `failed` in common state.
+        return {
+            app
+            for app, record in state.iteritems()
+            if app in running_workers and
+            abs(record.workers - running_workers[app])
+        }
+
     @gen.coroutine
     def get_running_apps_set(self):
         ch = yield self.node_service.list()
         apps_list = yield ch.rx.get()
 
         raise gen.Return(set(apps_list))
+
+    @gen.coroutine
+    def get_app_info(self, app, flag=0x01):  # 0x01: collect overseer info
+        ch = yield self.node_service.info(app, flag)
+        info = yield ch.rx.get()
+
+        raise gen.Return(info)
+
+    @gen.coroutine
+    def get_workers_count(self, apps):
+        result = dict()
+        for a in apps:
+            info = yield self.get_app_info(a)
+            if 'pool' in info and isinstance(info['pool'], dict):
+                active = info['pool'].get('active', 0)
+                idle = info['pool'].get('idle', 0)
+
+                result[a] = active + idle
+            else:
+                result[a] = 0
+
+        raise gen.Return(result)
 
     @gen.coroutine
     def process_loop(self):
@@ -292,13 +328,14 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         )
 
         last_uuid = None
+
         while self.should_run():
             self.status.mark_ok('listening on incoming queue')
 
             runtime_reborn = False
             is_state_updated = False
-            msg = None
-            uuid = None
+            uuid, msg = None, None
+            workers_mismatch = set()
 
             try:
                 msg = yield self.input_queue.get(
@@ -333,9 +370,15 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
                 running_apps = yield self.get_running_apps_set()
 
+                if not is_state_updated:
+                    workers_count = yield self.get_workers_count(running_apps)
+                    workers_mismatch = self.workers_diff(state, workers_count)
+
+                    self.debug('current workers count {}', workers_count)
+                    self.debug('workers mismatch {}', workers_mismatch)
+
                 self.debug('got running apps {}', running_apps)
                 self.debug('last known uuid is {}', last_uuid)
-
             except Exception as e:
                 self.error('failed to get control message with {}', e)
                 self.sentry_wrapper.capture_exception()
@@ -380,7 +423,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     DispatchMessage(
                         state, state_version, is_state_updated,
                         to_stop, to_run,
-                        runtime_reborn
+                        runtime_reborn,
+                        workers_mismatch
                     )
                 )
 
@@ -556,17 +600,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 command = yield self.control_queue.get()
                 self.control_queue.task_done()
 
-                self.debug(
-                    'control task: state {}, state_ver {}, do_adjust? {}, '
-                    'to_stop {}, to_run {}, runtime_reborn {}',
-                    command.state,
-                    command.state_version,
-                    command.is_state_updated,
-                    command.to_stop,
-                    command.to_run,
-                    command.runtime_reborn
-                )
-
+                self.debug('control task: {}', command._asdict())
                 self.status.mark_ok('processing control command')
 
                 self.ci_state.version = command.state_version
@@ -667,6 +701,16 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                     self.metrics_cnt['state_updates'] += 1
                     self.info('state updated')
+
+                now = time.time()
+                for app in command.workers_mismatch:
+                    profile = command.state[app].profile \
+                        if app in command.state else ''
+
+                    self.ci_state.mark_failed(
+                        app, profile, command.state_version, now,
+                        "workers count mismatch")
+
             except Exception as e:  # pragma nocover
                 self.error(
                     'failed to exec command with error {}: {}',
