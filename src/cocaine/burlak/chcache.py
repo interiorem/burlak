@@ -26,6 +26,9 @@ def close_tx_safe(ch, logger=None):  # pragma nocover
             logger.error('failed to close channel {}, err {}', ch, e)
 
 
+#
+# Deprecated
+#
 class _AppsCache(object):
     '''App services cache with handy control channel creation method
     '''
@@ -64,10 +67,10 @@ class _AppsCache(object):
 
 
 class ChannelsCache(object):
-    def __init__(self, logger):
+    def __init__(self, logger, node_service):
         self.channels = dict()
         self.logger = logger
-        self.app_cache = _AppsCache(logger)
+        self.node_service = node_service
 
     @gen.coroutine
     def close_and_remove(self, to_remove):
@@ -76,7 +79,6 @@ class ChannelsCache(object):
             self.logger.debug('removing from ch.cache {}', app)
             yield close_tx_safe(self.channels[app], self.logger)
             del self.channels[app]
-            self.app_cache.remove([app])
 
         raise gen.Return(cnt)
 
@@ -90,7 +92,7 @@ class ChannelsCache(object):
             self.logger.debug('ch chache `add_one`: closing ch for {}', app)
             yield close_tx_safe(self.channels[app], self.logger)
 
-        self.channels[app] = yield self.app_cache.make_control_ch(app)
+        self.channels[app] = yield self.node_service.control(app)
         raise gen.Return(self.channels[app])
 
     @gen.coroutine

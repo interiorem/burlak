@@ -611,7 +611,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     def blessing_road(self):
 
         # should be
-        channels_cache = ChannelsCache(self)
+        channels_cache = ChannelsCache(self, self.node_service)
         stopped_by_control = set()
 
         while self.should_run():
