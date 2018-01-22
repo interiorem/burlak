@@ -1,7 +1,11 @@
-cocaine-orca (0.1.15) UNRELEASED; urgency=medium
+cocaine-orca (0.1.16) UNRELEASED; urgency=medium
 
   * `stop_by_control`: stop app by sending control message with
     workers count == 0.
+  * RT feedback: periodically get number of running workers from
+    node::info and resend control to those apps with incorrect
+    workers count.
+  * mark `broken` apps as `failed` in commited state.
 
  -- Alex Karev <karapuz@yandex-team.ru>  Tue, 09 Jan 2018 15:10:14 +0300
 
