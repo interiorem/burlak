@@ -49,6 +49,7 @@ DispatchMessage = namedtuple('DispatchMessage', [
     'to_run',
     'runtime_reborn',
     'workers_mismatch',
+    'broken_apps',
 ])
 
 
@@ -298,26 +299,37 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         raise gen.Return(set(apps_list))
 
     @gen.coroutine
-    def get_app_info(self, app, flag=0x01):  # 0x01: collect overseer info
+    def get_info(self, app, flag=0x01):  # 0x01: collect overseer info
         ch = yield self.node_service.info(app, flag)
         info = yield ch.rx.get()
 
         raise gen.Return(info)
 
     @gen.coroutine
-    def get_workers_count(self, apps):
+    def get_apps_info(self, apps):
+        info = yield {a: self.get_info(a) for a in apps}
+        raise gen.Return(info)
+
+    def get_workers_per_apps(self, info):
         result = dict()
-        for a in apps:
-            info = yield self.get_app_info(a)
-            if 'pool' in info and isinstance(info['pool'], dict):
-                active = info['pool'].get('active', 0)
-                idle = info['pool'].get('idle', 0)
 
-                result[a] = active + idle
+        for app, record in info.iteritems():
+            if 'pool' in record and isinstance(record['pool'], dict):
+                active = record['pool'].get('active', 0)
+                idle = record['pool'].get('idle', 0)
+
+                result[app] = active + idle
             else:
-                result[a] = 0
+                result[app] = 0
 
-        raise gen.Return(result)
+        return result
+
+    def get_broken_apps(self, info):
+        return {
+            app
+            for app, record in info.iteritems()
+            if 'state' in record and record['state'] == 'broken'
+        }
 
     @gen.coroutine
     def process_loop(self):
@@ -336,6 +348,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             is_state_updated = False
             uuid, msg = None, None
             workers_mismatch = set()
+            broken_apps = set()
 
             try:
                 msg = yield self.input_queue.get(
@@ -371,9 +384,18 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 running_apps = yield self.get_running_apps_set()
 
                 if not is_state_updated:
-                    workers_count = yield self.get_workers_count(running_apps)
+                    info = yield self.get_apps_info(running_apps)
+
+                    if state:
+                        broken_apps = {
+                            app for app in self.get_broken_apps(info)
+                            if app in state
+                        }
+
+                    workers_count = self.get_workers_per_apps(info)
                     workers_mismatch = self.workers_diff(state, workers_count)
 
+                    self.debug('in broken state {}', broken_apps)
                     self.debug('current workers count {}', workers_count)
                     self.debug('workers mismatch {}', workers_mismatch)
 
@@ -424,7 +446,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                         state, state_version, is_state_updated,
                         to_stop, to_run,
                         runtime_reborn,
-                        workers_mismatch
+                        workers_mismatch,
+                        broken_apps,
                     )
                 )
 
@@ -665,12 +688,14 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     for app in command.to_run if app in command.state
                 ]
 
+                failed_to_start = command.to_run - started
+                started = started | command.workers_mismatch
+
                 # Send control to every app in state, except known for
                 # start up fail.
                 to_control = set(command.state.iterkeys()) \
                     if command.is_state_updated else started
 
-                failed_to_start = command.to_run - started
                 stopped_by_control = stopped_by_control - to_control
 
                 self.debug('stopped_by_control {}', stopped_by_control)
@@ -699,17 +724,17 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         app not in failed_to_start
                     ]
 
-                    self.metrics_cnt['state_updates'] += 1
-                    self.info('state updated')
-
                 now = time.time()
-                for app in command.workers_mismatch:
+                for app in command.broken_apps:
                     profile = command.state[app].profile \
                         if app in command.state else ''
 
                     self.ci_state.mark_failed(
                         app, profile, command.state_version, now,
-                        "workers count mismatch")
+                        "app is in broken state")
+
+                self.metrics_cnt['state_updates'] += 1
+                self.info('state updated')
 
             except Exception as e:  # pragma nocover
                 self.error(

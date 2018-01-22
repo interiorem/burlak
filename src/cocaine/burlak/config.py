@@ -49,7 +49,7 @@ class Defaults(object):
     STATUS_WEB_PATH = r'/status'
     STATUS_PORT = 9878
 
-    APPS_POLL_INTERVAL_SEC = 30
+    APPS_POLL_INTERVAL_SEC = 60
     INPUT_QUEUE_SIZE = 1024
 
     STOP_BY_CONTROL = False
