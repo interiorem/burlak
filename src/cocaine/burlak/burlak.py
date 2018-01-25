@@ -310,19 +310,24 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         info = yield {a: self.get_info(a) for a in apps}
         raise gen.Return(info)
 
-    def get_workers_per_apps(self, info):
-        result = dict()
+    def workers_per_app(self, info):
 
-        for app, record in info.iteritems():
-            if 'pool' in record and isinstance(record['pool'], dict):
-                active = record['pool'].get('active', 0)
-                idle = record['pool'].get('idle', 0)
+        def count_by_sum(record):  # pragma nocover
+            pool = record.get('pool', dict())
+            active = pool.get('active', 0)
+            idle = pool.get('idle', 0)
 
-                result[app] = active + idle
-            else:
-                result[app] = 0
+            return active + idle
 
-        return result
+        def count_by_len(record):  # pragma nocover
+            pool = record.get('pool', dict())
+            slaves = pool.get('slaves', dict())
+            return len(slaves)
+
+        return {
+            app: count_by_len(record)
+            for app, record in info.iteritems()
+        }
 
     def get_broken_apps(self, info):
         return {
@@ -392,7 +397,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                             if app in state
                         }
 
-                    workers_count = self.get_workers_per_apps(info)
+                    workers_count = self.workers_per_app(info)
                     workers_mismatch = self.workers_diff(state, workers_count)
 
                     self.debug('in broken state {}', broken_apps)
