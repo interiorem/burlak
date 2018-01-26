@@ -578,6 +578,12 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             try:
                 ch = yield channels_cache.get_ch(app)
                 yield ch.tx.write(to_adjust)
+                #
+                # TODO:
+                #   - framing violation?
+                #   - is `rx` closed somewhere
+                #
+                # _ = yield ch.rx.get()
             except Exception as e:
                 attempts -= 1
 
