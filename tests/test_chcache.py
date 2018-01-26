@@ -22,7 +22,10 @@ def ch_cache(mocker):
         'make_control_ch',
         return_value=make_mock_channel_with(0))
 
-    return ChannelsCache(logger)
+    node = mocker.Mock()
+    node.control = mocker.Mock(return_value=make_mock_channel_with(0))
+
+    return ChannelsCache(logger, node)
 
 
 @pytest.fixture

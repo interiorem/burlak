@@ -59,6 +59,12 @@ def elysium(mocker):
         )
     )
 
+    node.control = mocker.Mock(
+        side_effect=make_mock_channels_list_with(
+            xrange(count_apps(to_run_apps))
+        )
+    )
+
     return burlak.AppsElysium(
         Context(
             LoggerSetup(make_logger_mock(mocker), False),
@@ -196,6 +202,12 @@ def test_run(elysium, mocker):
             )
         )
 
+    mocker.patch.object(
+        ChannelsCache,
+        'get_ch',
+        return_value=make_mock_channel_with(0)
+    )
+
     yield elysium.blessing_road()
 
     for apps_list in to_run_apps:
@@ -232,6 +244,12 @@ def test_control(elysium, mocker):
             )
         )
 
+    mocker.patch.object(
+        ChannelsCache,
+        'get_ch',
+        return_value=make_mock_channel_with(0)
+    )
+
     yield elysium.blessing_road()
 
     for apps_list in to_run_apps:
@@ -248,8 +266,8 @@ def test_control(elysium, mocker):
         count_apps(to_run_apps)
 
     assert \
-        _AppsCache.make_control_ch.call_count == \
-        len(set(app for task in to_run_apps for app in task))
+        ChannelsCache.get_ch.call_count == \
+        len(list(app for task in to_run_apps for app in task))
 
 
 #
@@ -280,8 +298,8 @@ def test_control_exceptions(elysium, mocker):
     except_sequence = [
         0,
         Exception('broken', 'connect1'),
-        0,
         Exception('broken', 'connect2'),
+        0,
         Exception('broken', 'connect3'),
         0,
     ]
@@ -291,11 +309,8 @@ def test_control_exceptions(elysium, mocker):
         if isinstance(it, Exception):
             except_count += 1
 
-    mocker.patch.object(
-        _AppsCache,
-        'make_control_ch',
+    elysium.node_service.control = mocker.Mock(
         side_effect=[make_mock_channel_with(v) for v in except_sequence])
-
     yield elysium.blessing_road()
 
     for apps_list in to_run_apps:
@@ -305,13 +320,13 @@ def test_control_exceptions(elysium, mocker):
                 record.profile
             )
 
-            assert _AppsCache.make_control_ch.called_with(app)
+            assert elysium.node_service.control.called_with(app)
 
     assert \
         elysium.node_service.start_app.call_count == \
         sum(map(len, to_run_apps))
     assert \
-        _AppsCache.make_control_ch.call_count == \
+        elysium.node_service.control.call_count == \
         len(set(app for task in to_run_apps for app in task))
 
 
