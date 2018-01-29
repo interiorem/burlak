@@ -540,8 +540,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         '''
         try:
             if app in stopped_by_control:
-                self.debug(
-                    'app {} in stopped list, ignoring stop command.', app)
                 return
 
             yield self.adjust_by_channel(
