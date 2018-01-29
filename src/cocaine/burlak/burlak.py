@@ -568,22 +568,36 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.status.mark_warn('failed to stop application by control')
 
     @gen.coroutine
+    def control(self, ch, to_adjust):
+        yield ch.tx.write(to_adjust)
+
+    @gen.coroutine
+    def control_with_ack(self, ch, to_adjust):  # pragma nocover
+        '''Send control and get (dummy) result or exception
+
+        TODO: tests
+
+        '''
+        yield ch.tx.write(to_adjust)
+        yield ch.rx.get()
+
+    @gen.coroutine
     def adjust_by_channel(
             self, app, profile, channels_cache, to_adjust, state_version, tm):
 
-        self.debug('control command to {} with {}', app, to_adjust)
+        self.debug(
+            'control command to {} with {} ack {}',
+            app, to_adjust, self.context.config.control_with_ack is True
+        )
+
+        control_method = self.control_with_ack \
+            if self.context.config.control_with_ack else self.control
 
         attempts = CONTROL_RETRY_ATTEMPTS
         while attempts:
             try:
                 ch = yield channels_cache.get_ch(app)
-                yield ch.tx.write(to_adjust)
-                #
-                # TODO:
-                #   - framing violation?
-                #   - is `rx` closed somewhere
-                #
-                # _ = yield ch.rx.get()
+                yield control_method(ch, to_adjust)
             except Exception as e:
                 attempts -= 1
 

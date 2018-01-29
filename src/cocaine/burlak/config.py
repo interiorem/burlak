@@ -53,6 +53,7 @@ class Defaults(object):
     INPUT_QUEUE_SIZE = 1024
 
     STOP_BY_CONTROL = False
+    CONTROL_WITH_ACK = False
 
 
 #
@@ -124,6 +125,10 @@ class Config(object):
             'required': False,
         },
         'stop_by_control': {
+            'type': 'boolean',
+            'required': False,
+        },
+        'control_with_ack': {
             'type': 'boolean',
             'required': False,
         },
@@ -333,6 +338,10 @@ class Config(object):
     @property
     def status_port(self):
         return self._config.get('status_port', Defaults.STATUS_PORT)
+
+    @property
+    def control_with_ack(self):
+        return self._config.get('control_with_ack', Defaults.CONTROL_WITH_ACK)
 
     # TODO:
     #   refactor to single method?
