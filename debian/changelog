@@ -1,3 +1,10 @@
+cocaine-orca (0.1.18) UNRELEASED; urgency=medium
+
+  * `Stop again` list. Resend stop to application with non zero
+     workers count in runtime list.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Tue, 30 Jan 2018 15:21:40 +0300
+
 cocaine-orca (0.1.17) unstable; urgency=medium
 
   * Control with ack (enabled with config, default is off)

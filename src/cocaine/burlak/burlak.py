@@ -602,8 +602,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self, app, profile, channels_cache, to_adjust, state_version, tm):
 
         self.debug(
-            'control command to {} with {} ack {}',
-            app, to_adjust, self.context.config.control_with_ack is True
+            'control command to {} ack {} with {}',
+            app, self.context.config.control_with_ack is True, to_adjust
         )
 
         control_method = self.control_with_ack \
