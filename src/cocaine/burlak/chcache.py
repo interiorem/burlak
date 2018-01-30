@@ -105,3 +105,6 @@ class ChannelsCache(object):
         ch = yield self.add_one(app, should_close)
 
         raise gen.Return(ch)
+
+    def __len__(self):
+        return len(self.channels)

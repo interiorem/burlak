@@ -738,8 +738,11 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     if command.is_state_updated else started
 
                 stopped_by_control = stopped_by_control - to_control
-
                 self.debug('stopped_by_control {}', stopped_by_control)
+
+                self.metrics_cnt['to_control'] = len(to_control)
+                self.metrics_cnt['stopped_by_control'] = \
+                    len(stopped_by_control)
 
                 if failed_to_start:  # pragma nocover
                     self.warn(
@@ -775,8 +778,9 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         "app is in broken state")
 
                 self.metrics_cnt['state_updates'] += 1
-                self.info('state updated')
+                self.metrics_cnt['ch_cache_size'] += len(channels_cache)
 
+                self.info('state updated')
             except Exception as e:  # pragma nocover
                 self.error(
                     'failed to exec command with error {}: {}',
