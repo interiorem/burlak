@@ -49,6 +49,7 @@ DispatchMessage = namedtuple('DispatchMessage', [
     'to_run',
     'runtime_reborn',
     'workers_mismatch',
+    'stop_again',
     'broken_apps',
 ])
 
@@ -337,6 +338,32 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         }
 
     @gen.coroutine
+    def runtime_state(self, state, running_apps):
+        info = yield self.get_apps_info(running_apps)
+        workers_count = self.workers_per_app(info)
+
+        broken_apps, stop_again = [set() for _ in xrange(2)]
+
+        if state:
+            broken_apps = {
+                app for app in self.get_broken_apps(info)
+                if app in state
+            }
+            stop_again = {
+                app for app in workers_count
+                if app not in state and workers_count[app] > 0
+            }
+
+        workers_mismatch = self.workers_diff(state, workers_count)
+
+        self.debug('in broken state {}', broken_apps)
+        self.debug('current workers count {}', workers_count)
+        self.debug('stop command should be resent to {}', stop_again)
+        self.debug('workers mismatch {}', workers_mismatch)
+
+        raise gen.Return((workers_mismatch, stop_again, broken_apps))
+
+    @gen.coroutine
     def process_loop(self):
 
         running_apps = set()
@@ -352,8 +379,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             runtime_reborn = False
             is_state_updated = False
             uuid, msg = None, None
-            workers_mismatch = set()
-            broken_apps = set()
+            workers_mismatch, stop_again, broken_apps = \
+                [set() for _ in xrange(3)]
 
             try:
                 msg = yield self.input_queue.get(
@@ -389,23 +416,12 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 running_apps = yield self.get_running_apps_set()
 
                 if not is_state_updated:
-                    info = yield self.get_apps_info(running_apps)
+                    workers_mismatch, stop_again, broken_apps = \
+                        yield self.runtime_state(state, running_apps)
 
-                    if state:
-                        broken_apps = {
-                            app for app in self.get_broken_apps(info)
-                            if app in state
-                        }
-
-                    workers_count = self.workers_per_app(info)
-                    workers_mismatch = self.workers_diff(state, workers_count)
-
-                    self.debug('in broken state {}', broken_apps)
-                    self.debug('current workers count {}', workers_count)
-                    self.debug('workers mismatch {}', workers_mismatch)
-
-                self.debug('got running apps {}', running_apps)
-                self.debug('last known uuid is {}', last_uuid)
+                self.debug(
+                    'last uuid {}, running apps {}', last_uuid, running_apps
+                )
             except Exception as e:
                 self.error('failed to get control message with {}', e)
                 self.sentry_wrapper.capture_exception()
@@ -446,12 +462,14 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             if is_state_updated or to_run or to_stop:
                 self.status.mark_ok('sending processed state to dispatch')
 
+                # TODO: refact - make separate messages for each case.
                 yield self.control_queue.put(
                     DispatchMessage(
                         state, state_version, is_state_updated,
                         to_stop, to_run,
                         runtime_reborn,
                         workers_mismatch,
+                        stop_again,
                         broken_apps,
                     )
                 )
@@ -632,8 +650,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def blessing_road(self):
-
-        # should be
         channels_cache = ChannelsCache(self, self.node_service)
         stopped_by_control = set()
 
@@ -653,6 +669,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 if command.runtime_reborn:
                     stopped_by_control = set()
+
+                stopped_by_control = stopped_by_control - command.stop_again
 
                 if self.context.config.stop_apps:  # False by default
 
