@@ -1,4 +1,4 @@
-cocaine-orca (0.1.18) UNRELEASED; urgency=medium
+cocaine-orca (0.1.18) unstable; urgency=medium
 
   * `Stop again` list. Resend stop to application with non zero
      workers count in runtime list.
