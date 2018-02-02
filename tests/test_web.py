@@ -109,6 +109,8 @@ def app(mocker):
         incoming_state, TEST_INCOMING_STATE_VERSION, TEST_TS)
     committed_state.version = TEST_STATE_VERSION
 
+    workers_distribution = dict()
+
     rusage = RUsage(TEST_MAXRSS_KB, TEST_UTIME, TEST_STIME)
 
     mocker.patch('os.getloadavg', return_value=TEST_OS_LA)
@@ -134,6 +136,7 @@ def app(mocker):
         '', TEST_PORT, uptime, uniresis,
         committed_state, metrics_gatherer,
         qs, units,
+        workers_distribution,
         TEST_VERSION)
 
 

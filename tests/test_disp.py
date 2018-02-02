@@ -57,6 +57,7 @@ def disp(mocker):
     config = mocker.Mock()
 
     sentry_wrapper = mocker.Mock()
+    workers_distribution = dict()
 
     return burlak.StateAggregator(
         Context(
@@ -69,7 +70,8 @@ def disp(mocker):
         node,
         CommittedState(),
         queues.Queue(), queues.Queue(),
-        0.01)
+        0.01,
+        workers_distribution)
 
 
 @pytest.fixture
