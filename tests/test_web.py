@@ -109,7 +109,7 @@ def app(mocker):
         incoming_state, TEST_INCOMING_STATE_VERSION, TEST_TS)
     committed_state.version = TEST_STATE_VERSION
 
-    workers_distribution = dict()
+    workers_distribution = {'app{}'.format(i): i % 4 for i in xrange(10)}
 
     rusage = RUsage(TEST_MAXRSS_KB, TEST_UTIME, TEST_STIME)
 
@@ -289,3 +289,53 @@ def test_get_failed(http_client, base_url, failed_path):
 
     assert response.code == 200
     assert json.loads(response.body).get('failed', []) == failed
+
+
+@pytest.mark.gen_test
+def test_distribution_all(http_client, base_url):
+    response = yield http_client.fetch(
+        base_url + make_url('', API_V1, r'distribution'))
+
+    assert response.code == 200
+    assert json.loads(response.body) == dict(
+        app0=0,
+        app1=1,
+        app2=2,
+        app3=3,
+        app4=0,
+        app5=1,
+        app6=2,
+        app7=3,
+        app8=0,
+        app9=1,
+    )
+
+
+@pytest.mark.gen_test
+def test_distribution_none(http_client, base_url):
+    response = yield http_client.fetch(
+        base_url + make_url('', API_V1, r'distribution/none'))
+
+    assert response.code == 200
+    assert json.loads(response.body) == dict(
+        app0=0,
+        app4=0,
+        app8=0,
+    )
+
+
+@pytest.mark.gen_test
+def test_distribution_some(http_client, base_url):
+    response = yield http_client.fetch(
+        base_url + make_url('', API_V1, r'distribution/some'))
+
+    assert response.code == 200
+    assert json.loads(response.body) == dict(
+        app1=1,
+        app2=2,
+        app3=3,
+        app5=1,
+        app6=2,
+        app7=3,
+        app9=1,
+    )
