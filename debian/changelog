@@ -1,3 +1,10 @@
+cocaine-orca (0.1.19) unstable; urgency=medium
+
+  * Workers distribution web handler.
+  * Few more metrics.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Fri, 02 Feb 2018 17:19:19 +0300
+
 cocaine-orca (0.1.18) unstable; urgency=medium
 
   * `Stop again` list. Resend stop to application with non zero
