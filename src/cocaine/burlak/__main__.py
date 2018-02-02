@@ -97,12 +97,15 @@ def main(
         apps_poll_interval = config.apps_poll_interval_sec
 
     acquirer = burlak.StateAcquirer(context, input_queue)
+    workers_distribution = dict()
     state_processor = burlak.StateAggregator(
         context,
         node,
         committed_state,
         input_queue, control_queue,
-        apps_poll_interval)
+        apps_poll_interval,
+        workers_distribution,
+    )
 
     apps_elysium = burlak.AppsElysium(
         context, committed_state, node, control_queue)
@@ -142,7 +145,9 @@ def main(
             prefix, port, uptime, uniresis,
             committed_state, metrics_gatherer,
             qs, units,
-            __version__)
+            workers_distribution,
+            __version__
+        )
         status_app = make_status_web_handler( # noqa F841
             shared_status, config.status_web_path, config.status_port)
 

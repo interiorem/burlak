@@ -249,6 +249,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             ci_state,
             input_queue, control_queue,
             poll_interval_sec,
+            workers_distribution,
             **kwargs):
         super(StateAggregator, self).__init__(context, **kwargs)
 
@@ -261,8 +262,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         self.control_queue = control_queue
 
         self.poll_interval_sec = poll_interval_sec
-
         self.ci_state = ci_state
+        self.workers_distribution = workers_distribution
 
         self.status = context.shared_status.register(StateAggregator.TASK_NAME)
 
@@ -361,7 +362,12 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         self.debug('stop command should be resent to {}', stop_again)
         self.debug('workers mismatch {}', workers_mismatch)
 
-        raise gen.Return((workers_mismatch, stop_again, broken_apps))
+        raise gen.Return((
+            workers_count,
+            workers_mismatch,
+            stop_again,
+            broken_apps,
+        ))
 
     @gen.coroutine
     def process_loop(self):
@@ -411,13 +417,20 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     runtime_reborn = True
                     state.clear()
                     self.ci_state.reset()
+                    self.workers_distribution.clear()
                     self.debug('reset state signal')
 
                 running_apps = yield self.get_running_apps_set()
 
                 if not is_state_updated:
-                    workers_mismatch, stop_again, broken_apps = \
-                        yield self.runtime_state(state, running_apps)
+                    (
+                        workers_count,
+                        workers_mismatch,
+                        stop_again,
+                        broken_apps,
+                    ) = yield self.runtime_state(state, running_apps)
+                    self.workers_distribution.clear()
+                    self.workers_distribution.update(workers_count)
 
                 self.debug(
                     'last uuid {}, running apps {}', last_uuid, running_apps

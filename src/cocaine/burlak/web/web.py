@@ -15,7 +15,7 @@ def make_url(prefix, version, path):
 
 def make_web_app_v1(
         prefix, port, uptime, uniresis, committed_state,
-        metrics_gatherer, qs, units, version):
+        metrics_gatherer, qs, units, workers_distribution, version):
     '''make_web_app_v1
 
     For legacy API some handlers are exposed with API version part and without
@@ -30,6 +30,9 @@ def make_web_app_v1(
             dict(committed_state=committed_state)),
         (make_url(prefix, API_V1, r'failed'), FailedStateHandle,
             dict(committed_state=committed_state)),
+        (make_url(prefix, API_V1, r'distribution(/?[^/]*)'),
+            WorkersDistribution,
+            dict(workers_distribution=workers_distribution)),
         (prefix + r'/failed', FailedStateHandle,
             dict(committed_state=committed_state)),
         (
@@ -214,3 +217,28 @@ class SelfUUID(web.RequestHandler):
         )
 
         self.flush()
+
+
+class WorkersDistribution(web.RequestHandler):
+
+    def initialize(self, workers_distribution):
+        self.workers_distribution = workers_distribution
+
+    @gen.coroutine
+    def get(self, subset=None):
+        result = result = self.workers_distribution
+
+        if subset == '/none':
+            result = {
+                app: workers
+                for app, workers in self.workers_distribution.iteritems()
+                if not workers
+            }
+        elif subset == '/some':
+            result = {
+                app: workers
+                for app, workers in self.workers_distribution.iteritems()
+                if workers
+            }
+
+        self.write(result)

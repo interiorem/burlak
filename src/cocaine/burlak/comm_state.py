@@ -58,6 +58,10 @@ class CommittedState(object):
         self.state.clear()
         self.version = Defaults.INIT_STATE_VERSION
 
+    def clear(self):
+        '''Alias for reset'''
+        self.reset()
+
     def mark_running(self, app, workers, profile, state_version, tm):
         self.state.update(
             {
