@@ -7,10 +7,11 @@ from cocaine.burlak.context import Context, LoggerSetup
 
 import pytest
 
+from tornado import gen
 from tornado import queues
 
 from .common import ASYNC_TESTS_TIMEOUT, \
-    make_logger_mock, make_mock_channel_with
+    make_future, make_logger_mock, make_mock_channel_with
 
 
 running_app_lists = [
@@ -90,7 +91,6 @@ def test_state_input(disp, mocker):
 
     stop_side_effect = [True for _ in state_input]
     stop_side_effect.append(True)  # reset state message
-
     stop_side_effect.append(False)
 
     mocker.patch.object(
@@ -134,3 +134,63 @@ def test_state_input(disp, mocker):
         }
 
         assert command.state == normalized_state
+
+
+running_apps = [
+    dict(app1=3, app2=2, app3=1, app4=4),
+    dict(app1=3),
+    dict(),
+]
+
+
+@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
+def test_app_poll(disp, mocker):
+    stop_side_effect = [True for _ in running_apps]
+    stop_side_effect.append(True)  # reset state message
+    stop_side_effect.append(False)
+
+    mocker.patch.object(
+        burlak.LoopSentry, 'should_run', side_effect=stop_side_effect)
+
+    disp.input_queue.get = mocker.Mock(
+        side_effect=[
+            make_future(gen.TimeoutError()) for _ in running_apps
+        ]
+    )
+
+    disp.node_service.list = mocker.Mock(
+        side_effect=[
+            make_mock_channel_with(d.keys()) for d in running_apps
+        ]
+    )
+
+    def slaves_count(app):
+        for apps in running_apps:
+            for a in apps:
+                if a == app:
+                    return apps[a]
+
+    def info_mock(app, flags=None):
+        count = slaves_count(app)
+        ans = dict(
+            pool=dict(
+                slaves={app: 'dummy_info' for _ in xrange(count)}
+            )
+        )
+
+        return make_mock_channel_with(ans)
+
+    def check_workers_mismatch(state, workers_count):
+        for d in running_apps:
+            if d == workers_count:
+                return True
+        return False
+
+    disp.node_service.info = mocker.Mock(side_effect=info_mock)
+    disp.workers_diff = mocker.Mock(side_effect=check_workers_mismatch)
+
+    yield disp.process_loop()
+
+    assert disp.workers_diff.call_count == len(running_apps)
+    for d in running_apps:
+        assert disp.workers_diff.called_with(dict(), d)
