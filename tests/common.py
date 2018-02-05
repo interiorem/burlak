@@ -3,8 +3,8 @@ Mostly copy-pasted from darkvoice/tests/common.py
 '''
 import mock
 
+from tornado import gen
 from tornado.concurrent import Future
-
 
 ASYNC_TESTS_TIMEOUT = 10
 
@@ -14,7 +14,7 @@ def make_future(v):
     TODO: exceptions cases
     '''
     fut = Future()
-    if isinstance(v, Exception):
+    if isinstance(v, Exception) or isinstance(v, gen.TimeoutError):
         fut.set_exception(v)
     else:
         fut.set_result(v)
