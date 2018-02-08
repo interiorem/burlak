@@ -15,6 +15,7 @@ Depends: ${misc:Depends}, ${python:Depends},
   python-yaml (>= 3.0),
   python-cerberus (>= 0.9.0),
   python-raven (>=5.0.0),
+  python-six,
   ubic,
 Description: Orchestrator next-gen prototype
  Runtime state updater, listens for Scheduler updates command and tries to

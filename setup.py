@@ -22,6 +22,7 @@ setup(
         'PyYAML>=3.0',
         'cerberus>=0.9.0',
         'raven>=5.0.0',
+        'six',
     ],
     namespace_packages=['cocaine'],
     setup_requires=['pytest-runner', 'python-debian'],

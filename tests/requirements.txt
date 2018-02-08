@@ -8,3 +8,4 @@ pytest-mock
 pytest-tornado
 python-debian
 raven>=5.0.0
+six
