@@ -447,7 +447,9 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
             self.status.mark_ok('processing state records')
 
-            update_state_apps_set = set(state.iterkeys())
+            # was till 0.1.18 update_state_apps_set = set(state.iterkeys())
+            # starting from 0.1.19
+            update_state_apps_set = state.viewkeys()
 
             to_run = update_state_apps_set - running_apps
             to_stop = running_apps - update_state_apps_set
