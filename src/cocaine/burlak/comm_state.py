@@ -57,6 +57,7 @@ class CommittedState(object):
     def reset(self):
         self.state.clear()
         self.version = Defaults.INIT_STATE_VERSION
+        self.in_state = CommittedState.IncomingState(dict(), -1, 0)
 
     def clear(self):  # pragma nocover
         '''Alias for reset'''
