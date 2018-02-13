@@ -56,6 +56,7 @@ def disp(mocker):
     node = mocker.Mock()
     node.list = mocker.Mock()
     config = mocker.Mock()
+    config.white_list = []
 
     sentry_wrapper = mocker.Mock()
     workers_distribution = dict()

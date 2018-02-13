@@ -180,6 +180,13 @@ class Config(object):
                 ],
             },
         },
+        'white_list': {
+            'type': 'list',
+            'required': False,
+            'items': [
+                {'type': 'string'}
+            ],
+        }
     }
 
     def __init__(self, shared_status, logger=None):
@@ -317,6 +324,10 @@ class Config(object):
     def input_queue_size(self):
         return self._config.get(
             'input_queue_size', Defaults.INPUT_QUEUE_SIZE)
+
+    @property
+    def white_list(self):
+        return self._config.get('white_list', [])
 
     @property
     def pending_stop_in_state(self):

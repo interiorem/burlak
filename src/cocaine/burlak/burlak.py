@@ -18,11 +18,15 @@ from datetime import timedelta
 
 from cerberus import Validator
 
+import six
+
 from tornado import gen
 
 from .chcache import ChannelsCache, close_tx_safe
 from .logger import ConsoleLogger, VoidLogger
 from .loop_sentry import LoopSentry
+from .patricia.patricia import trie
+
 
 CONTROL_RETRY_ATTEMPTS = 3
 
@@ -58,6 +62,43 @@ StateRecord = namedtuple('StateRecord', [
     'workers',
     'profile',
 ])
+
+
+def build_trie(keys):
+    t = trie()
+    for k in keys:
+        t[k] = None
+
+    return t
+
+
+def search_trie(t, prefixes):
+    return [k for p in prefixes for k in t.iter(p)]
+
+
+def find_keys_with_prefix(data, prefixes):
+    t = build_trie(data)
+    return search_trie(t, prefixes)
+
+
+def filter_apps(apps, white_list):
+    if not white_list:
+        return apps
+
+    def filter_dict(di, white_list):
+        to_preserve = find_keys_with_prefix(six.viewkeys(di), white_list)
+        return {k: v for k, v in six.iteritems(di) if k in to_preserve}
+
+    def filter_set(s, white_list):
+        to_preserve = find_keys_with_prefix(s, white_list)
+        return {item for item in s if item in to_preserve}
+
+    if isinstance(apps, dict):
+        return filter_dict(apps, white_list)
+    elif isinstance(apps, set):
+        return filter_set(apps, white_list)
+
+    return apps
 
 
 #
@@ -406,6 +447,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 # supported.
                 if isinstance(msg, StateUpdateMessage):
                     state, state_version, uuid = msg.get_all()
+                    state = filter_apps(state, self.context.config.white_list)
+
                     is_state_updated = True
 
                     self.ci_state.set_incoming_state(state, state_version)
@@ -421,6 +464,10 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     self.debug('reset state signal')
 
                 running_apps = yield self.get_running_apps_set()
+                running_apps = filter_apps(
+                    running_apps,
+                    self.context.config.white_list
+                )
 
                 if not is_state_updated:
                     (
