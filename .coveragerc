@@ -5,3 +5,4 @@ omit =
     src/cocaine/burlak/helpers/*
     src/cocaine/burlak/sched_load/*
     src/cocaine/burlak/mokak/*
+    src/cocaine/burlak/patricia/*
