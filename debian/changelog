@@ -1,3 +1,11 @@
+cocaine-orca (0.1.20) UNRELEASED; urgency=medium
+
+  * Start porting to six package.
+  * Prelimintary `prod filter` (aka apps white list) support.
+  * Reset incoming state on runtime disconnection. 
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Tue, 13 Feb 2018 17:40:25 +0300
+
 cocaine-orca (0.1.19) unstable; urgency=medium
 
   * Workers distribution web handler.
