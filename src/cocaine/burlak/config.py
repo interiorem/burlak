@@ -183,9 +183,9 @@ class Config(object):
         'white_list': {
             'type': 'list',
             'required': False,
-            'items': [
-                {'type': 'string'}
-            ],
+            'schema': {
+                'type': 'string',
+            },
         }
     }
 

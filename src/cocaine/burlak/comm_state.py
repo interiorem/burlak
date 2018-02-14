@@ -39,6 +39,12 @@ class CommittedState(object):
         'timestamp'
     ])
 
+    TO_EXPIRE = (
+        'FAILED',
+        'STOPPED',
+        'PENDING_STOP',
+    )
+
     def __init__(self):
         self.in_state = CommittedState.IncomingState(dict(), -1, 0)
 
@@ -120,14 +126,7 @@ class CommittedState(object):
     def remove_expired(self, expire_span):
         '''Removes all non-RUNNING records
         '''
-        self.remove_old_records(
-            expire_span,
-            (
-                'FAILED',
-                'STOPPED',
-                'PENDING_STOP',
-            )
-        )
+        self.remove_old_records(expire_span, self.TO_EXPIRE)
 
     def remove(self, app):
         self.state.pop(app, {})

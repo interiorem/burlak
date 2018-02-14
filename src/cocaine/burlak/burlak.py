@@ -1,8 +1,8 @@
 #
 # TODO:
-#   - invalidate caches on runtime disconnection
 #
 # DONE:
+#   - invalidate caches on runtime disconnection
 #   - timing metrics (seemingly working now)
 #   - console logger wrapper
 #   - use cerberus validator on inputed state
@@ -45,8 +45,10 @@ def make_state_path(prefix, uuid):  # pragma nocover
     return prefix + '/' + uuid
 
 
+# TODO: Decompose!
 DispatchMessage = namedtuple('DispatchMessage', [
     'state',
+    'real_state',
     'state_version',
     'is_state_updated',
     'to_stop',
@@ -99,6 +101,23 @@ def filter_apps(apps, white_list):
         return filter_set(apps, white_list)
 
     return apps
+
+
+def update_fake_state(ci_state, state_version, state, control_state):
+    to_fake_mark = six.viewkeys(state) - six.viewkeys(control_state)
+
+    if to_fake_mark:
+        ci_state.clear()
+        ci_state.version = state_version
+
+    now = time.time()
+    for app in to_fake_mark:
+        try:
+            rec = state[app]
+            ci_state.mark_running(
+                app, rec.workers, rec.profile, state_version, now)
+        except KeyError:
+            pass
 
 
 #
@@ -384,7 +403,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         info = yield self.get_apps_info(running_apps)
         workers_count = self.workers_per_app(info)
 
-        broken_apps, stop_again = [set() for _ in xrange(2)]
+        broken_apps, stop_again = set(), set()
 
         if state:
             broken_apps = {
@@ -414,8 +433,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
     def process_loop(self):
 
         running_apps = set()
-        state, prev_state, state_version = (
-            dict(), dict(), DEFAULT_UNKNOWN_VERSIONS
+        state, prev_state, real_state, state_version = (
+            dict(), dict(), dict(), DEFAULT_UNKNOWN_VERSIONS
         )
 
         last_uuid = None
@@ -447,11 +466,20 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 # supported.
                 if isinstance(msg, StateUpdateMessage):
                     state, state_version, uuid = msg.get_all()
-                    state = filter_apps(state, self.context.config.white_list)
-
                     is_state_updated = True
 
                     self.ci_state.set_incoming_state(state, state_version)
+
+                    control_state = filter_apps(
+                        state, self.context.config.white_list)
+                    real_state = state
+                    state = control_state
+
+                    self.info(
+                        'pruned state: {}, muted apps {}',
+                        state,
+                        six.viewkeys(real_state) - six.viewkeys(state)
+                    )
 
                     self.debug(
                         'disp::got state update with version {} uuid {}: {}',
@@ -464,10 +492,16 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     self.debug('reset state signal')
 
                 running_apps = yield self.get_running_apps_set()
-                running_apps = filter_apps(
-                    running_apps,
-                    self.context.config.white_list
+                pruned_running_apps = filter_apps(
+                    running_apps, self.context.config.white_list)
+
+                self.info(
+                    'last uuid {}, running apps {}, muted apps {}',
+                    last_uuid, running_apps,
+                    running_apps - pruned_running_apps
                 )
+
+                running_apps = pruned_running_apps
 
                 if not is_state_updated:
                     (
@@ -476,36 +510,26 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                         stop_again,
                         broken_apps,
                     ) = yield self.runtime_state(state, running_apps)
+
                     self.workers_distribution.clear()
                     self.workers_distribution.update(workers_count)
 
-                self.debug(
-                    'last uuid {}, running apps {}', last_uuid, running_apps
-                )
             except Exception as e:
                 self.error('failed to get control message with {}', e)
                 self.sentry_wrapper.capture_exception()
 
             # Note that in general following code (up to the end of the
             # method) shouldn't raise.
-            if not state:
+            if not real_state:
                 self.info('state not known yet, skipping control iteration')
                 continue
 
             self.status.mark_ok('processing state records')
 
-            # was till 0.1.18 update_state_apps_set = set(state.iterkeys())
-            # starting from 0.1.19
-            update_state_apps_set = state.viewkeys()
+            update_state_apps_set = six.viewkeys(state)
 
             to_run = update_state_apps_set - running_apps
             to_stop = running_apps - update_state_apps_set
-
-            if last_uuid == uuid and prev_state == state:
-                self.debug(
-                    'got same state as in previous update iteration '
-                    'for same uuid, skipping control step')
-                is_state_updated = False
 
             if is_state_updated:  # check for profiles change
                 to_update = self.make_prof_update_set(prev_state, state)
@@ -527,7 +551,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 # TODO: refact - make separate messages for each case.
                 yield self.control_queue.put(
                     DispatchMessage(
-                        state, state_version, is_state_updated,
+                        state, real_state,
+                        state_version, is_state_updated,
                         to_stop, to_run,
                         runtime_reborn,
                         workers_mismatch,
@@ -734,8 +759,21 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 self.ci_state.version = command.state_version
 
+                if command.is_state_updated:
+                    update_fake_state(
+                        self.ci_state,
+                        command.state_version,
+                        command.real_state,
+                        command.state,
+                    )
+                    self.debug(
+                        'updating fake state {} real state {}',
+                        command.state,  # fake state
+                        command.real_state,
+                    )
+
                 if command.runtime_reborn:
-                    stopped_by_control = set()
+                    stopped_by_control.clear()
 
                 stopped_by_control = stopped_by_control - command.stop_again
 
@@ -830,7 +868,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                             channels_cache,
                             int(state_record.workers),
                             command.state_version, tm)
-                        for app, state_record in command.state.iteritems()
+                        for app, state_record in six.iteritems(command.state)
                         if app in to_control and
                         app not in failed_to_start
                     ]
