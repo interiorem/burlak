@@ -88,7 +88,7 @@ def filter_apps(apps, white_list):
         return apps
 
     def filter_dict(di, white_list):
-        to_preserve = find_keys_with_prefix(six.viewkeys(di), white_list)
+        to_preserve = find_keys_with_prefix(di.viewkeys(), white_list)
         return {k: v for k, v in six.iteritems(di) if k in to_preserve}
 
     def filter_set(s, white_list):
@@ -104,7 +104,7 @@ def filter_apps(apps, white_list):
 
 
 def update_fake_state(ci_state, state_version, state, control_state):
-    to_fake_mark = six.viewkeys(state) - six.viewkeys(control_state)
+    to_fake_mark = state.viewkeys() - control_state.viewkeys()
 
     if to_fake_mark:
         ci_state.clear()
@@ -478,7 +478,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     self.info(
                         'pruned state: {}, muted apps {}',
                         state,
-                        six.viewkeys(real_state) - six.viewkeys(state)
+                        real_state.viewkeys() - state.viewkeys()
                     )
 
                     self.debug(
@@ -526,7 +526,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
             self.status.mark_ok('processing state records')
 
-            update_state_apps_set = six.viewkeys(state)
+            update_state_apps_set = state.viewkeys()
 
             to_run = update_state_apps_set - running_apps
             to_stop = running_apps - update_state_apps_set
