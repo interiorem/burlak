@@ -5,7 +5,7 @@ from cocaine.burlak import burlak
 from cocaine.burlak.comm_state import CommittedState
 from cocaine.burlak.helpers import flatten_dict, flatten_dict_rec
 from cocaine.burlak.sys_metrics import SysMetricsGatherer
-from cocaine.burlak.web import API_V1, make_url, make_web_app_v1
+from cocaine.burlak.web import API_V1, WebOptions, make_url, make_web_app_v1
 
 import mock
 
@@ -132,12 +132,20 @@ def app(mocker):
     uptime = mocker.Mock()
     uptime.uptime = mocker.Mock(return_value=TEST_UPTIME)
 
-    return make_web_app_v1(
-        '', TEST_PORT, uptime, uniresis,
-        committed_state, metrics_gatherer,
-        qs, units,
+    wops = WebOptions(
+        '',
+        TEST_PORT,
+        uptime,
+        uniresis,
+        committed_state,
+        metrics_gatherer,
+        qs,
+        units,
         workers_distribution,
-        TEST_VERSION)
+        [],
+        TEST_VERSION
+    )
+    return make_web_app_v1(wops)
 
 
 TEST_METRICS = dict(
@@ -339,3 +347,12 @@ def test_distribution_some(http_client, base_url):
         app7=3,
         app9=1,
     )
+
+
+@pytest.mark.gen_test
+def test_white_list(http_client, base_url):
+    response = yield http_client.fetch(
+        base_url + make_url('', API_V1, r'white_list'))
+
+    assert response.code == 200
+    assert json.loads(response.body) == dict(white_list=[])

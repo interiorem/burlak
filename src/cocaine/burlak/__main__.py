@@ -24,7 +24,7 @@ from .mokak.mokak import SharedStatus, make_status_web_handler
 from .sentry import SentryClientWrapper
 from .sys_metrics import SysMetricsGatherer
 from .uniresis import catchup_an_uniresis
-from .web import Uptime, make_web_app_v1
+from .web import Uptime, WebOptions, make_web_app_v1
 
 
 try:
@@ -141,13 +141,15 @@ def main(
 
     try:
         uptime = Uptime()
-        web_app = make_web_app_v1( # noqa F841
+        wopts = WebOptions(
             prefix, port, uptime, uniresis,
             committed_state, metrics_gatherer,
             qs, units,
             workers_distribution,
+            context.config.white_list,
             __version__
         )
+        web_app = make_web_app_v1(wopts) # noqa F841
         status_app = make_status_web_handler( # noqa F841
             shared_status, config.status_web_path, config.status_port)
 

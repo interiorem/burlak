@@ -1,4 +1,5 @@
 import time
+from collections import namedtuple
 
 from tornado import gen
 from tornado import web
@@ -9,40 +10,55 @@ from ..helpers import flatten_dict
 API_V1 = r'v1'
 
 
+WebOptions = namedtuple('WebOptions', [
+    'prefix',
+    'port',
+    'uptime',
+    'uniresis',
+    'committed_state',
+    'metrics_gatherer',
+    'qs',
+    'units',
+    'workers_distribution',
+    'white_list',
+    'version',
+])
+
+
 def make_url(prefix, version, path):
     return '{}/{}/{}'.format(prefix, version, path)
 
 
-def make_web_app_v1(
-        prefix, port, uptime, uniresis, committed_state,
-        metrics_gatherer, qs, units, workers_distribution, version):
+def make_web_app_v1(opts):
     '''make_web_app_v1
 
     For legacy API some handlers are exposed with API version part and without
 
     '''
     app = web.Application([
-        (make_url(prefix, API_V1, r'state'), StateV1Handler,
-            dict(committed_state=committed_state)),
-        (make_url(prefix, API_V1, r'incoming_state'), IncomingStateHandle,
-            dict(committed_state=committed_state)),
-        (prefix + r'/state', StateHandler,
-            dict(committed_state=committed_state)),
-        (make_url(prefix, API_V1, r'failed'), FailedStateHandle,
-            dict(committed_state=committed_state)),
-        (make_url(prefix, API_V1, r'distribution(/?[^/]*)'),
+        (make_url(opts.prefix, API_V1, r'state'), StateV1Handler,
+            dict(committed_state=opts.committed_state)),
+        (make_url(opts.prefix, API_V1, r'incoming_state'), IncomingStateHandle,
+            dict(committed_state=opts.committed_state)),
+        (opts.prefix + r'/state', StateHandler,
+            dict(committed_state=opts.committed_state)),
+        (make_url(opts.prefix, API_V1, r'failed'), FailedStateHandle,
+            dict(committed_state=opts.committed_state)),
+        (make_url(opts.prefix, API_V1, r'white_list'), WhiteList,
+            dict(white_list=opts.white_list)),
+        (make_url(opts.prefix, API_V1, r'distribution(/?[^/]*)'),
             WorkersDistribution,
-            dict(workers_distribution=workers_distribution)),
-        (prefix + r'/failed', FailedStateHandle,
-            dict(committed_state=committed_state)),
+            dict(workers_distribution=opts.workers_distribution)),
+        (opts.prefix + r'/failed', FailedStateHandle,
+            dict(committed_state=opts.committed_state)),
         (
-            make_url(prefix, API_V1, r'metrics'),
+            make_url(opts.prefix, API_V1, r'metrics'),
             MetricsHandler,
             dict(
-                committed_state=committed_state,
-                queues=qs,
-                units=units,
-                metrics_gatherer=metrics_gatherer,
+                committed_state=opts.committed_state,
+                queues=opts.qs,
+                units=opts.units,
+                metrics_gatherer=opts.metrics_gatherer,
             )
         ),
 
@@ -53,16 +69,16 @@ def make_web_app_v1(
         # Doesn't contain version within path as it could only way to
         # obtain one.
         #
-        (prefix + r'/info', SelfUUID,
+        (opts.prefix + r'/info', SelfUUID,
             dict(
-                uniresis_proxy=uniresis,
-                uptime=uptime,
-                version=version,
+                uniresis_proxy=opts.uniresis,
+                uptime=opts.uptime,
+                version=opts.version,
                 api=API_V1)),
     ], debug=False)
 
-    if port is not None:
-        app.listen(port)
+    if opts.port is not None:
+        app.listen(opts.port)
 
     return app
 
@@ -242,3 +258,12 @@ class WorkersDistribution(web.RequestHandler):
             }
 
         self.write(result)
+
+
+class WhiteList(web.RequestHandler):
+    def initialize(self, white_list):
+        self.white_list = white_list
+
+    @gen.coroutine
+    def get(self):
+        self.write(dict(white_list=self.white_list))
