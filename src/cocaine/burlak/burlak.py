@@ -475,15 +475,12 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     real_state = state
                     state = control_state
 
-                    self.info(
-                        'pruned state: {}, muted apps {}',
-                        state,
+                    self.debug(
+                        'disp::got state update with version {} uuid {}: {}, '
+                        'muted apps {}',
+                        state_version, uuid, state,
                         real_state.viewkeys() - state.viewkeys()
                     )
-
-                    self.debug(
-                        'disp::got state update with version {} uuid {}: {}',
-                        state_version, uuid, state)
                 elif isinstance(msg, ResetStateMessage):
                     runtime_reborn = True
                     state.clear()
