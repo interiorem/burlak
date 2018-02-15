@@ -1,4 +1,11 @@
-cocaine-orca (0.1.20) UNRELEASED; urgency=medium
+cocaine-orca (0.1.21) UNRELEASED; urgency=medium
+
+  * Porting to six package (continue).
+  * Generate fake state for apps `white list`.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Thu, 15 Feb 2018 14:10:48 +0300
+
+cocaine-orca (0.1.20) unstable; urgency=medium
 
   * Start porting to six package.
   * Prelimintary `prod filter` (aka apps white list) support.
