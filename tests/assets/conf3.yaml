@@ -1,3 +1,7 @@
 
 locator:
     port: 10042
+
+
+white_list:
+    - q

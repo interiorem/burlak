@@ -200,3 +200,18 @@ def test_console_log_level_setter():
     cfg.console_log_level = console_level
 
     assert cfg.console_log_level == console_level
+
+
+@pytest.mark.parametrize(
+    'config,expect_wl',
+    [
+        ('tests/assets/conf1.yaml', ['a', 'b', 'c']),
+        ('tests/assets/conf2.yaml', []),
+        ('tests/assets/conf3.yaml', ['q']),
+    ]
+)
+def test_white_list(config, expect_wl):
+    cfg = Config(shared_status)
+    cfg.update([config])
+
+    assert cfg.white_list == expect_wl

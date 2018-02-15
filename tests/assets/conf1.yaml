@@ -10,3 +10,6 @@ console_log_level: 100
 status_port: 10042
 
 apps_poll_interval_sec: 100500
+
+
+white_list: ['a', 'b', 'c']
