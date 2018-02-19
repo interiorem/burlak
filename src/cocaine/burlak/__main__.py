@@ -70,6 +70,7 @@ def main(
         config.console_log_level = console_log_level
 
     input_queue = queues.Queue(config.input_queue_size)
+    white_list_queue = queues.Queue()
     control_queue = queues.Queue()
 
     logger = Logger(config.locator_endpoints)
@@ -96,13 +97,18 @@ def main(
     if not apps_poll_interval:
         apps_poll_interval = config.apps_poll_interval_sec
 
+    wl_listener = burlak.WhiteList(
+        context, unicorn,
+        white_list_queue, input_queue
+    )
+
     acquirer = burlak.StateAcquirer(context, input_queue)
     workers_distribution = dict()
     state_processor = burlak.StateAggregator(
         context,
         node,
         committed_state,
-        input_queue, control_queue,
+        white_list_queue, input_queue, control_queue,
         apps_poll_interval,
         workers_distribution,
     )
@@ -115,6 +121,7 @@ def main(
 
     # run async poll tasks in date flow reverse order, from sink to source
     io_loop = IOLoop.current()
+    io_loop.spawn_callback(wl_listener.listen_to_whitelist)
     io_loop.spawn_callback(apps_elysium.blessing_road)
     io_loop.spawn_callback(state_processor.process_loop)
 

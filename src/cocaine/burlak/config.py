@@ -1,4 +1,5 @@
 import os
+from collections import namedtuple
 
 import cerberus
 
@@ -18,6 +19,21 @@ CONFIG_PATHS = [
 ]
 
 
+ControlFilter = namedtuple('ControlFilter', [
+    'apply_control',
+    'white_list',
+])
+
+
+def control_filter_from_dict(d):
+    '''Creates control filter from dict with reasonable defaults
+    '''
+    apply_control = d.get('apply_control', Defaults.APPLY_CONTROL)
+    white_list = d.get('white_list', [])
+
+    return ControlFilter(apply_control, white_list)
+
+
 class Defaults(object):
     TOK_UPDATE_SEC = 10
 
@@ -25,7 +41,6 @@ class Defaults(object):
     WEB_PATH = ''
 
     # TODO: make mandatory and config only
-    # UUID_PATH = '/state'
     UUID_PATH = '/darkvoice/states'
 
     NODE_SERVICE_NAME = 'node'
@@ -55,6 +70,9 @@ class Defaults(object):
     STOP_BY_CONTROL = False
     CONTROL_WITH_ACK = False
 
+    APPLY_CONTROL = False
+    FILTER_PATH = '/darkvoice/control_filter'
+
 
 #
 # Should be compatible with tools secure section
@@ -62,6 +80,20 @@ class Defaults(object):
 class Config(object):
 
     TASK_NAME = 'config'
+
+    FILTER_SCHEMA = {
+        'type': 'dict',
+        'required': False,
+        'schema': {
+            'apply_control':  {'type': 'boolean'},
+            'white_list': {
+                'type': 'list',
+                'schema': {
+                    'type': 'string',
+                },
+            },
+        },
+    }
 
     # TODO: make schema work with tools config
     SCHEMA = {
@@ -180,13 +212,11 @@ class Config(object):
                 ],
             },
         },
-        'white_list': {
-            'type': 'list',
+        'control_filter_path': {
+            'type': 'string',
             'required': False,
-            'schema': {
-                'type': 'string',
-            },
-        }
+        },
+        'control_filter': FILTER_SCHEMA,
     }
 
     def __init__(self, shared_status, logger=None):
@@ -326,10 +356,6 @@ class Config(object):
             'input_queue_size', Defaults.INPUT_QUEUE_SIZE)
 
     @property
-    def white_list(self):
-        return self._config.get('white_list', [])
-
-    @property
     def pending_stop_in_state(self):
         return self._config.get(
             'pending_stop_in_state', Defaults.PENDING_STOP_IN_STATE)
@@ -353,6 +379,26 @@ class Config(object):
     @property
     def control_with_ack(self):
         return self._config.get('control_with_ack', Defaults.CONTROL_WITH_ACK)
+
+    @property
+    def control_filter_path(self):
+        return self._config.get('control_filter_path', Defaults.FILTER_PATH)
+
+    @property
+    def control_filter(self):
+        control_filter = self._config.get('control_filter', dict())
+
+        apply_ctl = control_filter.get('apply_control', Defaults.APPLY_CONTROL)
+        white_list = control_filter.get('white_list', [])
+
+        return ControlFilter(apply_ctl, white_list)
+
+    @control_filter.setter
+    def control_filter(self, control_filter):
+        self._config['control_filter'] = dict(
+            apply_control=control_filter.apply_control,
+            white_list=control_filter.white_list
+        )
 
     # TODO:
     #   refactor to single method?
