@@ -2,6 +2,8 @@
 locator:
     port: 10042
 
+control_filter_path: 'c:any\weird/string'
 
-white_list:
-    - q
+control_filter:
+    apply_control: false
+    white_list: []
