@@ -83,6 +83,17 @@ class ChannelsCache(object):
         raise gen.Return(cnt)
 
     @gen.coroutine
+    def close_other(self, to_retain_set):
+        '''
+        params:
+            to_retain_set - should stay in cache, other channels would be
+                            deleted
+
+        '''
+        to_close = self.channels.viewkeys() - to_retain_set
+        yield self.close_and_remove(to_close)
+
+    @gen.coroutine
     def close_and_remove_all(self):
         yield self.close_and_remove(self.channels.keys())
 
