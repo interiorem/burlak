@@ -3,6 +3,7 @@ from collections import namedtuple
 
 from cocaine.burlak import burlak
 from cocaine.burlak.comm_state import CommittedState
+from cocaine.burlak.config import Config
 from cocaine.burlak.helpers import flatten_dict, flatten_dict_rec
 from cocaine.burlak.sys_metrics import SysMetricsGatherer
 from cocaine.burlak.web import API_V1, WebOptions, make_url, make_web_app_v1
@@ -132,6 +133,9 @@ def app(mocker):
     uptime = mocker.Mock()
     uptime.uptime = mocker.Mock(return_value=TEST_UPTIME)
 
+    shared_status = mocker.Mock()
+    cfg = Config(shared_status)
+
     wops = WebOptions(
         '',
         TEST_PORT,
@@ -142,7 +146,7 @@ def app(mocker):
         qs,
         units,
         workers_distribution,
-        [],
+        cfg,
         TEST_VERSION
     )
     return make_web_app_v1(wops)
@@ -269,12 +273,12 @@ def test_get_info(http_client, base_url):
 
     assert response.code == 200
     assert json.loads(response.body) == \
-        {
-            'uuid': TEST_UUID,
-            'uptime': TEST_UPTIME,
-            'version': TEST_VERSION,
-            'api': API_V1,
-        }
+        dict(
+            uuid=TEST_UUID,
+            uptime=TEST_UPTIME,
+            version=TEST_VERSION,
+            api=API_V1,
+        )
 
 
 @pytest.mark.parametrize(
@@ -350,9 +354,13 @@ def test_distribution_some(http_client, base_url):
 
 
 @pytest.mark.gen_test
-def test_white_list(http_client, base_url):
+def test_filter_handle(http_client, base_url):
     response = yield http_client.fetch(
-        base_url + make_url('', API_V1, r'white_list'))
+        base_url + make_url('', API_V1, r'filter'))
 
     assert response.code == 200
-    assert json.loads(response.body) == dict(white_list=[])
+    assert json.loads(response.body) == \
+        dict(control_filter=dict(
+            apply_control=False,
+            white_list=[],
+        ))

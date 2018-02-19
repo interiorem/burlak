@@ -20,7 +20,7 @@ WebOptions = namedtuple('WebOptions', [
     'qs',
     'units',
     'workers_distribution',
-    'white_list',
+    'config',
     'version',
 ])
 
@@ -44,8 +44,8 @@ def make_web_app_v1(opts):
             dict(committed_state=opts.committed_state)),
         (make_url(opts.prefix, API_V1, r'failed'), FailedStateHandle,
             dict(committed_state=opts.committed_state)),
-        (make_url(opts.prefix, API_V1, r'white_list'), WhiteList,
-            dict(white_list=opts.white_list)),
+        (make_url(opts.prefix, API_V1, r'filter'), ControlFilterHandle,
+            dict(config=opts.config)),
         (make_url(opts.prefix, API_V1, r'distribution(/?[^/]*)'),
             WorkersDistribution,
             dict(workers_distribution=opts.workers_distribution)),
@@ -228,7 +228,7 @@ class SelfUUID(web.RequestHandler):
                 uuid=uuid,
                 uptime=self.uptime.uptime(),
                 version=self.version,
-                api=self.api
+                api=self.api,
             )
         )
 
@@ -260,10 +260,12 @@ class WorkersDistribution(web.RequestHandler):
         self.write(result)
 
 
-class WhiteList(web.RequestHandler):
-    def initialize(self, white_list):
-        self.white_list = white_list
+class ControlFilterHandle(web.RequestHandler):
+    def initialize(self, config):
+        self.config = config
 
     @gen.coroutine
     def get(self):
-        self.write(dict(white_list=self.white_list))
+        self.write(dict(
+            control_filter=self.config.control_filter._asdict()
+        ))
