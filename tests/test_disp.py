@@ -4,6 +4,7 @@
 from cocaine.burlak import burlak
 from cocaine.burlak.comm_state import CommittedState
 from cocaine.burlak.context import Context, LoggerSetup
+from cocaine.burlak.control_filter import ControlFilter
 
 import pytest
 
@@ -71,7 +72,7 @@ def disp(mocker):
         ),
         node,
         CommittedState(),
-        queues.Queue(), queues.Queue(),
+        queues.Queue(), queues.Queue(), queues.Queue(),
         0.01,
         workers_distribution)
 
@@ -99,22 +100,41 @@ def test_state_input(disp, mocker):
 
     assert state_input
 
-    disp.sync_queue = mocker.Mock()
-    disp.sync_queue.get = mocker.Mock(
-        side_effect=[make_mock_channel_with(True) for _ in state_input])
-
     running_apps_list = []
     for state, running_list, version in state_input:
         yield disp.input_queue.put(
             burlak.StateUpdateMessage(state, version, uuid=''))
         running_apps_list.append(running_list)
 
+    control_filter = dict(apply_control=True, white_list=[])
+    control_filter = ControlFilter.from_dict(control_filter)
+
+    yield disp.filter_queue.put(burlak.ControlFilterMessage(control_filter))
     yield disp.input_queue.put(burlak.ResetStateMessage())
+
+    def info_mock(app, flags=None):
+        info = {
+            app: {
+                'pool': dict(
+                    active=1,
+                    idle=1,
+                    slaves=dict(a=1, b=2, c=3),
+                ),
+            },
+        }
+        return make_mock_channel_with(info)
 
     disp.node_service.list = mocker.Mock(
         return_value=make_mock_channel_with(*running_apps_list))
+    disp.node_service.info = mocker.Mock(side_effect=info_mock)
 
     yield disp.process_loop()
+
+    msg = yield disp.control_queue.get()
+    disp.control_queue.task_done()
+
+    assert msg.control_filter.apply_control
+    assert msg.control_filter.white_list == []
 
     for state, running_list, version in state_input:
         if not state:
@@ -189,6 +209,11 @@ def test_app_poll(disp, mocker):
 
     disp.node_service.info = mocker.Mock(side_effect=info_mock)
     disp.workers_diff = mocker.Mock(side_effect=check_workers_mismatch)
+
+    control_filter = dict(apply_control=True, white_list=[])
+    control_filter = ControlFilter.from_dict(control_filter)
+
+    yield disp.filter_queue.put(burlak.ControlFilterMessage(control_filter))
 
     yield disp.process_loop()
 

@@ -1,5 +1,6 @@
 from cocaine.burlak import Config, ConsoleLogger
-from cocaine.burlak.config import ControlFilter, Defaults
+from cocaine.burlak.control_filter import ControlFilter
+from cocaine.burlak.defaults import Defaults
 from cocaine.burlak.mokak.mokak import SharedStatus
 
 import pytest
@@ -214,7 +215,7 @@ def test_control_filter(config, expected_filter):
     cfg = Config(shared_status)
     cfg.update([config])
 
-    assert cfg.control_filter == expected_filter
+    assert cfg.control_filter.as_dict() == expected_filter.as_dict()
 
 
 @pytest.mark.parametrize(
@@ -228,7 +229,7 @@ def test_control_filter(config, expected_filter):
 def test_set_control_fitter(expected_filter):
     cfg = Config(shared_status)
     cfg.control_filter = expected_filter
-    assert cfg.control_filter == expected_filter
+    assert cfg.control_filter.as_dict() == expected_filter.as_dict()
 
 
 @pytest.mark.parametrize(
