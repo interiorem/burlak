@@ -266,6 +266,4 @@ class ControlFilterHandle(web.RequestHandler):
 
     @gen.coroutine
     def get(self):
-        self.write(dict(
-            control_filter=self.config.control_filter._asdict()
-        ))
+        self.write(self.config.control_filter.as_dict())

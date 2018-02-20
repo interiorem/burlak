@@ -1,11 +1,12 @@
 import os
-from collections import namedtuple
 
 import cerberus
 
 import yaml
 
-from .logger import ConsoleLogger
+from .control_filter import ControlFilter
+from .defaults import Defaults
+
 
 CONFIG_PATHS = [
     '/etc/cocaine/.cocaine/tools.yml',
@@ -19,61 +20,6 @@ CONFIG_PATHS = [
 ]
 
 
-ControlFilter = namedtuple('ControlFilter', [
-    'apply_control',
-    'white_list',
-])
-
-
-def control_filter_from_dict(d):
-    '''Creates control filter from dict with reasonable defaults
-    '''
-    apply_control = d.get('apply_control', Defaults.APPLY_CONTROL)
-    white_list = d.get('white_list', [])
-
-    return ControlFilter(apply_control, white_list)
-
-
-class Defaults(object):
-    TOK_UPDATE_SEC = 10
-
-    WEB_PORT = 8877
-    WEB_PATH = ''
-
-    # TODO: make mandatory and config only
-    UUID_PATH = '/darkvoice/states'
-
-    NODE_SERVICE_NAME = 'node'
-    UNICORN_SERVICE_NAME = 'unicorn'
-
-    PROFILE_NAME = 'default'
-
-    LOCATOR_HOST = 'localhost'
-    LOCATOR_PORT = 10053
-
-    STOP_APPS_NOT_IN_STATE = False
-    PENDING_STOP_IN_STATE = False
-
-    SENTRY_DSN = ''
-
-    EXPIRE_STOPPED_SEC = 900
-
-    # Default is skip all console logging.
-    CONSOLE_LOGGER_LEVEL = int(ConsoleLogger.ERROR) + 1
-
-    STATUS_WEB_PATH = r'/status'
-    STATUS_PORT = 9878
-
-    APPS_POLL_INTERVAL_SEC = 60
-    INPUT_QUEUE_SIZE = 1024
-
-    STOP_BY_CONTROL = False
-    CONTROL_WITH_ACK = False
-
-    APPLY_CONTROL = False
-    FILTER_PATH = '/darkvoice/control_filter'
-
-
 #
 # Should be compatible with tools secure section
 #
@@ -85,9 +31,13 @@ class Config(object):
         'type': 'dict',
         'required': False,
         'schema': {
-            'apply_control':  {'type': 'boolean'},
+            'apply_control':  {
+                'type': 'boolean',
+                'required': False,
+            },
             'white_list': {
                 'type': 'list',
+                'required': False,
                 'schema': {
                     'type': 'string',
                 },
@@ -386,12 +336,8 @@ class Config(object):
 
     @property
     def control_filter(self):
-        control_filter = self._config.get('control_filter', dict())
-
-        apply_ctl = control_filter.get('apply_control', Defaults.APPLY_CONTROL)
-        white_list = control_filter.get('white_list', [])
-
-        return ControlFilter(apply_ctl, white_list)
+        d = self._config.get('control_filter', dict())
+        return ControlFilter.from_dict(d)
 
     @control_filter.setter
     def control_filter(self, control_filter):
