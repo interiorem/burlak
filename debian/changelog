@@ -1,4 +1,16 @@
-cocaine-orca (0.1.21) UNRELEASED; urgency=medium
+cocaine-orca (0.1.23) UNRELEASED; urgency=medium
+
+  * Add `apply_control` flag to `control_filter`.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Tue, 20 Feb 2018 17:26:25 +0300
+
+cocaine-orca (0.1.22) unstable; urgency=medium
+
+  * Make use of unicorn subscription for `prod fitler` listener.
+
+ -- Alex Karev <karapuz@yandex-texm.ru>  Fri, 16 Feb 2018 19:08:25 +0300
+
+cocaine-orca (0.1.21) unstable; urgency=medium
 
   * Porting to six package (continue).
   * Generate fake state for apps `white list`.
