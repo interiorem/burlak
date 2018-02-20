@@ -23,6 +23,9 @@ import six
 from tornado import gen
 
 from .chcache import ChannelsCache, close_tx_safe
+# Config imported for filter schema
+from .config import Config
+from .control_filter import ControlFilter
 from .logger import ConsoleLogger, VoidLogger
 from .loop_sentry import LoopSentry
 from .patricia.patricia import trie
@@ -103,19 +106,18 @@ def filter_apps(apps, white_list):
     return apps
 
 
-def update_fake_state(ci_state, state_version, state, control_state):
-    to_fake_mark = state.viewkeys() - control_state.viewkeys()
+def update_fake_state(ci_state, version, real_state, control_state):
+    to_fake_mark = real_state.viewkeys() - control_state.viewkeys()
 
     if to_fake_mark:
-        ci_state.clear()
-        ci_state.version = state_version
+        ci_state.reset_output_state()
+        ci_state.version = version
 
     now = time.time()
     for app in to_fake_mark:
         try:
-            rec = state[app]
-            ci_state.mark_running(
-                app, rec.workers, rec.profile, state_version, now)
+            r = real_state[app]
+            ci_state.mark_running(app, r.workers, r.profile, version, now)
         except KeyError:
             pass
 
@@ -149,6 +151,15 @@ class StateUpdateMessage(object):
 
     def get_all(self):
         return self._state, self._version, self._uuid
+
+
+class ControlFilterMessage(object):
+    def __init__(self, control_filter):
+        self._control_filter = control_filter
+
+    @property
+    def control_filter(self):
+        return self._control_filter
 
 
 class ResetStateMessage(object):
@@ -189,6 +200,99 @@ class LoggerMixin(object):  # pragma nocover
     def error(self, fmt, *args):
         self.console.error(fmt, *args)
         self.logger.error(self.format, fmt.format(*args))
+
+
+class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
+
+    TASK_NAME = 'control_list_listener'
+
+    FILTER_SCHEMA = Config.FILTER_SCHEMA
+
+    def __init__(
+            self, context, unicorn, filter_queue, input_queue, **kwargs):
+        super(ControlFilterListener, self).__init__(context, **kwargs)
+
+        self.context = context
+        self.unicorn = unicorn
+
+        # TODO: refactor as one single queue
+        self.filter_queue = filter_queue
+        self.input_queue = input_queue
+
+        self.status = context.shared_status.register(
+            ControlFilterListener.TASK_NAME)
+
+    def validate_filter(self, validator, control_filter):
+        if not isinstance(control_filter, dict):
+            self.metrics_cnt['filter_wrong_type'] += 1
+            raise Exception('control_filter is of wrong type')
+
+        if not validator.validate({'control_filter': control_filter}):
+            self.metrics_cnt['not_valid_control_filter'] += 1
+            raise Exception(
+                'control filter not valid {}, errors {}'
+                .format(control_filter, validator.errors)
+            )
+
+    @gen.coroutine
+    def send_filter(self, startup, control_filter):
+        msg = ControlFilterMessage(control_filter)
+        try:
+            if startup:
+                yield self.filter_queue.put(msg)
+            else:
+                yield self.input_queue.put(msg)
+        except Exception as e:
+            self.error('failed to send control filter, error {}', e)
+
+        raise gen.Return(False)
+
+    @gen.coroutine
+    def subscribe_to_control_filter(self):
+        ch = None
+        startup = True
+        validator = Validator(
+            dict(control_filter=ControlFilterListener.FILTER_SCHEMA))
+
+        was_an_error = False
+        while self.should_run():
+            try:
+                path = self.context.config.control_filter_path
+
+                info_message = 'subscribing for control filter'
+                self.status.mark_ok(info_message)
+                self.info('{} at {}', info_message, path)
+
+                ch = yield self.unicorn.subscribe(path)
+
+                while self.should_run():
+                    info_message = 'waiting for control filter'
+                    self.status.mark_ok(info_message)
+                    self.debug(info_message)
+
+                    control_filter, version = yield ch.rx.get()
+
+                    # Throws on error
+                    self.validate_filter(validator, control_filter)
+
+                    control_filter = ControlFilter.from_dict(control_filter)
+                    startup = yield self.send_filter(startup, control_filter)
+                    self.metrics_cnt['control_filter_updates'] += 1
+                    was_an_error = False
+
+            except Exception as e:  # pragma nocover
+                message = 'failed to get control filter from unicorn'
+                self.status.mark_ok(message)
+                self.info('{}, reason: "{}"', message, e)
+
+                if not was_an_error:
+                    startup = yield self.send_filter(
+                        startup, self.context.config.control_filter)
+
+                was_an_error = True
+                yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
+            finally:
+                yield close_tx_safe(ch)
 
 
 class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
@@ -259,11 +363,11 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     assert isinstance(version, int)
 
                     if not isinstance(state, dict):  # pragma nocover
-                        self.error(
-                            'expected dictionary, got {}',
-                            type(state).__name__)
                         self.metrics_cnt['got_broken_sate'] += 1
-                        raise Exception('state is empty, resubscribing')
+                        raise Exception(
+                            'expected dictionary as state type, got {}'
+                            .format(type(state).__name__)
+                        )
 
                     #
                     # Bench results:
@@ -276,10 +380,14 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                         # 'transmute_and_filter_state' will correct/coerse
                         # state records to normal format, if not, it would be
                         # exception in StateUpdateMessage ctor.
-                        self.error(
-                            'state not valid {} {}', state, validator.errors)
                         self.metrics_cnt['not_valid_state'] += 1
-                        self.status.mark_warn('state not valid')
+
+                        error_message = 'state not valid'
+                        self.status.mark_warn(error_message)
+                        self.error(
+                            '{}: {}, errors: {}',
+                            error_message, state, validator.errors
+                        )
 
                     yield self.input_queue.put(
                         StateUpdateMessage(state, version, uuid))
@@ -307,7 +415,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             context,
             node,
             ci_state,
-            input_queue, control_queue,
+            filter_queue, input_queue, control_queue,
             poll_interval_sec,
             workers_distribution,
             **kwargs):
@@ -318,6 +426,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
         self.node_service = node
 
+        self.filter_queue = filter_queue
         self.input_queue = input_queue
         self.control_queue = control_queue
 
@@ -364,7 +473,6 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
     def get_info(self, app, flag=0x01):  # 0x01: collect overseer info
         ch = yield self.node_service.info(app, flag)
         info = yield ch.rx.get()
-
         raise gen.Return(info)
 
     @gen.coroutine
@@ -430,20 +538,39 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         ))
 
     @gen.coroutine
-    def process_loop(self):
+    def get_filter_once(self):
+        '''Get control filter on dispatch main loop startup
+        '''
+        # Get control filter on startup
+        self.debug('waiting for init control_filter')
 
+        msg = yield self.filter_queue.get()
+        self.filter_queue.task_done()
+
+        control_filter = msg.control_filter
+        yield self.control_queue.put(msg)
+        self.info('got init control_filter {}', msg.control_filter.as_dict())
+
+        raise gen.Return(control_filter)
+
+    @gen.coroutine
+    def process_loop(self):
         running_apps = set()
         state, prev_state, real_state, state_version = (
             dict(), dict(), dict(), DEFAULT_UNKNOWN_VERSIONS
         )
 
         last_uuid = None
+        control_filter = yield self.get_filter_once()
 
         while self.should_run():
-            self.status.mark_ok('listening on incoming queue')
+            self.status.mark_ok('listenning on incoming queue')
 
             runtime_reborn = False
             is_state_updated = False
+
+            # Note that uuid is used to determinate was it
+            # any incoming state.
             uuid, msg = None, None
             workers_mismatch, stop_again, broken_apps = \
                 [set() for _ in xrange(3)]
@@ -467,11 +594,10 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 if isinstance(msg, StateUpdateMessage):
                     state, state_version, uuid = msg.get_all()
                     is_state_updated = True
-
                     self.ci_state.set_incoming_state(state, state_version)
 
-                    control_state = filter_apps(
-                        state, self.context.config.white_list)
+                    control_state = \
+                        filter_apps(state, control_filter.white_list)
                     real_state = state
                     state = control_state
 
@@ -483,14 +609,36 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     )
                 elif isinstance(msg, ResetStateMessage):
                     runtime_reborn = True
+
                     state.clear()
+                    real_state.clear()
+
                     self.ci_state.reset()
                     self.workers_distribution.clear()
-                    self.debug('reset state signal')
+                    self.info('reset state signal')
+                elif isinstance(msg, ControlFilterMessage):
+                    control_filter = msg.control_filter
+                    self.info(
+                        'white_list updated signal {}',
+                        control_filter.as_dict()
+                    )
+                    yield self.control_queue.put(msg)
+
+                    # If it was some last state, apply it again with new
+                    # control_filter settings.
+                    if real_state:
+                        self.info('resubmitting last state')
+                        self.debug('previous state was {}', real_state)
+
+                        state = \
+                            filter_apps(real_state, control_filter.white_list)
+
+                        uuid = last_uuid
+                        is_state_updated = True
 
                 running_apps = yield self.get_running_apps_set()
-                pruned_running_apps = filter_apps(
-                    running_apps, self.context.config.white_list)
+                pruned_running_apps = \
+                    filter_apps(running_apps, control_filter.white_list)
 
                 self.info(
                     'last uuid {}, running apps {}, muted apps {}',
@@ -737,10 +885,17 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         for app in to_stop:
             self.ci_state.mark_pending_stop(app, state_version, now)
 
+    def apply_filter(self, channels_cache, control_filter):
+        self.info('got control filter {}'. control_filter.as_dict())
+        if control_filter.white_list:
+            yield channels_cache.close_other(control_filter.white_list)
+
     @gen.coroutine
     def blessing_road(self):
         channels_cache = ChannelsCache(self, self.node_service)
         stopped_by_control = set()
+
+        control_filter = None
 
         while self.should_run():
             try:
@@ -750,6 +905,19 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 command = yield self.control_queue.get()
                 self.control_queue.task_done()
+
+                if isinstance(command, ControlFilterMessage):
+                    # State is already pruned in dispatch in those case
+                    control_filter = command.control_filter
+                    self.apply_filter(channels_cache, control_filter)
+                    continue
+                elif not isinstance(command, DispatchMessage):
+                    error_message = 'wrong command type in control subsystem'
+                    self.error(
+                        '{}: {}',
+                        error_message, type(command).__name__)
+                    self.status.mark_failed(error_message)
+                    continue
 
                 self.debug('control task: {}', command._asdict())
                 self.status.mark_ok('processing control command')
@@ -763,6 +931,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         command.real_state,
                         command.state,
                     )
+
                     self.debug(
                         'updating fake state {} real state {}',
                         command.state,  # fake state
@@ -773,6 +942,23 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     stopped_by_control.clear()
 
                 stopped_by_control = stopped_by_control - command.stop_again
+
+                if control_filter and not control_filter.apply_control:
+                    self.info(
+                        'got control command, but apply_control flag is off, '
+                        'skipping control sequence')
+                    update_fake_state(
+                        self.ci_state,
+                        command.state_version,
+                        command.real_state,
+                        dict(),
+                    )
+
+                    channels_cache.close_and_remove_all()
+                    continue
+                #
+                # Control commands follows
+                #
 
                 if self.context.config.stop_apps:  # False by default
 

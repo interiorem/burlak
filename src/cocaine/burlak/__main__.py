@@ -97,7 +97,7 @@ def main(
     if not apps_poll_interval:
         apps_poll_interval = config.apps_poll_interval_sec
 
-    wl_listener = burlak.WhiteList(
+    control_filter = burlak.ControlFilterListener(
         context, unicorn,
         white_list_queue, input_queue
     )
@@ -121,7 +121,7 @@ def main(
 
     # run async poll tasks in date flow reverse order, from sink to source
     io_loop = IOLoop.current()
-    io_loop.spawn_callback(wl_listener.listen_to_whitelist)
+    io_loop.spawn_callback(control_filter.subscribe_to_control_filter)
     io_loop.spawn_callback(apps_elysium.blessing_road)
     io_loop.spawn_callback(state_processor.process_loop)
 
@@ -153,8 +153,8 @@ def main(
             committed_state, metrics_gatherer,
             qs, units,
             workers_distribution,
-            context.config.white_list,
-            __version__
+            context.config,
+            __version__,
         )
         web_app = make_web_app_v1(wopts) # noqa F841
         status_app = make_status_web_handler( # noqa F841

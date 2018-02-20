@@ -95,6 +95,8 @@ class ChannelsCache(object):
 
     @gen.coroutine
     def close_and_remove_all(self):
+        # Note: should be keys(), not iterkeys(), may be reimplemented someday
+        #       with iterators
         yield self.close_and_remove(self.channels.keys())
 
     @gen.coroutine

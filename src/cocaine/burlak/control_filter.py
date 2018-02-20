@@ -24,6 +24,9 @@ class ControlFilter(object):
             )
         )
 
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
     @staticmethod
     def from_dict(d):
         '''Creates control filter from dict with reasonable defaults

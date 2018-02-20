@@ -60,9 +60,12 @@ class CommittedState(object):
     def as_named_dict(self):
         return {app: rec._asdict() for app, rec in self.state.iteritems()}
 
-    def reset(self):
+    def reset_output_state(self):
         self.state.clear()
         self.version = Defaults.INIT_STATE_VERSION
+
+    def reset(self):
+        self.reset_output_state()
         self.in_state = CommittedState.IncomingState(dict(), -1, 0)
 
     def clear(self):  # pragma nocover
