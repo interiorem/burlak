@@ -2,6 +2,7 @@
 /.idea
 /.tox
 /.eggs
+/.pytest_cache
 MANIFEST
 /deb_dist
 /*.egg-info
