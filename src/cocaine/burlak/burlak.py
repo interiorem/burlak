@@ -818,10 +818,9 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 tm,
             )
 
-            self.ci_state.mark_stopped(app, state_version, tm)
-            self.metrics_cnt['apps_stopped_by_control'] += 1
             stopped_by_control.add(app)
 
+            self.metrics_cnt['apps_stopped_by_control'] += 1
             self.info('app {} has been stopped with control', app)
         except Exception as e:  # pragma nocover
             self.error(
@@ -831,6 +830,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
             self.sentry_wrapper.capture_exception()
             self.status.mark_warn('failed to stop application by control')
+        finally:
+            self.ci_state.mark_stopped(app, state_version, tm)
 
     @gen.coroutine
     def control(self, ch, to_adjust):
@@ -877,11 +878,11 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 self.metrics_cnt['errors_of_control'] += 1
                 self.sentry_wrapper.capture_exception()
 
-                self.ci_state.mark_failed(
-                    app, profile, state_version, tm, error_message)
-
                 yield channels_cache.close_and_remove([app])
                 yield gen.sleep(DEFAULT_RETRY_EXP_BASE_SEC)
+
+                self.ci_state.mark_failed(
+                    app, profile, state_version, tm, error_message)
             else:
                 self.ci_state.mark_running(
                     app, to_adjust, profile, state_version, tm)
@@ -949,7 +950,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                     self.debug(
                         'updating fake state, diff {}',
-                        command.real_state - command.state
+                        command.real_state.viewkeys() -
+                        command.state.viewkeys()
                     )
 
                 if command.runtime_reborn:
