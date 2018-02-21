@@ -1,4 +1,11 @@
-cocaine-orca (0.1.23) UNRELEASED; urgency=medium
+cocaine-orca (0.1.24) unstable; urgency=medium
+
+  * Apply close channels on control filter update.
+  * Channels apps and filter web handles.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Wed, 21 Feb 2018 14:59:52 +0300
+
+cocaine-orca (0.1.23) unstable; urgency=medium
 
   * Add `apply_control` flag to `control_filter`.
 
