@@ -27,6 +27,16 @@ def update(unicorn, path, record):
 
 
 @gen.coroutine
+def get(unicorn, path):
+    ch = yield unicorn.get(path)
+    data, version = yield ch.rx.get()
+
+    if version == -1:
+        print 'no record'
+
+    print 'data is\n{}'.format(data)
+
+@gen.coroutine
 def remove_node(unicorn, path):
     print 'checking node {}'.format(path)
 
@@ -44,10 +54,11 @@ def remove_node(unicorn, path):
 
 @click.command()
 @click.option('--path', default=DEFAULT_FILTER_PATH, help='subscription node, default {}'.format(DEFAULT_FILTER_PATH))
+@click.option('--record/--no-record', default=True, help='view unicorn record (default operation)')
 @click.option('--delete/--no-delete', default=False, help='delete node and exit')
 @click.option('--apply-control/--no-apply-control', default=False, help='apply_control flag')
 @click.option('--white-list', default='', type=click.STRING, help='comma separated prefixes for white list')
-def main(path, delete, apply_control, white_list):
+def main(path, record, delete, apply_control, white_list):
     config = Config(SharedStatus())
     config.update()
 
@@ -56,15 +67,17 @@ def main(path, delete, apply_control, white_list):
 
     white_list = [item.strip() for item in white_list.split(',') if item]
 
-    record = dict(
-        apply_control=bool(apply_control),
-        white_list=white_list
-    )
+    if record:
+        return IOLoop.current().run_sync(lambda: get(unicorn, path))
 
     if delete:
-        IOLoop.current().run_sync(lambda: remove_node(unicorn, path))
+        return IOLoop.current().run_sync(lambda: remove_node(unicorn, path))
     else:
-        IOLoop.current().run_sync(lambda: update(unicorn, path, record))
+        r = dict(
+            apply_control=bool(apply_control),
+            white_list=white_list
+        )
+        return IOLoop.current().run_sync(lambda: update(unicorn, path, r))
 
 
 if __name__ == '__main__':
