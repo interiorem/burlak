@@ -60,17 +60,19 @@ def main(
         dup_to_console,
         console_log_level):
 
-    committed_state = CommittedState()
     shared_status = SharedStatus(name=MODULE_NAME)
 
     config = Config(shared_status)
     config.update()
 
+    committed_state = CommittedState()
+    committed_state.control_filter = config.control_filter
+
     if console_log_level is not None:
         config.console_log_level = console_log_level
 
     input_queue = queues.Queue(config.input_queue_size)
-    white_list_queue = queues.Queue()
+    filter_queue = queues.Queue()
     control_queue = queues.Queue()
 
     logger = Logger(config.locator_endpoints)
@@ -99,7 +101,8 @@ def main(
 
     control_filter = burlak.ControlFilterListener(
         context, unicorn,
-        white_list_queue, input_queue
+        committed_state,
+        filter_queue, input_queue
     )
 
     acquirer = burlak.StateAcquirer(context, input_queue)
@@ -108,7 +111,7 @@ def main(
         context,
         node,
         committed_state,
-        white_list_queue, input_queue, control_queue,
+        filter_queue, input_queue, control_queue,
         apps_poll_interval,
         workers_distribution,
     )
@@ -153,7 +156,6 @@ def main(
             committed_state, metrics_gatherer,
             qs, units,
             workers_distribution,
-            context.config,
             __version__,
         )
         web_app = make_web_app_v1(wopts) # noqa F841

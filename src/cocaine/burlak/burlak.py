@@ -212,7 +212,11 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
     FILTER_SCHEMA = Config.FILTER_SCHEMA
 
     def __init__(
-            self, context, unicorn, filter_queue, input_queue, **kwargs):
+            self, context,
+            unicorn,
+            ci_state,
+            filter_queue, input_queue,
+            **kwargs):
         super(ControlFilterListener, self).__init__(context, **kwargs)
 
         self.context = context
@@ -221,6 +225,8 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
         # TODO: refactor as one single queue
         self.filter_queue = filter_queue
         self.input_queue = input_queue
+
+        self.ci_state = ci_state
 
         self.status = context.shared_status.register(
             ControlFilterListener.TASK_NAME)
@@ -245,6 +251,8 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
                 yield self.filter_queue.put(msg)
             else:
                 yield self.input_queue.put(msg)
+
+            self.ci_state.control_filter = control_filter
         except Exception as e:
             self.error('failed to send control filter, error {}', e)
 
@@ -958,7 +966,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     )
 
                     channels_cache.close_and_remove_all()
-                    stop_by_control.clear()
+                    stopped_by_control.clear()
                     continue
 
                 #

@@ -20,7 +20,6 @@ WebOptions = namedtuple('WebOptions', [
     'qs',
     'units',
     'workers_distribution',
-    'config',
     'version',
 ])
 
@@ -45,7 +44,7 @@ def make_web_app_v1(opts):
         (make_url(opts.prefix, API_V1, r'failed'), FailedStateHandle,
             dict(committed_state=opts.committed_state)),
         (make_url(opts.prefix, API_V1, r'filter'), ControlFilterHandle,
-            dict(config=opts.config)),
+            dict(committed_state=opts.committed_state)),
         (make_url(opts.prefix, API_V1, r'distribution(/?[^/]*)'),
             WorkersDistribution,
             dict(workers_distribution=opts.workers_distribution)),
@@ -261,9 +260,9 @@ class WorkersDistribution(web.RequestHandler):
 
 
 class ControlFilterHandle(web.RequestHandler):
-    def initialize(self, config):
-        self.config = config
+    def initialize(self, committed_state):
+        self.committed_state = committed_state
 
     @gen.coroutine
     def get(self):
-        self.write(self.config.control_filter.as_dict())
+        self.write(self.committed_state.control_filter.as_dict())

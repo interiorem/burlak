@@ -3,7 +3,6 @@ from collections import namedtuple
 
 from cocaine.burlak import burlak
 from cocaine.burlak.comm_state import CommittedState
-from cocaine.burlak.config import Config
 from cocaine.burlak.helpers import flatten_dict, flatten_dict_rec
 from cocaine.burlak.sys_metrics import SysMetricsGatherer
 from cocaine.burlak.web import API_V1, WebOptions, make_url, make_web_app_v1
@@ -133,9 +132,6 @@ def app(mocker):
     uptime = mocker.Mock()
     uptime.uptime = mocker.Mock(return_value=TEST_UPTIME)
 
-    shared_status = mocker.Mock()
-    cfg = Config(shared_status)
-
     wops = WebOptions(
         '',
         TEST_PORT,
@@ -146,7 +142,6 @@ def app(mocker):
         qs,
         units,
         workers_distribution,
-        cfg,
         TEST_VERSION
     )
     return make_web_app_v1(wops)

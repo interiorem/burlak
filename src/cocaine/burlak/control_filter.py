@@ -35,3 +35,9 @@ class ControlFilter(object):
         white_list = d.get('white_list', [])
 
         return ControlFilter(apply_control, white_list)
+
+    @staticmethod
+    def with_defaults():
+        '''Creates control filter from dict with reasonable defaults
+        '''
+        return ControlFilter.from_dict(dict())
