@@ -1,3 +1,9 @@
+cocaine-orca (0.1.25) UNRELEASED; urgency=medium
+
+  * Fix incorrect stop mark in case of broken app.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Wed, 21 Feb 2018 17:03:08 +0300
+
 cocaine-orca (0.1.24) unstable; urgency=medium
 
   * Apply close channels on control filter update.
