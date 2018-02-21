@@ -46,7 +46,7 @@ def remove_node(unicorn, path):
 @click.option('--path', default=DEFAULT_FILTER_PATH, help='subscription node, default {}'.format(DEFAULT_FILTER_PATH))
 @click.option('--delete/--no-delete', default=False, help='delete node and exit')
 @click.option('--apply-control/--no-apply-control', default=False, help='apply_control flag')
-@click.option('--white-list', default=[], type=click.STRING, help='comma separated prefixes for white list')
+@click.option('--white-list', default='', type=click.STRING, help='comma separated prefixes for white list')
 def main(path, delete, apply_control, white_list):
     config = Config(SharedStatus())
     config.update()
@@ -54,7 +54,7 @@ def main(path, delete, apply_control, white_list):
     unicorn = SecureServiceFabric.make_secure_adaptor(
         Service('unicorn'), *config.secure, endpoints=config.locator_endpoints)
 
-    white_list = [item.strip() for item in white_list.split(',')]
+    white_list = [item.strip() for item in white_list.split(',') if item]
 
     record = dict(
         apply_control=bool(apply_control),

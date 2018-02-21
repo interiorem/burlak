@@ -228,8 +228,8 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
 
         self.ci_state = ci_state
 
-        self.status = context.shared_status.register(
-            ControlFilterListener.TASK_NAME)
+        self.status = \
+            context.shared_status.register(ControlFilterListener.TASK_NAME)
 
     def validate_filter(self, validator, control_filter):
         if not isinstance(control_filter, dict):
@@ -285,7 +285,6 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
 
                     # Throws on error
                     self.validate_filter(validator, control_filter)
-
                     control_filter = ControlFilter.from_dict(control_filter)
                     startup = yield self.send_filter(startup, control_filter)
                     self.metrics_cnt['control_filter_updates'] += 1
@@ -630,7 +629,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 elif isinstance(msg, ControlFilterMessage):
                     control_filter = msg.control_filter
                     self.info(
-                        'white_list updated signal {}',
+                        'control_filter updated signal {}',
                         control_filter.as_dict()
                     )
                     yield self.control_queue.put(msg)
