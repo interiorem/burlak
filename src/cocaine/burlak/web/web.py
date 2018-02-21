@@ -45,6 +45,8 @@ def make_web_app_v1(opts):
             dict(committed_state=opts.committed_state)),
         (make_url(opts.prefix, API_V1, r'filter'), ControlFilterHandle,
             dict(committed_state=opts.committed_state)),
+        (make_url(opts.prefix, API_V1, r'channels'), ChannelsHandle,
+            dict(committed_state=opts.committed_state)),
         (make_url(opts.prefix, API_V1, r'distribution(/?[^/]*)'),
             WorkersDistribution,
             dict(workers_distribution=opts.workers_distribution)),
@@ -266,3 +268,14 @@ class ControlFilterHandle(web.RequestHandler):
     @gen.coroutine
     def get(self):
         self.write(self.committed_state.control_filter.as_dict())
+
+
+class ChannelsHandle(web.RequestHandler):
+    '''Display apps with opened control channels
+    '''
+    def initialize(self, committed_state):
+        self.committed_state = committed_state
+
+    @gen.coroutine
+    def get(self):
+        self.write(dict(chs=self.committed_state.channels_cache_apps))

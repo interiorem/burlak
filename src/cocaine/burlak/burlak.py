@@ -78,7 +78,7 @@ def build_trie(keys):
 
 
 def search_trie(t, prefixes):
-    return [k for p in prefixes for k in t.iter(p)]
+    return [k for p in prefixes for k in t.iter(p) if p]
 
 
 def find_keys_with_prefix(data, prefixes):
@@ -91,7 +91,7 @@ def filter_apps(apps, white_list):
         return apps
 
     def filter_dict(di, white_list):
-        to_preserve = find_keys_with_prefix(di.viewkeys(), white_list)
+        to_preserve = find_keys_with_prefix(di.iterkeys(), white_list)
         return {k: v for k, v in six.iteritems(di) if k in to_preserve}
 
     def filter_set(s, white_list):
@@ -965,6 +965,9 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     )
 
                     channels_cache.close_and_remove_all()
+                    self.ci_state.channels_cache_apps = \
+                        channels_cache.get_apps()
+
                     stopped_by_control.clear()
                     continue
 
@@ -1075,6 +1078,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     self.ci_state.mark_failed(
                         app, profile, command.state_version, now,
                         "app is in broken state")
+
+                self.ci_state.channels_cache_apps = channels_cache.get_apps()
 
                 self.metrics_cnt['state_updates'] += 1
                 self.metrics_cnt['ch_cache_size'] += len(channels_cache)

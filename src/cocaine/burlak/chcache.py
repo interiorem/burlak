@@ -121,3 +121,6 @@ class ChannelsCache(object):
 
     def __len__(self):
         return len(self.channels)
+
+    def get_apps(self):
+        return self.channels.keys()

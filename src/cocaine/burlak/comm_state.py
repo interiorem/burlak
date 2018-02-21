@@ -56,6 +56,8 @@ class CommittedState(object):
         # for now time when version was updated.
         self.updated_timestamp = 0
 
+        self.ch_apps = list()
+
     def as_dict(self):
         return self.state
 
@@ -192,6 +194,14 @@ class CommittedState(object):
     @control_filter.setter
     def control_filter(self, ctl_filter):
         self.ctl_filter = ctl_filter
+
+    @property
+    def channels_cache_apps(self):
+        return self.ch_apps
+
+    @channels_cache_apps.setter
+    def channels_cache_apps(self, ch_apps):
+        self.ch_apps = ch_apps
 
     @property
     def updated_at(self):
