@@ -88,7 +88,6 @@ class ChannelsCache(object):
         params:
             to_retain_set - should stay in cache, other channels would be
                             deleted
-
         '''
         to_close = self.channels.viewkeys() - to_retain_set
         yield self.close_and_remove(to_close)
@@ -122,5 +121,5 @@ class ChannelsCache(object):
     def __len__(self):
         return len(self.channels)
 
-    def get_apps(self):
+    def apps(self):
         return self.channels.keys()

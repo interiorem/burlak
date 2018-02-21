@@ -102,6 +102,8 @@ def filter_apps(apps, white_list):
         return filter_dict(apps, white_list)
     elif isinstance(apps, set):
         return filter_set(apps, white_list)
+    elif isinstance(apps, list):
+        return list(filter_set(set(apps), white_list))
 
     return apps
 
@@ -895,10 +897,13 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         for app in to_stop:
             self.ci_state.mark_pending_stop(app, state_version, now)
 
+    @gen.coroutine
     def apply_filter(self, channels_cache, control_filter):
-        self.info('got control filter {}'. control_filter.as_dict())
+        self.info('applying control filter {}', control_filter.as_dict())
         if control_filter.white_list:
-            yield channels_cache.close_other(control_filter.white_list)
+            to_retain = \
+                filter_apps(channels_cache.apps(), control_filter.white_list)
+            yield channels_cache.close_other(to_retain)
 
     @gen.coroutine
     def blessing_road(self):
@@ -919,7 +924,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 if isinstance(command, ControlFilterMessage):
                     # State is already pruned in dispatch in those case
                     control_filter = command.control_filter
-                    self.apply_filter(channels_cache, control_filter)
+                    yield self.apply_filter(channels_cache, control_filter)
                     continue
                 elif not isinstance(command, DispatchMessage):
                     error_message = 'wrong command type in control subsystem'
@@ -966,7 +971,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                     channels_cache.close_and_remove_all()
                     self.ci_state.channels_cache_apps = \
-                        channels_cache.get_apps()
+                        channels_cache.apps()
 
                     stopped_by_control.clear()
                     continue
@@ -1079,7 +1084,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         app, profile, command.state_version, now,
                         "app is in broken state")
 
-                self.ci_state.channels_cache_apps = channels_cache.get_apps()
+                self.ci_state.channels_cache_apps = channels_cache.apps()
 
                 self.metrics_cnt['state_updates'] += 1
                 self.metrics_cnt['ch_cache_size'] += len(channels_cache)
