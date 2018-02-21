@@ -948,9 +948,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     )
 
                     self.debug(
-                        'updating fake state {} real state {}',
-                        command.state,  # fake state
-                        command.real_state,
+                        'updating fake state, diff {}',
+                        command.real_state - command.state
                     )
 
                 if command.runtime_reborn:
