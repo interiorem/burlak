@@ -1,4 +1,4 @@
-cocaine-orca (0.1.25) UNRELEASED; urgency=medium
+cocaine-orca (0.1.25) unstable; urgency=medium
 
   * Fix incorrect stop mark in case of broken app.
 
