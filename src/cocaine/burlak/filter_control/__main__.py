@@ -10,12 +10,17 @@ from ..config import Config
 DEFAULT_FILTER_PATH = '/darkvoice/control_filter'
 
 
+def get_path_from_ctx(ctx):
+    return ctx.obj['PATH'] if 'PATH' in ctx.obj else DEFAULT_FILTER_PATH
+
+
 def get_secure_unicorn():
     config = Config(SharedStatus())
     config.update()
 
     return SecureServiceFabric.make_secure_adaptor(
         Service('unicorn'), *config.secure, endpoints=config.locator_endpoints)
+
 
 @gen.coroutine
 def update(unicorn, path, record):
@@ -43,6 +48,7 @@ def get(unicorn, path):
 
     raise gen.Return(data)
 
+
 @gen.coroutine
 def remove_node(unicorn, path):
     print 'checking node {}'.format(path)
@@ -60,33 +66,43 @@ def remove_node(unicorn, path):
 
 
 @click.group()
-def cli():
-    click.echo('processing commnads...')
+@click.option('--path', default=DEFAULT_FILTER_PATH, help='subscription node, default {}'.format(DEFAULT_FILTER_PATH))
+@click.pass_context
+def cli(ctx, path):
+    click.echo('processing commands...')
+    ctx.obj['PATH'] = path
 
 
 @cli.command()
-@click.option('--path', default=DEFAULT_FILTER_PATH, help='subscription node, default {}'.format(DEFAULT_FILTER_PATH))
-def view(path):
+@click.pass_context
+def view(ctx):
     '''View control filter record'''
+
+    path = get_path_from_ctx(ctx)
+
     unicorn = get_secure_unicorn()
     click.echo('loading record...')
     data = IOLoop.current().run_sync(lambda: get(unicorn, path))
     print 'record: \n{}'.format(data)
 
+
 @cli.command()
-@click.option('--path', default=DEFAULT_FILTER_PATH, help='node to delete, default {}'.format(DEFAULT_FILTER_PATH))
-def delete(path):
+@click.pass_context
+def delete(ctx):
     '''Delete specified node'''
+
+    path = get_path_from_ctx(ctx)
+
     unicorn = get_secure_unicorn()
     click.echo('deleting record')
     IOLoop.current().run_sync(lambda: remove_node(unicorn, path))
 
 
 @cli.command()
-@click.option('--path', default=DEFAULT_FILTER_PATH, help='subscription node, default {}'.format(DEFAULT_FILTER_PATH))
 @click.option('--apply-control/--no-apply-control', default=False, help='apply_control flag')
 @click.option('--white-list', default='', type=click.STRING, help='comma separated prefixes for white list')
-def modify(path, apply_control, white_list):
+@click.pass_context
+def modify(ctx, apply_control, white_list):
     '''Modify or delete control filter record'''
 
     unicorn = get_secure_unicorn()
@@ -100,4 +116,4 @@ def modify(path, apply_control, white_list):
 
 
 if __name__ == '__main__':
-    cli()
+    cli(obj={})
