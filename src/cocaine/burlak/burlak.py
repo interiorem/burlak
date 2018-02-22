@@ -565,6 +565,13 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         raise gen.Return(control_filter)
 
     def mark_broken_apps(self, state, broken_apps, state_version):
+        '''Mark broken apps from state as `failed`
+
+        Moved out from control loop as it more local to runtime info processing
+        and simplify units interconnection a bit, but logically still a
+        `control` type procedure.
+
+        '''
         now = time.time()
         for app in broken_apps:
             profile = state[app].profile if app in state else ''
