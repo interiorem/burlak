@@ -59,7 +59,6 @@ DispatchMessage = namedtuple('DispatchMessage', [
     'runtime_reborn',
     'workers_mismatch',
     'stop_again',
-    'broken_apps',
 ])
 
 
@@ -565,6 +564,14 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
         raise gen.Return(control_filter)
 
+    def mark_broken_apps(self, state, broken_apps, state_version):
+        now = time.time()
+        for app in broken_apps:
+            profile = state[app].profile if app in state else ''
+            self.ci_state.mark_failed(
+                app, profile, state_version, now,
+                "app is in broken state")
+
     @gen.coroutine
     def process_loop(self):
         running_apps = set()
@@ -584,8 +591,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             # Note that uuid is used to determinate was it
             # any incoming state.
             uuid, msg = None, None
-            workers_mismatch, stop_again, broken_apps = \
-                [set() for _ in xrange(3)]
+            workers_mismatch, stop_again = \
+                [set() for _ in xrange(2)]
 
             try:
                 msg = yield self.input_queue.get(
@@ -668,6 +675,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                         broken_apps,
                     ) = yield self.runtime_state(state, running_apps)
 
+                    self.mark_broken_apps(state, broken_apps, state_version)
+
                     self.workers_distribution.clear()
                     self.workers_distribution.update(workers_count)
 
@@ -720,7 +729,6 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                         runtime_reborn,
                         workers_mismatch,
                         stop_again,
-                        broken_apps,
                     )
                 )
 
@@ -1081,15 +1089,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         if app in to_control and
                         app not in failed_to_start
                     ]
-
-                now = time.time()
-                for app in command.broken_apps:
-                    profile = command.state[app].profile \
-                        if app in command.state else ''
-
-                    self.ci_state.mark_failed(
-                        app, profile, command.state_version, now,
-                        "app is in broken state")
 
                 self.ci_state.channels_cache_apps = channels_cache.apps()
 

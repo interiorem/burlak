@@ -95,7 +95,7 @@ def test_stop(elysium, mocker):
                 set(stop_apps),
                 set(),
                 False,
-                set(), set(), set(),
+                set(), set(),
             )
         )
 
@@ -133,7 +133,7 @@ def test_stop_by_control(elysium, mocker):
                 -1, False,
                 set(stop_apps), set(),
                 False,
-                set(), set(), set(),
+                set(), set(),
             )
         )
 
@@ -181,7 +181,7 @@ def test_stop_apps_disabled(elysium, mocker, log_pending_stop):
                 -1, False,
                 set(stop_apps), set(),
                 False,
-                set(), set(), set(),
+                set(), set(),
             )
         )
 
@@ -212,7 +212,6 @@ def test_run(elysium, mocker):
                 set(),
                 set(run_apps.iterkeys()),
                 False,
-                set(),
                 set(),
                 set(),
             )
@@ -256,7 +255,6 @@ def test_control(elysium, mocker):
                 set(),
                 set(run_apps.iterkeys()),
                 False,
-                set(),
                 set(),
                 set(),
             )
@@ -309,7 +307,6 @@ def test_control_exceptions(elysium, mocker):
                 set(),
                 set(run_apps.iterkeys()),
                 False,
-                set(),
                 set(),
                 set(),
             )
@@ -385,7 +382,6 @@ def skipped_test_gapped_control(elysium, mocker):
                 set(),
                 set(state.iterkeys()),
                 False,
-                set(),
                 set(),
                 set(),
             )
