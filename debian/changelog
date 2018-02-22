@@ -1,3 +1,9 @@
+cocaine-orca (0.1.26) unstable; urgency=medium
+
+  * Refactor: make use of workers_mismatch set.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Thu, 22 Feb 2018 13:23:27 +0300
+
 cocaine-orca (0.1.25) unstable; urgency=medium
 
   * Fix incorrect stop mark in case of broken app.
