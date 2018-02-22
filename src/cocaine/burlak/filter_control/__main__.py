@@ -105,6 +105,8 @@ def delete(ctx):
 def modify(ctx, apply_control, white_list):
     '''Modify or delete control filter record'''
 
+    path = get_path_from_ctx(ctx)
+
     unicorn = get_secure_unicorn()
     white_list = [item.strip() for item in white_list.split(',') if item]
 
@@ -112,6 +114,7 @@ def modify(ctx, apply_control, white_list):
         apply_control=bool(apply_control),
         white_list=white_list
     )
+
     return IOLoop.current().run_sync(lambda: update(unicorn, path, r))
 
 
