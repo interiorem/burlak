@@ -702,7 +702,13 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             self.info("to_stop apps list {}", to_stop)
             self.info("to_run apps list {}", to_run)
 
-            if is_state_updated or to_run or to_stop:
+            def should_dispatch():
+                return (
+                    is_state_updated or to_run or to_stop or
+                    workers_mismatch
+                )
+
+            if should_dispatch():
                 self.status.mark_ok('sending processed state to dispatch')
 
                 # TODO: refact - make separate messages for each case.
