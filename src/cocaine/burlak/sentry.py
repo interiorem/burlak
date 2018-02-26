@@ -1,7 +1,22 @@
 # TODO: tests
 #
-import raven
-from raven.transport.tornado import TornadoHTTPTransport
+# Raven install appears to be broken in testing!
+#
+try:
+    import raven
+    from raven.transport.tornado import TornadoHTTPTransport
+    TRANSPORT = TornadoHTTPTransport
+except Exception as e:
+    print 'Broken raven package: {}'.format(e)
+    TRANSPORT = None
+
+
+class SentryStub(object):
+    def captureException(**kwargs):
+        pass
+
+    def captureMessage(message, **kwargs):
+        pass
 
 
 class SentryClientWrapper(object):
@@ -13,8 +28,7 @@ class SentryClientWrapper(object):
     details.
     '''
     def __init__(
-            self, logger, dsn, revision, transport=TornadoHTTPTransport,
-            **kwargs):
+            self, logger, dsn, revision, transport=TRANSPORT, **kwargs):
 
         self.logger = logger
 
@@ -23,17 +37,19 @@ class SentryClientWrapper(object):
 
         self.client = self._connect(dsn, transport, **kwargs)
 
-    def _connect(self, dsn, transport=TornadoHTTPTransport, **kwargs):
+    def _connect(self, dsn, transport=TRANSPORT, **kwargs):
         self.dsn = dsn
-        self.transport = TornadoHTTPTransport
+        self.transport = transport
 
-        self.client = raven.Client(
-            self.dsn,
-            transport=self.transport,
-            revision=self.revision,
-            **kwargs)
-
-        return self.client
+        try:
+            return raven.Client(
+                self.dsn,
+                transport=self.transport,
+                revision=self.revision,
+                **kwargs)
+        except NameError:
+            print "Raven module wasn't loaded, using 'void' stub!"
+            return SentryStub()
 
     def capture_exception(self, **kwargs):
         try:
