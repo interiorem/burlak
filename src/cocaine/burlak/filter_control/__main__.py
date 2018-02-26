@@ -15,6 +15,7 @@ def get_path_from_ctx(ctx):
 
 
 def get_secure_unicorn():
+
     config = Config(SharedStatus())
     config.update()
 
@@ -31,11 +32,13 @@ def update(unicorn, path, record):
 
     if version == -1:
         print 'creating node...'
-        yield unicorn.create(path, {})
+        yield unicorn.create(path, record)
         version = 0
+    else:
+        ch = yield unicorn.put(path, record, version)
+        _, (result, _) = yield ch.rx.get()
 
-    ch = yield unicorn.put(path, record, version)
-    _, (result, _) = yield ch.rx.get()
+    print 'written data {}'.format(record)
 
 
 @gen.coroutine
