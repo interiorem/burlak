@@ -15,6 +15,7 @@ apps = [
 ]
 
 apps_set = set(apps)
+apps_list = apps
 apps_dict = dict(map(lambda x: (x, None), apps))
 
 
@@ -48,6 +49,11 @@ def test_dict_void_filter():
     assert subset == apps_dict
 
 
+def test_none_filter():
+    subset = filter_apps(None, ['a', 'b', 'c'])
+    assert subset is None
+
+
 @pytest.mark.parametrize(
     'prefix,count',
     [
@@ -65,6 +71,26 @@ def test_dict_void_filter():
 )
 def test_dict_filter(prefix, count):
     subset = filter_apps(apps_dict, [prefix])
+    assert len(subset) == count
+
+
+@pytest.mark.parametrize(
+    'prefix,count',
+    [
+        ('z', 4),
+        ('zo', 3),
+        ('zoo', 2),
+        ('zd', 1),
+
+        ('b', 4),
+        ('bo', 4),
+        ('boo', 3),
+        ('boom', 1),
+        ('boorka ', 1),
+    ]
+)
+def test_list_filter(prefix, count):
+    subset = filter_apps(apps_list, [prefix])
     assert len(subset) == count
 
 
