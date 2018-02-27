@@ -1,6 +1,8 @@
 from collections import OrderedDict
 
 from cocaine.burlak.comm_state import CommittedState, Defaults
+from cocaine.burlak.control_filter import ControlFilter
+
 
 import pytest
 
@@ -46,6 +48,9 @@ mixed_state = dict(
         'STOPPED', 0,
         Defaults.NA_PROFILE_LABEL, 3, Defaults.STOPPED_DESCRIPTION, 50),
 )
+
+
+test_cf = ControlFilter(False, ['x', 'y', 'z'])
 
 
 @pytest.fixture
@@ -157,3 +162,8 @@ def test_workers_count(init_state):
             for record in init_state.as_dict().itervalues()
             if record.state == 'STARTED'
         )
+
+
+def test_control_filter(init_state):
+    init_state.control_filter = test_cf
+    assert init_state.control_filter == test_cf
