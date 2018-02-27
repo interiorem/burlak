@@ -80,3 +80,24 @@ def test_app_cache(app_cache, app):
 
     app_cache.remove([app])
     assert len(app_cache) == 0
+
+
+@pytest.mark.parametrize(
+    'apps,to_retain',
+    [
+        (['zoo', 'moo', 'boo', 'a', 'b'], ['a', 'b']),
+        ([], ['a', 'b']),
+        (['a', 'b'], [])
+    ]
+)
+@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
+def test_retain(ch_cache, apps, to_retain):
+    for a in apps:
+        yield ch_cache.get_ch(a)
+
+    assert len(ch_cache) == len(apps)
+    assert set(ch_cache.apps()) == set(apps)
+
+    ch_cache.close_other(to_retain)
+    if ch_cache.apps():
+        assert set(ch_cache.apps()) == set(to_retain)
