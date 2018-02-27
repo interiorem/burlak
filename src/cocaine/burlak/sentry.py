@@ -10,12 +10,12 @@ try:
     import raven
     from raven.transport.tornado import TornadoHTTPTransport
     TRANSPORT = TornadoHTTPTransport
-except Exception as e:
+except Exception as e:  # pragma nocover
     print 'Broken raven package: {}'.format(e)
     TRANSPORT = None
 
 
-class SentryStub(object):
+class SentryStub(object):  # pragma nocover
     def captureException(**kwargs):
         pass
 
@@ -51,7 +51,7 @@ class SentryClientWrapper(object):
                 transport=self.transport,
                 revision=self.revision,
                 **kwargs)
-        except NameError:
+        except NameError:  # pragma nocover
             print "Raven module wasn't loaded, using 'void' stub!"
             return SentryStub()
 
