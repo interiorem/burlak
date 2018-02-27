@@ -278,4 +278,4 @@ class ChannelsHandle(web.RequestHandler):
 
     @gen.coroutine
     def get(self):
-        self.write(dict(chs=self.committed_state.channels_cache_apps))
+        self.write(dict(apps=self.committed_state.channels_cache_apps))

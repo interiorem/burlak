@@ -3,6 +3,7 @@ from collections import namedtuple
 
 from cocaine.burlak import burlak
 from cocaine.burlak.comm_state import CommittedState
+from cocaine.burlak.control_filter import ControlFilter
 from cocaine.burlak.helpers import flatten_dict, flatten_dict_rec
 from cocaine.burlak.sys_metrics import SysMetricsGatherer
 from cocaine.burlak.web import API_V1, WebOptions, make_url, make_web_app_v1
@@ -54,6 +55,10 @@ test_state = {
     'app4': CommittedState.Record('FAILED', 100502, 3, 1, 'error', 100502),
 }
 
+
+test_filter = ControlFilter(True, ['a', 'b', 'c'])
+
+
 incoming_state = {
     'app1': StateRecord(4, 'one'),
     'app2': StateRecord(3, 'two'),
@@ -67,6 +72,9 @@ system_metrics = {
     'utime': TEST_UTIME,
     'stime': TEST_STIME,
 }
+
+
+test_channels = ['x', 'y', 'z']
 
 
 class MetricsMock(burlak.MetricsMixin):
@@ -108,6 +116,8 @@ def app(mocker):
     committed_state.set_incoming_state(
         incoming_state, TEST_INCOMING_STATE_VERSION, TEST_TS)
     committed_state.version = TEST_STATE_VERSION
+    committed_state.control_filter = test_filter
+    committed_state.channels_cache_apps = test_channels
 
     workers_distribution = {'app{}'.format(i): i % 4 for i in xrange(10)}
 
@@ -354,8 +364,18 @@ def test_filter_handle(http_client, base_url):
         base_url + make_url('', API_V1, r'filter'))
 
     assert response.code == 200
-    assert json.loads(response.body) == \
-        dict(control_filter=dict(
-            apply_control=False,
-            white_list=[],
-        ))
+
+    cf = json.loads(response.body)
+    cf = cf.get('control_filter', dict())
+
+    assert ControlFilter.from_dict(cf) == \
+        test_filter
+
+
+@pytest.mark.gen_test
+def test_defaults_channels(http_client, base_url):
+    response = yield http_client.fetch(
+        base_url + make_url('', API_V1, r'channels'))
+
+    assert response.code == 200
+    assert json.loads(response.body) == dict(apps=test_channels)

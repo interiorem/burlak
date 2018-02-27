@@ -1,9 +1,7 @@
-
 from .defaults import Defaults
 
 
 class ControlFilter(object):
-
     def __init__(self, apply_control, white_list):
         self._apply_control = apply_control
         self._white_list = white_list
