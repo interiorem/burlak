@@ -1,6 +1,10 @@
+#
 # TODO: tests
 #
-# Raven install appears to be broken in testing!
+# Note that Raven install appears to be broken in testing (sometimes) on
+# `import raven` statement! So we should guard it with try/except statement,
+# also `SentryStub` is used instead sentry client in case of malfunction
+# install.
 #
 try:
     import raven
