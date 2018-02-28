@@ -215,7 +215,6 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
     def __init__(
             self, context,
             unicorn,
-            ci_state,
             filter_queue, input_queue,
             **kwargs):
         super(ControlFilterListener, self).__init__(context, **kwargs)
@@ -226,8 +225,6 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
         # TODO: refactor as one single queue
         self.filter_queue = filter_queue
         self.input_queue = input_queue
-
-        self.ci_state = ci_state
 
         self.status = \
             context.shared_status.register(ControlFilterListener.TASK_NAME)
@@ -252,8 +249,6 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
                 yield self.filter_queue.put(msg)
             else:
                 yield self.input_queue.put(msg)
-
-            self.ci_state.control_filter = control_filter
         except Exception as e:
             self.error('failed to send control filter, error {}', e)
 
@@ -453,10 +448,10 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         for app, state_record in state.iteritems():
             prev_record = prev_state.get(app)
             if prev_record and prev_record.profile != state_record.profile:
-                    # If profiles names for the same app is different
-                    # upon updates, app must be stopped and restarted
-                    # with new profile.
-                    to_update.append(app)
+                # If profiles names for the same app is different
+                # upon updates, app must be stopped and restarted
+                # with new profile.
+                to_update.append(app)
 
         return set(to_update)
 
@@ -558,11 +553,16 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         msg = yield self.filter_queue.get()
         self.filter_queue.task_done()
 
-        control_filter = msg.control_filter
+        control_filter = self.update_control_filter(msg.control_filter)
+
         yield self.control_queue.put(msg)
         self.info('got init control_filter {}', msg.control_filter.as_dict())
 
         raise gen.Return(control_filter)
+
+    def update_control_filter(self, control_filter):
+        self.ci_state.control_filter = control_filter
+        return control_filter
 
     def mark_broken_apps(self, state, broken_apps, state_version):
         '''Mark broken apps from state as `failed`
@@ -643,7 +643,9 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     self.workers_distribution.clear()
                     self.info('reset state signal')
                 elif isinstance(msg, ControlFilterMessage):
-                    control_filter = msg.control_filter
+                    control_filter = \
+                        self.update_control_filter(msg.control_filter)
+
                     self.info(
                         'control_filter updated signal {}',
                         control_filter.as_dict()
