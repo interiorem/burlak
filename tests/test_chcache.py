@@ -87,7 +87,7 @@ def test_app_cache(app_cache, app):
     [
         (['zoo', 'moo', 'boo', 'a', 'b'], ['a', 'b']),
         ([], ['a', 'b']),
-        (['a', 'b'], [])
+        (['a', 'b'], []),
     ]
 )
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)

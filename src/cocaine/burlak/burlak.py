@@ -112,18 +112,18 @@ def update_fake_state(ci_state, version, real_state, control_state):
 
     if to_fake_mark:
         ci_state.reset_output_state()
-        ci_state.version = version
 
+    ci_state.version = version
     now = time.time()
+
     # for app in control_state:
     #     ci_state.mark_stopped(app, version, now)
 
     for app in to_fake_mark:
-        try:
-            r = real_state[app]
-            ci_state.mark_running(app, r.workers, r.profile, version, now)
-        except KeyError:
-            pass
+        # to_fake_mark is always subset of real_state, so no check for
+        # KeyError exception is needed.
+        r = real_state[app]
+        ci_state.mark_running(app, r.workers, r.profile, version, now)
 
 
 #
@@ -291,7 +291,7 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
                     self.metrics_cnt['control_filter_updates'] += 1
                     was_an_error = False
 
-            except Exception as e:  # pragma nocover
+            except Exception as e:
                 message = 'failed to get control filter from unicorn'
                 self.status.mark_ok(message)
                 self.info('{}, reason: "{}"', message, e)
