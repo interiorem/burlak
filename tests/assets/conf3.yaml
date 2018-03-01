@@ -7,3 +7,5 @@ control_filter_path: 'c:any\weird/string'
 control_filter:
     apply_control: false
     white_list: []
+
+api_timeout: 42

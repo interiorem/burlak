@@ -245,3 +245,18 @@ def test_control_filter_path(config, expected_filter_path):
     cfg.update([config])
 
     assert cfg.control_filter_path == expected_filter_path
+
+
+@pytest.mark.parametrize(
+    'config,expected_to',
+    [
+        ('tests/assets/conf1.yaml', Defaults.API_TIMEOUT),
+        ('tests/assets/conf2.yaml', Defaults.API_TIMEOUT),
+        ('tests/assets/conf3.yaml', 42),
+    ]
+)
+def test_api_timeout(config, expected_to):
+    cfg = Config(shared_status)
+    cfg.update([config])
+
+    assert cfg.api_timeout == expected_to

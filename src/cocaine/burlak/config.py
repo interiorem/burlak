@@ -131,6 +131,12 @@ class Config(object):
             'type': 'integer',
             'required': False,
         },
+        'api_timeout': {  # see ConsoleLogger.LEVELS for valie values
+            'type': 'integer',
+            'min': 0,
+            'max': 2**16,
+            'required': False,
+        },
         'status_web_path': {
             'type': 'string',
             'required': False,
@@ -338,6 +344,10 @@ class Config(object):
     def control_filter(self):
         d = self._config.get('control_filter', dict())
         return ControlFilter.from_dict(d)
+
+    @property
+    def api_timeout(self):
+        return self._config.get('api_timeout', Defaults.API_TIMEOUT)
 
     @control_filter.setter
     def control_filter(self, control_filter):
