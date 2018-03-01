@@ -243,7 +243,7 @@ class WorkersDistribution(web.RequestHandler):
 
     @gen.coroutine
     def get(self, subset=None):
-        result = result = self.workers_distribution
+        result = self.workers_distribution
 
         if subset == '/none':
             result = {
