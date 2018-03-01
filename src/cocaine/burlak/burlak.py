@@ -365,6 +365,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     self.debug(info_message)
 
                     state, version = yield ch.rx.get()
+
                     self.debug(
                         'subscribe:: got version {} state {}', version, state)
                     self.status.mark_ok('processing state')
@@ -474,14 +475,15 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
     @gen.coroutine
     def get_running_apps_set(self):
         ch = yield self.node_service.list()
-        apps_list = yield ch.rx.get()
+        apps_list = yield ch.rx.get(timeout=self.context.config.api_timeout)
 
         raise gen.Return(set(apps_list))
 
     @gen.coroutine
     def get_info(self, app, flag=0x01):  # 0x01: collect overseer info
         ch = yield self.node_service.info(app, flag)
-        info = yield ch.rx.get()
+        info = yield ch.rx.get(timeout=self.context.config.api_timeout)
+
         raise gen.Return(info)
 
     @gen.coroutine
@@ -778,7 +780,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         '''
         try:
             ch = yield self.node_service.start_app(app, profile)
-            yield ch.rx.get()
+            yield ch.rx.get(timeout=self.context.config.api_timeout)
         except Exception as e:
             self.metrics_cnt['errors_start_app'] += 1
             self.status.mark_warn('failed to start application')
@@ -808,7 +810,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         '''
         try:
             ch = yield self.node_service.pause_app(app)
-            yield ch.rx.get()
+            yield ch.rx.get(timeout=self.context.config.api_timeout)
 
             self.ci_state.mark_stopped(app, state_version, tm)
             self.metrics_cnt['apps_stopped'] += 1
@@ -871,7 +873,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
         '''
         yield ch.tx.write(to_adjust)
-        yield ch.rx.get()
+        yield ch.rx.get(timeout=self.context.config.api_timeout)
 
     @gen.coroutine
     def adjust_by_channel(
