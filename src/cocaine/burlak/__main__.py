@@ -101,7 +101,6 @@ def main(
 
     control_filter = burlak.ControlFilterListener(
         context, unicorn,
-        committed_state,
         filter_queue, input_queue
     )
 
