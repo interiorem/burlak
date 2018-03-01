@@ -244,12 +244,13 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
     @gen.coroutine
     def send_filter(self, startup, control_filter):
         msg = ControlFilterMessage(control_filter)
+
         try:
             if startup:
                 yield self.filter_queue.put(msg)
             else:
                 yield self.input_queue.put(msg)
-        except Exception as e:
+        except Exception as e:  # pragma nocover
             self.error('failed to send control filter, error {}', e)
 
         raise gen.Return(False)
