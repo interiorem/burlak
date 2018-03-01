@@ -288,7 +288,9 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
                     was_an_error = False
 
             except Exception as e:
-                message = 'failed to get control filter from unicorn'
+
+                message = 'using default control filter'
+
                 self.status.mark_ok(message)
                 self.info('{}, reason: "{}"', message, e)
 
