@@ -212,6 +212,11 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
 
     FILTER_SCHEMA = Config.FILTER_SCHEMA
 
+    VersionedFilter = namedtuple('VersionedFilter', [
+        'control_filter',
+        'version'
+    ])
+
     def __init__(
             self, context,
             unicorn,
@@ -243,6 +248,12 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def send_filter(self, startup, control_filter):
+
+        self.debug(
+            'sending control_filter start_flag {}, {} ',
+            startup, control_filter
+        )
+
         msg = ControlFilterMessage(control_filter)
 
         try:
@@ -263,6 +274,8 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
             dict(control_filter=ControlFilterListener.FILTER_SCHEMA))
 
         was_an_error = False
+        last_filter = None
+
         while self.should_run():
             try:
                 path = self.context.config.control_filter_path
@@ -282,6 +295,18 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
                         yield ch.rx.get(
                             timeout=self.context.config.api_timeout_by2)
 
+                    current_filter = ControlFilterListener.VersionedFilter(
+                            control_filter, version)
+
+                    if current_filter == last_filter:
+                        self.info(
+                            'control_filter with version {} '
+                            'already processed, ignoring',
+                            version)
+                        continue
+
+                    last_filter = current_filter
+
                     # Throws on error
                     self.validate_filter(validator, control_filter)
                     control_filter = ControlFilter.from_dict(control_filter)
@@ -289,7 +314,7 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
                     self.metrics_cnt['control_filter_updates'] += 1
                     was_an_error = False
             except gen.TimeoutError as e:
-                self.info('control_filter subscription expired {}', e)
+                self.debug('control_filter subscription expired {}', e)
             except Exception as e:
 
                 message = 'using default control filter'
@@ -302,6 +327,8 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
                         startup, self.context.config.control_filter)
 
                 was_an_error = True
+                last_filter = None
+
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
             finally:
                 yield close_tx_safe(ch)
@@ -329,6 +356,11 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
         },
     }
 
+    VersionedState = namedtuple('VersionedState', [
+        'state',
+        'version'
+    ])
+
     def __init__(
             self, context, input_queue, **kwargs):
         super(StateAcquirer, self).__init__(context, **kwargs)
@@ -342,6 +374,8 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
         validator = Validator(StateAcquirer.STATE_SCHEMA)
 
         ch = None
+        last_state = None
+
         while self.should_run():
             try:
                 self.status.mark_ok('getting uuid')
@@ -370,6 +404,18 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     state, version = \
                         yield ch.rx.get(
                             timeout=self.context.config.api_timeout_by2)
+
+                    current_state = \
+                        StateAcquirer.VersionedState(state, version)
+
+                    if current_state == last_state:
+                        self.info(
+                            'state with version {} already processed, '
+                            'ignoring',
+                            version)
+                        continue
+
+                    last_state = current_state
 
                     self.debug(
                         'subscribe:: got version {} state {}', version, state)
@@ -411,7 +457,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
                     self.metrics_cnt['apps_in_last_state'] = len(state)
             except gen.TimeoutError as e:
-                self.info('state subscription expired {}', e)
+                self.debug('state subscription expired {}', e)
             except Exception as e:  # pragma nocover
 
                 yield self.input_queue.put(ResetStateMessage())
@@ -419,6 +465,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                 self.status.mark_warn('failed to get state')
                 self.error('failed to get state, error: "{}"', e)
 
+                last_state = None
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
 
             finally:  # pragma nocover
