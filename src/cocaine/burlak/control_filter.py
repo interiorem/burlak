@@ -34,6 +34,12 @@ class ControlFilter(object):
 
         return ControlFilter(apply_control, white_list)
 
+    def __str__(self):
+        return 'ControlFilter{{ {} {} }}'.format(
+            self._apply_control,
+            self._white_list,
+        )
+
     @staticmethod
     def with_defaults():
         '''Creates control filter from dict with reasonable defaults
