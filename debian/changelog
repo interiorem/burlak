@@ -1,3 +1,10 @@
+cocaine-orca (0.1.29) UNRELEASED; urgency=medium
+
+  * Retries for node::info and node::list.
+  * Timeouts for unicorn subscriptions.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Fri, 02 Mar 2018 14:50:47 +0300
+
 cocaine-orca (0.1.28) unstable; urgency=medium
 
   * Cocaine API calls with configurable timeout. `api_timeout`
