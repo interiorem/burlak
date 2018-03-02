@@ -278,7 +278,9 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
                     self.status.mark_ok(info_message)
                     self.debug(info_message)
 
-                    control_filter, version = yield ch.rx.get()
+                    control_filter, version = \
+                        yield ch.rx.get(
+                            timeout=self.context.config.api_timeout_by2)
 
                     # Throws on error
                     self.validate_filter(validator, control_filter)
@@ -286,7 +288,8 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
                     startup = yield self.send_filter(startup, control_filter)
                     self.metrics_cnt['control_filter_updates'] += 1
                     was_an_error = False
-
+            except gen.TimeoutError as e:
+                self.info('control_filter subscription expired {}', e)
             except Exception as e:
 
                 message = 'using default control filter'
@@ -330,6 +333,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
             self, context, input_queue, **kwargs):
         super(StateAcquirer, self).__init__(context, **kwargs)
 
+        self.context = context
         self.input_queue = input_queue
         self.status = context.shared_status.register(StateAcquirer.TASK_NAME)
 
@@ -363,8 +367,9 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     info_message = 'waiting for state updates'
                     self.status.mark_ok(info_message)
                     self.debug(info_message)
-
-                    state, version = yield ch.rx.get()
+                    state, version = \
+                        yield ch.rx.get(
+                            timeout=self.context.config.api_timeout_by2)
 
                     self.debug(
                         'subscribe:: got version {} state {}', version, state)
@@ -399,10 +404,14 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                             error_message, state, validator.errors
                         )
 
+                    # StateUpdateMessage should throw in ctor on wrong state
+                    # format
                     yield self.input_queue.put(
                         StateUpdateMessage(state, version, uuid))
 
                     self.metrics_cnt['apps_in_last_state'] = len(state)
+            except gen.TimeoutError as e:
+                self.info('state subscription expired {}', e)
             except Exception as e:  # pragma nocover
 
                 yield self.input_queue.put(ResetStateMessage())
@@ -474,15 +483,49 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def get_running_apps_set(self):
-        ch = yield self.node_service.list()
-        apps_list = yield ch.rx.get(timeout=self.context.config.api_timeout)
+        '''
+            TODO: make wrapper for retries
+        '''
+        apps_list = set()
+
+        attempts = DEFAULT_RETRY_ATTEMPTS
+        while attempts > 0:
+            try:
+                ch = yield self.node_service.list()
+                apps_list = yield ch.rx.get(
+                    timeout=self.context.config.api_timeout_by2)
+            except gen.TimeoutError as e:
+                attempts -= 1
+                self.warn(
+                    'failed to got apps list, timeout {}, attempts left {}',
+                    e, attempts
+                )
+            else:
+                break
 
         raise gen.Return(set(apps_list))
 
     @gen.coroutine
     def get_info(self, app, flag=0x01):  # 0x01: collect overseer info
-        ch = yield self.node_service.info(app, flag)
-        info = yield ch.rx.get(timeout=self.context.config.api_timeout)
+        '''
+            TODO: make wrapper for retries
+        '''
+        info = dict()
+
+        attempts = DEFAULT_RETRY_ATTEMPTS
+        while attempts > 0:
+            try:
+                ch = yield self.node_service.info(app, flag)
+                info = yield ch.rx.get(
+                    timeout=self.context.config.api_timeout_by2)
+            except gen.TimeoutError as e:
+                attempts -= 1
+                self.warn(
+                    'failed to got apps info, timeout {}, attempts left {}',
+                    e, attempts
+                )
+            else:
+                break
 
         raise gen.Return(info)
 
