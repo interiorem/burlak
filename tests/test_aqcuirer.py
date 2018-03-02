@@ -1,4 +1,4 @@
-from cocaine.burlak import burlak
+from cocaine.burlak import burlak, config
 from cocaine.burlak.context import Context, LoggerSetup
 from cocaine.burlak.uniresis import catchup_an_uniresis
 
@@ -62,13 +62,12 @@ def acq(mocker):
     logger = make_logger_mock(mocker)
     input_queue = queues.Queue()
 
-    config = mocker.Mock()
     sentry_wrapper = mocker.Mock()
 
     return burlak.StateAcquirer(
         Context(
             LoggerSetup(logger, False),
-            config,
+            config.Config(mocker.Mock()),
             '0',
             sentry_wrapper,
             mocker.Mock(),
@@ -93,8 +92,7 @@ def test_state_subscribe_input(acq, mocker):
     uniresis = catchup_an_uniresis(use_stub_uuid=TEST_UUID)
 
     for state, ver in states_list:
-        yield acq.subscribe_to_state_updates(
-            unicorn, uniresis, TEST_UUID_PFX)
+        yield acq.subscribe_to_state_updates(unicorn, uniresis, TEST_UUID_PFX)
 
         inp = yield acq.input_queue.get()
         acq.input_queue.task_done()
