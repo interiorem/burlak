@@ -349,6 +349,10 @@ class Config(object):
     def api_timeout(self):
         return self._config.get('api_timeout', Defaults.API_TIMEOUT)
 
+    @property
+    def api_timeout_by2(self):
+        return 2 * self._config.get('api_timeout', Defaults.API_TIMEOUT)
+
     @control_filter.setter
     def control_filter(self, control_filter):
         self._config['control_filter'] = dict(
