@@ -1,4 +1,4 @@
-cocaine-orca (0.1.29) UNRELEASED; urgency=medium
+cocaine-orca (0.1.29) unstable; urgency=medium
 
   * Retries for node::info and node::list.
   * Timeouts for unicorn subscriptions.
