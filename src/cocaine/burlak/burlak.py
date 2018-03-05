@@ -315,6 +315,7 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
                     was_an_error = False
             except gen.TimeoutError as e:
                 self.debug('control_filter subscription expired {}', e)
+                self.metrics_cnt['control_filter_timeout_error'] += 1
             except Exception as e:
 
                 message = 'using default control filter'
@@ -457,6 +458,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
                     self.metrics_cnt['apps_in_last_state'] = len(state)
             except gen.TimeoutError as e:
+                self.metrics_cnt['state_timeout_error'] += 1
                 self.debug('state subscription expired {}', e)
             except Exception as e:  # pragma nocover
 
@@ -542,6 +544,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 apps_list = yield ch.rx.get(
                     timeout=self.context.config.api_timeout_by2)
             except gen.TimeoutError as e:
+                self.metrics_cnt['list_timeout_error'] += 1
                 attempts -= 1
                 self.warn(
                     'failed to got apps list, timeout {}, attempts left {}',
@@ -566,6 +569,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 info = yield ch.rx.get(
                     timeout=self.context.config.api_timeout_by2)
             except gen.TimeoutError as e:
+                self.metrics_cnt['info_timeout_error'] += 1
                 attempts -= 1
                 self.warn(
                     'failed to got apps info, timeout {}, attempts left {}',
