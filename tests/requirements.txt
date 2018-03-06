@@ -2,7 +2,7 @@ cocaine
 coverage
 mock
 python-coveralls
-tornado>=4.2
+tornado>=4.2,<5.0
 pytest
 pytest-mock
 pytest-tornado

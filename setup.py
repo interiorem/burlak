@@ -17,7 +17,7 @@ setup(
     author_email='karapuz@yandex-team.ru',
     install_requires=[
         # 'cocaine',
-        'tornado>=4.3',
+        'tornado>=4.3,<5.0',
         'click>=5.0',
         'PyYAML>=3.0',
         'cerberus>=0.9.0',
