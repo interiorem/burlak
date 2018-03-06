@@ -131,7 +131,7 @@ class Config(object):
             'type': 'integer',
             'required': False,
         },
-        'api_timeout': {  # see ConsoleLogger.LEVELS for valie values
+        'api_timeout_sec': {
             'type': 'integer',
             'min': 0,
             'max': 2**16,
@@ -347,11 +347,11 @@ class Config(object):
 
     @property
     def api_timeout(self):
-        return self._config.get('api_timeout', Defaults.API_TIMEOUT)
+        return self._config.get('api_timeout_sec', Defaults.API_TIMEOUT)
 
     @property
     def api_timeout_by2(self):
-        return 2 * self._config.get('api_timeout', Defaults.API_TIMEOUT)
+        return 2 * self._config.get('api_timeout_sec', Defaults.API_TIMEOUT)
 
     @control_filter.setter
     def control_filter(self, control_filter):

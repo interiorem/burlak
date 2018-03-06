@@ -8,4 +8,4 @@ control_filter:
     apply_control: false
     white_list: []
 
-api_timeout: 42
+api_timeout_sec: 42
