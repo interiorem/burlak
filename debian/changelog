@@ -1,3 +1,10 @@
+cocaine-orca (0.1.30) unstable; urgency=medium
+
+  * Apply stop_again command based on real state,
+    not filtered one.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Wed, 07 Mar 2018 13:46:41 +0300
+
 cocaine-orca (0.1.29) unstable; urgency=medium
 
   * Retries for node::info and node::list.
