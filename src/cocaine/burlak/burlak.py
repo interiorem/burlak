@@ -885,7 +885,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 'failed to start app {} {} with err: {}', app, profile, e)
 
             self.sentry_wrapper.capture_exception(
-                message="can't start app {}".format(app),
+                message="can't start app",
                 extra=dict(
                     app=app,
                     profile=profile
