@@ -612,13 +612,13 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         }
 
     @gen.coroutine
-    def runtime_state(self, state, running_apps):
+    def runtime_state(self, state, real_state_nonempty, running_apps):
         info = yield self.get_apps_info(running_apps)
         workers_count = self.workers_per_app(info)
 
         broken_apps, stop_again = set(), set()
 
-        if state:
+        if real_state_nonempty:
             broken_apps = {
                 app for app in self.get_broken_apps(info)
                 if app in state
@@ -630,6 +630,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
         workers_mismatch = self.workers_diff(state, workers_count)
 
+        self.debug('real state non empty {}', real_state_nonempty)
         self.debug('in broken state {}', broken_apps)
         self.debug('current workers count {}', workers_count)
         self.debug('stop command should be resent to {}', stop_again)
@@ -781,7 +782,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                         workers_mismatch,
                         stop_again,
                         broken_apps,
-                    ) = yield self.runtime_state(state, running_apps)
+                    ) = yield self.runtime_state(
+                        state, bool(real_state), running_apps)
 
                     self.mark_broken_apps(state, broken_apps, state_version)
 
