@@ -300,8 +300,9 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
 
                     if current_filter == last_filter:
                         self.info(
-                            'control_filter with version {} '
+                            'control_filter {} with version {} '
                             'already processed, ignoring',
+                            current_filter.control_filter,
                             version)
                         continue
 
