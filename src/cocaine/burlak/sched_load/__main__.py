@@ -36,6 +36,8 @@ DEFAULT_DISABLE_PROPORTION = 0.0
 DEFAULT_PROFILE1 = 'IsoProcess'
 DEFAULT_PROFILE2 = 'IsoProcess2'
 
+TO_ZERO_ON = 11
+
 
 def sample_sin(a, x):
     return a * sin(x) * sin(x)
@@ -46,10 +48,10 @@ def sample_cos(a, x):
 
 
 def verify_state(input_state, result_state):
+    errors = []
     for app, val in input_state.iteritems():
         orca_state = result_state[app]
 
-        errors = []
         wrk = val['workers']
         if orca_state['workers'] != wrk:
             errors.append(
@@ -94,6 +96,7 @@ def state_pusher(
         version = 0
 
     x = 0
+    zerofy_iter = 1
     wrk_generators = [sample_sin, sample_cos]
     while True:
         try:
@@ -120,6 +123,11 @@ def state_pusher(
                 state.keys(), min(count_to_stop, len(state)))
             for stop_app in to_stop:
                 del state[stop_app]
+
+            if zerofy_iter % TO_ZERO_ON == 0:
+                state = dict()
+
+            zerofy_iter += 1
 
             ch = yield unicorn.put(path, state, version)
             _, (result, _) = yield ch.rx.get()
