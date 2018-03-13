@@ -1,3 +1,10 @@
+cocaine-orca (0.1.31) unstable; urgency=medium
+
+  * Empty state is legal now, stop any running app,
+    allowed by control filter.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Tue, 13 Mar 2018 18:20:25 +0300
+
 cocaine-orca (0.1.30) unstable; urgency=medium
 
   * Apply stop_again command based on real state,
