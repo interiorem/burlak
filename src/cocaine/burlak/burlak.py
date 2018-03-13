@@ -689,6 +689,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
         last_uuid = None
         control_filter = yield self.get_filter_once()
+        no_state_yet = True
 
         while self.should_run():
             self.status.mark_ok('listenning on incoming queue')
@@ -721,6 +722,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 if isinstance(msg, StateUpdateMessage):
                     state, state_version, uuid = msg.get_all()
                     is_state_updated = True
+                    no_state_yet = False
                     self.ci_state.set_incoming_state(state, state_version)
 
                     control_state = \
@@ -734,8 +736,14 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                         state_version, uuid, state,
                         real_state.viewkeys() - state.viewkeys()
                     )
+
+                    if not real_state:
+                        self.info(
+                            'empty incoming state, version {}', state_version)
+
                 elif isinstance(msg, ResetStateMessage):
                     runtime_reborn = True
+                    no_state_yet = True
 
                     state.clear()
                     real_state.clear()
@@ -797,7 +805,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
             # Note that in general following code (up to the end of the
             # method) shouldn't raise.
-            if not real_state:
+            if no_state_yet:
                 self.info('state not known yet, skipping control iteration')
                 continue
 
