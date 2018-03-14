@@ -13,6 +13,8 @@
 #   - secure service for 'unicorn'
 #
 import time
+
+from cocaine.exceptions import ServiceError
 from collections import defaultdict, namedtuple
 from datetime import timedelta
 
@@ -137,6 +139,10 @@ def transmute_and_filter_state(input_state):
         for app, val in input_state.iteritems()
         if val['workers'] >= 0
     }
+
+
+class NoStateNodeMessage(object):
+    pass
 
 
 class StateUpdateMessage(object):
@@ -403,18 +409,33 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     info_message = 'waiting for state updates'
                     self.status.mark_ok(info_message)
                     self.debug(info_message)
-                    state, version = \
-                        yield ch.rx.get(
+
+                    state, version = yield ch.rx.get(
                             timeout=self.context.config.api_timeout_by2)
+
+                    if state is None and version == -1:
+                        self.metrics_cnt['empty_state_node'] += 1
+                        self.info('state possible was removed')
+                        yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
+                        continue
+
+                    assert isinstance(version, int)
+
+                    if not isinstance(state, dict):  # pragma nocover
+                        self.metrics_cnt['non_valid_state'] += 1
+                        raise Exception(
+                            'expected dictionary as state type, got {}'
+                            .format(type(state).__name__)
+                        )
 
                     current_state = \
                         StateAcquirer.VersionedState(state, version)
 
                     if current_state == last_state:
                         self.info(
-                            'state with version {} already processed, '
-                            'ignoring',
-                            version)
+                            'state version {} already processed, ignoring',
+                            version
+                        )
                         continue
 
                     last_state = current_state
@@ -422,15 +443,6 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     self.debug(
                         'subscribe:: got version {} state {}', version, state)
                     self.status.mark_ok('processing state')
-
-                    assert isinstance(version, int)
-
-                    if not isinstance(state, dict):  # pragma nocover
-                        self.metrics_cnt['got_broken_sate'] += 1
-                        raise Exception(
-                            'expected dictionary as state type, got {}'
-                            .format(type(state).__name__)
-                        )
 
                     #
                     # Bench results:
@@ -462,18 +474,24 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                 self.metrics_cnt['state_timeout_error'] += 1
                 self.debug('state subscription expired {}', e)
             except Exception as e:  # pragma nocover
+                to_send = StateAcquirer.select_reset_message(e)
+                yield self.input_queue.put(to_send)
 
-                yield self.input_queue.put(ResetStateMessage())
-
-                self.status.mark_warn('failed to get state')
-                self.error('failed to get state, error: "{}"', e)
+                self.status.mark_warn('state not ready')
+                self.error('failed to get state, exception: "{}"', e)
 
                 last_state = None
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
-
             finally:  # pragma nocover
                 # TODO: Is it really needed?
                 yield close_tx_safe(ch)
+
+    @staticmethod
+    def select_reset_message(error):
+        if isinstance(error, ServiceError):
+            return NoStateNodeMessage()
+        else:
+            return ResetStateMessage()
 
 
 class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
@@ -680,6 +698,13 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 app, profile, state_version, now,
                 "app is in broken state")
 
+    def reset_state(self, state, real_state):
+        state.clear()
+        real_state.clear()
+
+        self.ci_state.reset()
+        self.workers_distribution.clear()
+
     @gen.coroutine
     def process_loop(self):
         running_apps = set()
@@ -745,12 +770,11 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     runtime_reborn = True
                     no_state_yet = True
 
-                    state.clear()
-                    real_state.clear()
-
-                    self.ci_state.reset()
-                    self.workers_distribution.clear()
+                    self.reset_state(state, real_state)
                     self.info('reset state signal')
+                elif isinstance(msg, NoStateNodeMessage):
+                    self.reset_state(state, real_state)
+                    self.info('seems that there is no state node')
                 elif isinstance(msg, ControlFilterMessage):
                     control_filter = \
                         self.update_control_filter(msg.control_filter)
