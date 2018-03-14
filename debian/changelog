@@ -1,3 +1,12 @@
+cocaine-orca (0.1.32) unstable; urgency=medium
+
+  * Treat state node removal as empty state
+    (only when it was some initial state already).
+  * Try to separate unicorn (RT) disconnection errors and
+    state node removal cases.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Wed, 14 Mar 2018 20:47:37 +0300
+
 cocaine-orca (0.1.31) unstable; urgency=medium
 
   * Empty state is legal now, stop any running app,

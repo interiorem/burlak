@@ -413,13 +413,13 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     state, version = yield ch.rx.get(
                             timeout=self.context.config.api_timeout_by2)
 
+                    assert isinstance(version, int)
+
                     if state is None and version == -1:
                         self.metrics_cnt['empty_state_node'] += 1
                         self.info('state possible was removed')
                         yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
                         continue
-
-                    assert isinstance(version, int)
 
                     if not isinstance(state, dict):  # pragma nocover
                         self.metrics_cnt['non_valid_state'] += 1
