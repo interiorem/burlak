@@ -20,9 +20,14 @@ class ResoursesProxy(object):
 
 class UniresisProxy(ResoursesProxy):
 
-    def __init__(self, endpoints=None, name='uniresis'):
+    def __init__(self, endpoints, name):
+        self.name = name
         self.uniresis = \
             Service(name, endpoints) if endpoints else Service(name)
+
+    @property
+    def service_name(self):
+        return self.name
 
     @gen.coroutine
     def uuid(self):
@@ -41,13 +46,22 @@ class DummyProxy():
     def __init__(self, uuid=None):
         self._uuid = uuid if uuid else DummyProxy.COCAINE_TEST_UUID
 
+    @property
+    def service_name(self):
+        return 'dumm_proxy'
+
     @gen.coroutine
     def uuid(self):
         raise gen.Return(self._uuid)
 
 
-def catchup_an_uniresis(use_stub_uuid=None, endpoints=None):
+def catchup_an_uniresis(
+    use_stub_uuid=None, endpoints=None, service_name='locator'):
+    '''
+    Note that former `service_name` was uniresis, which is deprecated now.
+    '''
+
     if use_stub_uuid:
         return DummyProxy(use_stub_uuid)
     else:
-        return UniresisProxy(endpoints)
+        return UniresisProxy(endpoints, service_name)
