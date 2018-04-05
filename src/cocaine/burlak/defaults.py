@@ -12,6 +12,14 @@ class Defaults(object):
     # TODO: make mandatory and config only
     UUID_PATH = '/darkvoice/states'
 
+    FEEDBACK_PATH = '/darkvoice/feedback'
+
+    DISCOVERY_PATH = '/darkvoice/discovery'
+    DISCOVERY_UPDATE_INTERVAL_SEC = 3600
+
+    METRICS_PATH = '/darkvoice/metrics'
+    METRICS_POLL_INTERVAL_SEC = 5
+
     NODE_SERVICE_NAME = 'node'
     UNICORN_SERVICE_NAME = 'unicorn'
 

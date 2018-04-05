@@ -4,6 +4,8 @@ import cerberus
 
 import yaml
 
+from collections import namedtuple
+
 from .control_filter import ControlFilter
 from .defaults import Defaults
 
@@ -18,6 +20,39 @@ CONFIG_PATHS = [
     '~/cocaine/orca.yaml',
     '~/.cocaine/orca.yaml',
 ]
+
+
+def make_metrics_config(d):
+    MetricsConfig = namedtuple('MetricsConfig', [
+        'path',
+        'poll_interval_sec',
+        'query',
+        'use',
+    ])
+
+    path = d.get('path', Defaults.METRICS_PATH)
+    poll_interval_sec = d.get(
+        'poll_interval_sec', Defaults.METRICS_POLL_INTERVAL_SEC)
+    query = d.get('query', {})
+
+    use = True if d else False
+    return MetricsConfig(path, poll_interval_sec, query, use)
+
+
+def make_discovery_config(d):
+    DiscoveryConfig = namedtuple('DiscoveryConfig', [
+        'path',
+        'update_interval_sec',
+        'use',
+    ])
+
+    path = d.get('path', Defaults.DISCOVERY_PATH)
+    update_interval_sec = d.get(
+        'update_interval_sec', Defaults.DISCOVERY_PATH)
+
+    use = True if d else False
+
+    return DiscoveryConfig(path, update_interval_sec, use)
 
 
 #
@@ -97,6 +132,41 @@ class Config(object):
         'uuid_path': {
             'type': 'string',
             'required': False,
+        },
+        'feedback_to_unicorn': {
+            'type': 'boolean',
+            'required': False,
+        },
+        'feedback_path': {
+            'type': 'string',
+            'required': False,
+        },
+        'discovery': {
+            'type': 'dict',
+            'required': False,
+            'schema': {
+                'path': {'type': 'string'},
+                'update_interval_sec': {
+                    'type': 'integer',
+                    'min': 0,
+                    'max': 2**24,
+                    'required': False,
+                }
+            }
+        },
+        'metrics': {
+            'type': 'dict',
+            'required': False,
+            'schema': {
+                'path': {'type': 'string'},
+                'poll_interval_sec': {
+                    'type': 'integer',
+                    'min': 0,
+                    'max': 2**16,
+                    'required': False,
+                },
+                'query': {'type': 'dict'},
+            }
         },
         'default_profile': {
             'type': 'string',
@@ -331,6 +401,24 @@ class Config(object):
     @property
     def status_port(self):
         return self._config.get('status_port', Defaults.STATUS_PORT)
+
+    @property
+    def feedback_to_unicorn(self):
+        return self._config.get('feedback_to_unicorn', False)
+
+    @property
+    def feedback_path(self):
+        return self._config.get('feedback_path', Defaults.FEEDBACK_PATH)
+
+    @property
+    def metrics_confg(self):
+        metrics = self._config.get('metrics', {})
+        return make_metrics_config(metrics)
+
+    @property
+    def discovery_confg(self):
+        discovery = self._config.get('discovery', {})
+        return make_metrics_config(discovery)
 
     @property
     def control_with_ack(self):
