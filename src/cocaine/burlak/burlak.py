@@ -388,7 +388,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
             try:
                 self.status.mark_ok('getting uuid')
 
-                self.debug('retrieving uuid from uniresis')
+                self.debug('retrieving uuid from {}', uniresis.service_name)
                 uuid = yield uniresis.uuid()
 
                 # TODO: validate uuid
