@@ -634,7 +634,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         self.filter_queue = filter_queue
         self.input_queue = input_queue
         self.control_queue = control_queue
-        
+
         self.poster = UnicornSubmitter(context, state_dumper_queue)
 
         self.poll_interval_sec = poll_interval_sec
@@ -944,7 +944,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     self.workers_distribution.clear()
                     self.workers_distribution.update(workers_count)
 
-                    poster.post_state(self.ci_state.as_named_dict_ext())
+                    self.poster.post_state(self.ci_state.as_named_dict_ext())
 
             except Exception as e:
                 self.error('failed to get control message with {}', e)
