@@ -22,6 +22,18 @@ CONFIG_PATHS = [
 ]
 
 
+def make_feedback_config(d):
+    FeedbackConfig = namedtuple('FeedbackConfig', [
+        'unicorn_path',
+        'unicorn_enabled'
+    ])
+
+    path = d.get('unicorn_path', Defaults.FEEDBACK_PATH)
+    enabled = d.get('unicorn_enabled', False)
+
+    return FeedbackConfig(path, enabled)
+
+
 def make_metrics_config(d):
     MetricsConfig = namedtuple('MetricsConfig', [
         'path',
@@ -133,13 +145,13 @@ class Config(object):
             'type': 'string',
             'required': False,
         },
-        'feedback_to_unicorn': {
-            'type': 'boolean',
+        'feedback': {
+            'type': 'dict',
             'required': False,
-        },
-        'feedback_path': {
-            'type': 'string',
-            'required': False,
+            'schema': {
+                'unicorn_path': {'type': 'string'},
+                'unicorn_enabled': {'type': 'boolean'}
+            }
         },
         'discovery': {
             'type': 'dict',
@@ -414,12 +426,9 @@ class Config(object):
         return self._config.get('status_port', Defaults.STATUS_PORT)
 
     @property
-    def feedback_to_unicorn(self):
-        return self._config.get('feedback_to_unicorn', False)
-
-    @property
-    def feedback_path(self):
-        return self._config.get('feedback_path', Defaults.FEEDBACK_PATH)
+    def feedback_config(self):
+        feedback = self._config.get('feedback', {})
+        return make_feedback_config(feedback)
 
     @property
     def metrics_confg(self):

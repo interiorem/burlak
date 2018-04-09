@@ -13,8 +13,8 @@ class Defaults(object):
     UUID_PATH = '/darkvoice/states'
 
     FEEDBACK_PATH = '/darkvoice/feedback'
-
     DISCOVERY_PATH = '/darkvoice/discovery'
+
     DISCOVERY_UPDATE_INTERVAL_SEC = 3600
 
     METRICS_PATH = '/darkvoice/metrics'
