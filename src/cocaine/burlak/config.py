@@ -168,6 +168,12 @@ class Config(object):
                 'query': {'type': 'dict'},
             }
         },
+        'async_error_timeout_sec': {
+            'type': 'integer',
+            'min': 0,
+            'max': 2**16,
+            'required': False,
+        },
         'default_profile': {
             'type': 'string',
             'required': False,
@@ -375,6 +381,11 @@ class Config(object):
     def apps_poll_interval_sec(self):
         return self._config.get(
             'apps_poll_interval_sec', Defaults.APPS_POLL_INTERVAL_SEC)
+
+    @property
+    def async_error_timeout_sec(self):
+        return self._config.get(
+            'async_error_timeout_sec', Defaults.ON_AYNC_ERROR_TIMEOUT_SEC)
 
     @property
     def input_queue_size(self):
