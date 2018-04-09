@@ -75,6 +75,9 @@ def main(
     filter_queue = queues.Queue()
     control_queue = queues.Queue()
 
+    state_dumper_queue = queues.Queue()
+    metrics_dumper_queue = queues.Queue()
+
     logger = Logger(config.locator_endpoints)
 
     unicorn = SecureServiceFabric.make_secure_adaptor(
@@ -110,22 +113,33 @@ def main(
         context,
         node,
         committed_state,
-        filter_queue, input_queue, control_queue,
+        filter_queue, input_queue, control_queue, state_dumper_queue,
         apps_poll_interval,
         workers_distribution,
     )
 
     apps_elysium = burlak.AppsElysium(
-        context, committed_state, node, control_queue)
+        context, committed_state, node, control_queue, state_dumper_queue)
 
     if not uuid_prefix:
         uuid_prefix = config.uuid_path
+
+    feedback_path = config.feedback_config.unicorn_path
+    state_dumper = burlak.UnicornDumper(
+        context, uniresis, unicorn, feedback_path, state_dumper_queue)
+
+    metrics_path = config.metrics_confg.path
+    metrics_dumper = burlak.UnicornDumper(
+        context, uniresis, unicorn, metrics_path, metrics_dumper_queue)
 
     # run async poll tasks in date flow reverse order, from sink to source
     io_loop = IOLoop.current()
     io_loop.spawn_callback(control_filter.subscribe_to_control_filter)
     io_loop.spawn_callback(apps_elysium.blessing_road)
     io_loop.spawn_callback(state_processor.process_loop)
+
+    io_loop.spawn_callback(state_dumper.listen_for_events)
+    io_loop.spawn_callback(metrics_dumper.listen_for_events)
 
     # io_loop.spawn_callback(
     #     # TODO: make node list constructor parameter

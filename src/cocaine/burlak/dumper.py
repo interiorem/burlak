@@ -5,7 +5,8 @@ DEFAULT_RETRY_TIMEOUT_SEC = 1.0
 
 
 class Dumper(object):
-
+    '''Dumper stores provided payload into unicorn service
+    '''
     def __init__(self, context, unicorn):
         self.unicorn_service = unicorn
         self.context = context
@@ -39,6 +40,11 @@ class Dumper(object):
 
     @gen.coroutine
     def dump(self, path, payload, ephemeral=True):
+        '''dump provided `payload` at `path` node
+
+        TODO: ephemeral type not exposed from unicorn API.
+
+        '''
         attempts = DEFAULT_ATTEMPTS
         while attempts > 0:
             try:
