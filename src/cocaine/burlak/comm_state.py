@@ -67,8 +67,8 @@ class CommittedState(object):
     def as_named_dict_ext(self):
         return dict(
             state = self.as_named_dict(),
-            version = self.committed_state.version,
-            timestamp = self.committed_state.updated_at,
+            timestamp = self.updated_at,
+            version = self.version,
         )
 
     def reset_output_state(self):
