@@ -51,3 +51,5 @@ class Defaults(object):
     FILTER_PATH = '/darkvoice/control_filter'
 
     API_TIMEOUT = 300
+
+    ON_AYNC_ERROR_TIMEOUT_SEC = 10
