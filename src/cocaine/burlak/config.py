@@ -27,7 +27,7 @@ def make_metrics_config(d):
         'path',
         'poll_interval_sec',
         'query',
-        'use',
+        'enabled',
     ])
 
     path = d.get('path', Defaults.METRICS_PATH)
@@ -35,24 +35,24 @@ def make_metrics_config(d):
         'poll_interval_sec', Defaults.METRICS_POLL_INTERVAL_SEC)
     query = d.get('query', {})
 
-    use = True if d else False
-    return MetricsConfig(path, poll_interval_sec, query, use)
+    enabled = True if d else False
+    return MetricsConfig(path, poll_interval_sec, query, enabled)
 
 
 def make_discovery_config(d):
     DiscoveryConfig = namedtuple('DiscoveryConfig', [
         'path',
         'update_interval_sec',
-        'use',
+        'enabled',
     ])
 
     path = d.get('path', Defaults.DISCOVERY_PATH)
     update_interval_sec = d.get(
         'update_interval_sec', Defaults.DISCOVERY_PATH)
 
-    use = True if d else False
+    enabled = True if d else False
 
-    return DiscoveryConfig(path, update_interval_sec, use)
+    return DiscoveryConfig(path, update_interval_sec, enabled)
 
 
 #
@@ -429,7 +429,7 @@ class Config(object):
     @property
     def discovery_confg(self):
         discovery = self._config.get('discovery', {})
-        return make_metrics_config(discovery)
+        return make_discovery_config(discovery)
 
     @property
     def control_with_ack(self):
