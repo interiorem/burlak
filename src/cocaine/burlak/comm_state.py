@@ -64,6 +64,13 @@ class CommittedState(object):
     def as_named_dict(self):
         return {app: rec._asdict() for app, rec in self.state.iteritems()}
 
+    def as_named_dict_ext(self):
+        return dict(
+            state = self.as_named_dict(),
+            version = self.committed_state.version,
+            timestamp = self.committed_state.updated_at,
+        )
+
     def reset_output_state(self):
         self.state.clear()
         self.version = Defaults.INIT_STATE_VERSION
