@@ -27,7 +27,10 @@ class Dumper(object):
             version = 0
         else:
             ch = yield self.unicorn_service.put(path, version)
-            current, version = yield ch.rx.get(timeout=api_timeout)
+            version = yield ch.rx.get(timeout=api_timeout)
+            self.logger.debug(
+                "value for path {} was written with version {}",
+                path, version)
 
     @gen.coroutine
     def dump(self, path, payload, ephemeral=True):
