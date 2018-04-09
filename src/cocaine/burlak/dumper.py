@@ -5,7 +5,7 @@ DEFAULT_RETRY_TIMEOUT_SEC = 1.0
 
 
 class Dumper(object):
-    '''Dumper stores provided payload into unicorn service
+    '''Dumper stores provided payload using unicorn service
     '''
     def __init__(self, context, unicorn):
         self.unicorn_service = unicorn

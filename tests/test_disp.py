@@ -72,7 +72,7 @@ def disp(mocker):
         ),
         node,
         CommittedState(),
-        queues.Queue(), queues.Queue(), queues.Queue(),
+        queues.Queue(), queues.Queue(), queues.Queue(), queues.Queue(),
         0.01,
         workers_distribution)
 

@@ -75,7 +75,7 @@ def elysium(mocker):
         ),
         CommittedState(),
         node,
-        queues.Queue())
+        queues.Queue(), queues.Queue())
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
