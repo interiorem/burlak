@@ -9,6 +9,7 @@ import burlak
 import click
 
 from cocaine.logger import Logger
+
 # TODO: not released yet!
 # from cocaine.services import SecureServiceFabric, Service
 from cocaine.services import Service
@@ -125,25 +126,22 @@ def main(
         uuid_prefix = config.uuid_path
 
     feedback_path = config.feedback_config.unicorn_path
+    metrics_path = config.metrics_confg.path
+
     state_dumper = burlak.UnicornDumper(
         context, uniresis, unicorn, feedback_path, state_dumper_queue)
-
-    metrics_path = config.metrics_confg.path
     metrics_dumper = burlak.UnicornDumper(
         context, uniresis, unicorn, metrics_path, metrics_dumper_queue)
 
     # run async poll tasks in date flow reverse order, from sink to source
     io_loop = IOLoop.current()
+
     io_loop.spawn_callback(control_filter.subscribe_to_control_filter)
     io_loop.spawn_callback(apps_elysium.blessing_road)
     io_loop.spawn_callback(state_processor.process_loop)
 
     io_loop.spawn_callback(state_dumper.listen_for_events)
     io_loop.spawn_callback(metrics_dumper.listen_for_events)
-
-    # io_loop.spawn_callback(
-    #     # TODO: make node list constructor parameter
-    #     lambda: acquirer.poll_running_apps_list(node_list))
     io_loop.spawn_callback(
         lambda: acquirer.subscribe_to_state_updates(
             unicorn, uniresis, uuid_prefix))

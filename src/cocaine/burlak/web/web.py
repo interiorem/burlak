@@ -169,6 +169,7 @@ class StateV1Handler(web.RequestHandler):
 
         self.write(
             dict(
+                api=API_V1,
                 state=result,
                 version=last_version,
                 timestamp=last_timestamp
