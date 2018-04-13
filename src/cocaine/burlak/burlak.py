@@ -1,5 +1,6 @@
 #
 # TODO:
+#   - file too long! refactor to different project files
 #
 # DONE:
 #   - invalidate caches on runtime disconnection
@@ -28,6 +29,7 @@ from .chcache import ChannelsCache, close_tx_safe
 # Config imported for filter schema
 from .config import Config
 from .control_filter import ControlFilter
+from .dumper import Dumper
 from .logger import ConsoleLogger, VoidLogger
 from .loop_sentry import LoopSentry
 from .patricia.patricia import trie
@@ -68,6 +70,10 @@ StateRecord = namedtuple('StateRecord', [
     'workers',
     'profile',
 ])
+
+
+def make_unicorn_leaf_path(path, uuid):
+    return '{}/{}'.format(path, uuid)
 
 
 def build_trie(keys):
@@ -494,6 +500,118 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
             return ResetStateMessage()
 
 
+class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
+    '''
+    TODO: WIP, not yet implemented, nor tested
+    '''
+    def __init__(self, context, source, feedback_queue, **kwargs):
+        super(MetricsFetcher, self).__init__(context, **kwargs)
+
+        self._config = context.config
+        self._source = source
+        self._feedback_queue = feedback_queue
+        self.sentry_wrapper = context.sentry_wrapper
+
+    def _filter(self, payload):
+        '''
+        TODO: not implemented yet.
+        '''
+        return payload
+
+    @gen.coroutine
+    def _fetch_and_upload(self):
+        '''
+        TODO: fitler out active workers state
+        '''
+        now = time.time()
+        payload = yield self._source.fetch({})
+        payload = self._filter(payload)
+
+        elapsed = time.time() - now
+        self.debug('fetching and updating workers stat took {}s', elapsed)
+
+        yield self._feedback_queue.put(payload)
+
+    @gen.coroutine
+    def gain_stats(self):
+        while self.should_run():
+            try:
+                to_sleep = self._config.metrics_confg.poll_interval_sec
+
+                if self._config.metrics_confg.enabled:
+                    yield self._fetch_and_upload()
+
+                yield gen.sleep(to_sleep)
+            except Exception as e:
+                self.error('failed to fetch runtime workers stat {}', e)
+                self.sentry_wrapper.capture_exception()
+
+                yield gen.sleep(self._config.async_error_timeout_sec)
+
+
+class UnicornSubmitter(LoggerMixin, MetricsMixin, LoopSentry):
+    '''UnicornSubmitter wrapper over unicorn queue put operation.
+
+    Provides additional app-wide checks, e.g. was unicron_feedback conigured
+    or not.
+
+    '''
+    def __init__(self, ctx, dumper_queue, **kwargs):
+        super(UnicornSubmitter, self).__init__(ctx, **kwargs)
+
+        self._config = ctx.config
+        self._dumper_queue = dumper_queue
+
+    @gen.coroutine
+    def post_state(self, state):
+        if not self._config.feedback_config.unicorn_feedback:
+            self.debug('unicorn posting is disabled')
+            return
+
+        yield self._dumper_queue.put(state)
+
+
+class UnicornDumper(LoggerMixin, MetricsMixin, LoopSentry):
+    '''UnicornDumper to_write queue listener
+
+    Listen on FIFO for paylod to write to unicorn.
+
+    '''
+    def __init__(self, ctx, uniresis, unicorn, path, dumper_queue, **kwargs):
+        super(UnicornDumper, self).__init__(ctx, **kwargs)
+
+        self._context = ctx
+        self._uniresis = uniresis
+        self._unicorn = unicorn
+        self._path = path
+        self._dumper_queue = dumper_queue
+
+        self.sentry_wrapper = ctx.sentry_wrapper
+
+    @gen.coroutine
+    def listen_for_events(self):
+
+        dumper = Dumper(self._context, self._unicorn)
+
+        while self.should_run():
+            try:
+                payload = yield self._dumper_queue.get()
+                self._dumper_queue.task_done()
+
+                uuid = yield self._uniresis.uuid()
+                path = make_unicorn_leaf_path(self._path, uuid)
+
+                self.debug('writing dumper event to unicorn path {}', path)
+                yield dumper.dump(path, payload)
+            except Exception as e:
+                self.error('failed to dump payload for path {}: {}',
+                    self._path, e)
+                self.sentry_wrapper.capture_exception()
+
+                to_sleep = self._context.config.async_error_timeout_sec
+                yield gen.sleep(to_sleep)
+
+
 class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
     TASK_NAME = 'state_processor'
 
@@ -502,7 +620,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             context,
             node,
             ci_state,
-            filter_queue, input_queue, control_queue,
+            filter_queue, input_queue, control_queue, state_dumper_queue,
             poll_interval_sec,
             workers_distribution,
             **kwargs):
@@ -517,11 +635,14 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         self.input_queue = input_queue
         self.control_queue = control_queue
 
+        self.poster = UnicornSubmitter(context, state_dumper_queue)
+
         self.poll_interval_sec = poll_interval_sec
         self.ci_state = ci_state
         self.workers_distribution = workers_distribution
 
         self.status = context.shared_status.register(StateAggregator.TASK_NAME)
+
 
     def make_prof_update_set(self, prev_state, state):
         to_update = []
@@ -823,6 +944,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     self.workers_distribution.clear()
                     self.workers_distribution.update(workers_count)
 
+                    self.poster.post_state(self.ci_state.as_named_dict_ext())
+
             except Exception as e:
                 self.error('failed to get control message with {}', e)
                 self.sentry_wrapper.capture_exception()
@@ -889,7 +1012,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             context,
             ci_state,
             node,
-            control_queue,
+            control_queue, state_dumper_queue,
             **kwargs):
         super(AppsElysium, self).__init__(context, **kwargs)
 
@@ -901,6 +1024,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         self.node_service = node
         self.control_queue = control_queue
 
+        self.poster = UnicornSubmitter(context, state_dumper_queue)
         self.status = context.shared_status.register(AppsElysium.TASK_NAME)
 
     @gen.coroutine
@@ -1132,6 +1256,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         channels_cache.apps()
 
                     stopped_by_control.clear()
+
+                    self.poster.post_state(self.ci_state.as_named_dict_ext())
                     continue
 
                 #
@@ -1237,6 +1363,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 self.metrics_cnt['state_updates'] += 1
                 self.metrics_cnt['ch_cache_size'] += len(channels_cache)
+
+                self.poster.post_state(self.ci_state.as_named_dict_ext())
 
                 self.info('state updated')
             except Exception as e:  # pragma nocover

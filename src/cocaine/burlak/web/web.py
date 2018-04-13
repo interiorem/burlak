@@ -153,29 +153,21 @@ class StateV1Handler(web.RequestHandler):
 
     @gen.coroutine
     def get(self):
-        last_state = self.committed_state.as_named_dict()
-        last_version = self.committed_state.version
-        last_timestamp = self.committed_state.updated_at
+        state_with_meta = self.committed_state.as_named_dict_ext()
+        state = state_with_meta.get('state', dict())
 
         request = self.get_arguments('app')
 
-        result = dict()
+        state_to_client = dict()
         if request:
             for app in request:
-                if app in last_state:
-                    result[app] = last_state[app]
+                if app in state:
+                    state_to_client[app] = state[app]
         else:
-            result = last_state
+            state_to_client = state
 
-        self.write(
-            dict(
-                state=result,
-                version=last_version,
-                timestamp=last_timestamp
-            )
-        )
-
-        self.flush()
+        state_with_meta['state'] = state_to_client
+        self.write(state_with_meta)
 
 
 class FailedStateHandle(web.RequestHandler):

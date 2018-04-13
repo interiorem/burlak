@@ -5,20 +5,21 @@ DEFAULT_RETRY_TIMEOUT_SEC = 1.0
 
 
 class Dumper(object):
-
+    '''Dumper stores provided payload using unicorn service
+    '''
     def __init__(self, context, unicorn):
-        self.unicorn_service = unicorn
+        self.unicorn = unicorn
         self.context = context
         self.logger = context.logger_setup.logger
 
     @gen.coroutine
     def _upload(self, path, payload, _ephemeral):
-        '''
+        """
         TODO: ephemeral nodes aren't supported by unicorn service API yet.
-        '''
+        """
         api_timeout = self.context.config.api_timeout
 
-        ch = yield self.unicorn_service.get(path)
+        ch = yield self.unicorn.get(path)
         _, version = yield ch.rx.get(timeout=api_timeout)
 
         if version == -1:
@@ -26,26 +27,33 @@ class Dumper(object):
 
             ch = yield self.unicorn.create(path, payload)
             yield ch.rx.get(timeout=api_timeout)
+
             version = 0
+        else:
+            self.logger.debug(
+                'writing unicorn node {}, version {}'.format(path, version))
 
-        self.logger.debug(
-            'writing unicorn node {}, version {}'.format(path, version))
+            ch = yield self.unicorn.put(path, payload, version)
+            version = yield ch.rx.get(timeout=api_timeout)
 
-        ch = yield self.unicorn_service.put(path, version)
-        version = yield ch.rx.get(timeout=api_timeout)
-        self.logger.debug(
-            "value for path {} was written with version {}"
-            .format(path, version))
+        raise gen.Return(version)
 
     @gen.coroutine
     def dump(self, path, payload, ephemeral=True):
+        """dumps provided `payload` at `path` node
+
+        TODO: ephemeral type not exposed from unicorn API.
+
+        returns: version of written payload
+        """
         attempts = DEFAULT_ATTEMPTS
+        version = -1
+
         while attempts > 0:
             try:
-                yield self._upload(path, payload, ephemeral)
+                version = yield self._upload(path, payload, ephemeral)
             except Exception as e:
                 attempts -= 1
-
                 self.logger.error(
                     'failed to write to unicorn, path: '
                     '{}, attempts: {}, error: {}'
@@ -57,4 +65,4 @@ class Dumper(object):
                     'wrote to unicorn path: {}, version {}'
                     .format(path, version))
 
-                raise gen.Return(True)
+                raise gen.Return(version)

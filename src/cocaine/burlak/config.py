@@ -25,11 +25,11 @@ CONFIG_PATHS = [
 def make_feedback_config(d):
     FeedbackConfig = namedtuple('FeedbackConfig', [
         'unicorn_path',
-        'unicorn_enabled'
+        'unicorn_feedback'
     ])
 
     path = d.get('unicorn_path', Defaults.FEEDBACK_PATH)
-    enabled = d.get('unicorn_enabled', False)
+    enabled = d.get('unicorn_feedback', False)
 
     return FeedbackConfig(path, enabled)
 
@@ -150,7 +150,7 @@ class Config(object):
             'required': False,
             'schema': {
                 'unicorn_path': {'type': 'string'},
-                'unicorn_enabled': {'type': 'boolean'}
+                'unicorn_feedback': {'type': 'boolean'}
             }
         },
         'discovery': {

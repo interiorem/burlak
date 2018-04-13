@@ -1,3 +1,9 @@
+cocaine-orca (0.1.33) unstable; urgency=medium
+
+  * Initial unicorn-based feedback support.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Mon, 09 Apr 2018 20:48:28 +0300
+
 cocaine-orca (0.1.32) unstable; urgency=medium
 
   * Treat state node removal as empty state
