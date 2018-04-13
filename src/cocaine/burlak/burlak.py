@@ -564,7 +564,7 @@ class UnicornSubmitter(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def post_state(self, state):
-        if not self._config.feedback_config.unicorn_enabled:
+        if not self._config.feedback_config.unicorn_feedback:
             self.debug('unicorn posting is disabled')
             return
 
