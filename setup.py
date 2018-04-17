@@ -25,7 +25,10 @@ setup(
         'six',
     ],
     namespace_packages=['cocaine'],
-    setup_requires=['pytest-runner', 'python-debian'],
+    setup_requires=[
+        'pytest-runner',
+        'python-debian',
+        'setuptools_scm<=1.17'],
     tests_require=['pytest'],
     package_dir={'': 'src'},
     description=__desc__,

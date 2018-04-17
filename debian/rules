@@ -7,5 +7,3 @@ $(shell echo __version__ = \'`dpkg-parsechangelog --show-field VERSION`\' > src/
 
 %:
 	dh $@ --with python2 --buildsystem=python_distutils
-
-

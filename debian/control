@@ -2,7 +2,7 @@ Source: cocaine-orca
 Maintainer: Alex Karev <karapuz@yandex-team.ru>
 Section: python
 Priority: optional
-Build-Depends: python-setuptools (>= 0.6b3), python-all (>= 2.6.6-3), debhelper (>= 7), python-debian
+Build-Depends: python-setuptools (>= 3.3), python-all (>= 2.6.6-3), debhelper (>= 7), python-debian
 Standards-Version: 3.9.5
 
 Package: cocaine-orca
