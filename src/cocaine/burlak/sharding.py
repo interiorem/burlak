@@ -22,14 +22,18 @@ class AsyncPathProvider(object):
 
 
 class ShardingSetup(object):
+    """Provides sharding environment routes.
+    """
     def __init__(self, context, uniresis):
         self._ctx = context
         self._uniresis = uniresis
+        self._logger = context.logger_setup.logger
 
     @gen.coroutine
     def get_state_path(self):
-        path = yield self._generate_path(
-            self._ctx.config.uuid_path, 'state_subnode')
+        fallback_path = self._ctx.config.uuid_path
+        path = yield self._generate_path(fallback_path, 'state_subnode')
+
         raise gen.Return(path)
 
     @gen.coroutine
@@ -71,10 +75,11 @@ class ShardingSetup(object):
 
             tag = extra.get(tag_key, default)
         except Exception as e:
-            #
-            # TODO: log!
-            #
-            pass
+            # Note: print log, ignore
+            self._logger.info(
+                'method uniresis::extra not implemented, '
+                'using default tag [%s]', tag
+            )
 
         raise gen.Return(tag)
 

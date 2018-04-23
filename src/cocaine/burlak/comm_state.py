@@ -57,6 +57,7 @@ class CommittedState(object):
         self.updated_timestamp = 0
 
         self.ch_apps = list()
+        self.dirty = False
 
     def as_dict(self):
         return self.state
@@ -78,10 +79,20 @@ class CommittedState(object):
     def reset(self):
         self.reset_output_state()
         self.in_state = CommittedState.IncomingState(dict(), -1, 0)
+        self.mark_clean()
 
     def clear(self):  # pragma nocover
         '''Alias for reset'''
         self.reset()
+
+    def is_dirty(self):
+        return self.dirty
+
+    def _mark_dirty(self):
+        self.dirty = True
+
+    def mark_clean(self):
+        self.dirty = False
 
     def mark_running(self, app, workers, profile, state_version, tm):
         self.state.update(
@@ -94,6 +105,8 @@ class CommittedState(object):
                     Defaults.SUCCESS_DESCRIPTION,
                     int(tm))
             })
+
+        self._mark_dirty()
 
     def mark_failed(self, app, profile, state_version, tm, reason=None):
         if reason is None:
@@ -109,6 +122,9 @@ class CommittedState(object):
                     reason,
                     int(tm))
             })
+
+        self._mark_dirty()
+
 
     def mark_stopped(self, app, state_version, tm):
         _, workers, profile, _, description, _ = self.state.get(
@@ -133,6 +149,8 @@ class CommittedState(object):
                     description,
                     int(tm)),
             })
+
+        self._mark_dirty()
 
     def remove_old_stopped(self, expire_span):
         self.remove_old_records(expire_span, ('STOPPED',))

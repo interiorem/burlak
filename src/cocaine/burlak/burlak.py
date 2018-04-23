@@ -557,7 +557,7 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
 class UnicornSubmitter(LoggerMixin, MetricsMixin, LoopSentry):
     '''UnicornSubmitter wrapper over unicorn queue put operation.
 
-    Provides additional app-wide checks, e.g. was unicron_feedback conigured
+    Provides additional app-wide checks, e.g. was unicron_feedback configured
     or not.
 
     '''
@@ -568,15 +568,16 @@ class UnicornSubmitter(LoggerMixin, MetricsMixin, LoopSentry):
         self._dumper_queue = dumper_queue
 
     @gen.coroutine
-    def post_state(self, state):
+    def post_state(self, ci_state):
         if not self._config.feedback.unicorn_feedback:
             self.debug('unicorn posting is disabled')
             return
 
-        if state:
-            yield self._dumper_queue.put(state)
+        if ci_state.is_dirty():
+            yield self._dumper_queue.put(ci_state.as_named_dict_ext())
+            ci_state.mark_clean()
         else:
-            self.info('skipping submitting of empty state')
+            self.info('skipping submitting of clean state')
 
 
 class UnicornDumper(LoggerMixin, MetricsMixin, LoopSentry):
@@ -953,7 +954,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     self.workers_distribution.clear()
                     self.workers_distribution.update(workers_count)
 
-                    self.poster.post_state(self.ci_state.as_named_dict_ext())
+                    self.poster.post_state(self.ci_state)
 
             except Exception as e:
                 self.error('failed to get control message with {}', e)
@@ -1266,7 +1267,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                     stopped_by_control.clear()
 
-                    self.poster.post_state(self.ci_state.as_named_dict_ext())
+                    self.poster.post_state(self.ci_state)
                     continue
 
                 #
@@ -1373,7 +1374,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 self.metrics_cnt['state_updates'] += 1
                 self.metrics_cnt['ch_cache_size'] += len(channels_cache)
 
-                self.poster.post_state(self.ci_state.as_named_dict_ext())
+                self.poster.post_state(self.ci_state)
 
                 self.info('state updated')
             except Exception as e:  # pragma nocover

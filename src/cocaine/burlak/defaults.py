@@ -2,7 +2,7 @@ from .logger import ConsoleLogger
 
 
 class Defaults(object):
-    '''App wide defaults
+    '''App-wide defaults
     '''
     TOK_UPDATE_SEC = 10
 
