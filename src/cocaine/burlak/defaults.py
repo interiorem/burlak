@@ -53,3 +53,13 @@ class Defaults(object):
     API_TIMEOUT = 300
 
     ON_AYNC_ERROR_TIMEOUT_SEC = 10
+
+    SHARDING_ENABLED = False
+    FALLBACK_SHARDING_TAG = '_unspec'
+    SHARDING_COMMON_PREFIX = '/darkvoice/sharding'
+
+    DC_TAG_KEY = 'x-cocaine-cluster'
+
+    SHARDING_FEEDBACK_SUBNODE = 'feedback'
+    SHARDING_STATE_SUBNODE = 'state'
+    SHARDING_METRICS_SUBNODE = 'metrics'

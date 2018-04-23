@@ -67,6 +67,33 @@ def make_discovery_config(d):
     return DiscoveryConfig(path, update_interval_sec, enabled)
 
 
+def make_sharding_config(d):
+    ShardingConfig = namedtuple('ShardingConfig', [
+        'enabled',
+        'default_tag',
+        'common_prefix',
+        'tag_key',
+        'state_subnode',
+        'feedback_subnode',
+        'metrics_subnode',
+    ])
+
+    enabled = d.get('enabled', Defaults.SHARDING_ENABLED)
+    default_tag = d.get('default_tag', Defaults.FALLBACK_SHARDING_TAG)
+    common_prefix = d.get('common_prefix', Defaults.SHARDING_COMMON_PREFIX)
+
+    tag_key = d.get('tag_key', Defaults.DC_TAG_KEY)
+
+    state_subnode = d.get('state_subnode', Defaults.SHARDING_STATE_SUBNODE)
+    feedback_subnode = d.get(
+        'feed_subnode', Defaults.SHARDING_FEEDBACK_SUBNODE)
+    metrics_subnode = d.get(
+        'metrics_subnode', Defaults.SHARDING_METRICS_SUBNODE)
+
+    return ShardingConfig(enabled, default_tag, common_prefix, tag_key,
+        state_subnode, feedback_subnode, metrics_subnode)
+
+
 #
 # Should be compatible with tools secure section
 #
@@ -166,6 +193,33 @@ class Config(object):
                 }
             }
         },
+        'sharding': {
+            'type': 'dict',
+            'required': False,
+            'schema': {
+                'enabled': {'type': 'boolean'},
+                'default_tag': {
+                    'type': 'string',
+                    'required': False,
+                },
+                'tag_key': {
+                    'type': 'string',
+                    'required': False,
+                },
+                'state_subnode': {
+                    'type': 'string',
+                    'required': False,
+                },
+                'feedback_subnode': {
+                    'type': 'string',
+                    'required': False,
+                },
+                'metrics_subnode': {
+                    'type': 'string',
+                    'required': False,
+                },
+            }
+        },
         'metrics': {
             'type': 'dict',
             'required': False,
@@ -177,7 +231,10 @@ class Config(object):
                     'max': 2**16,
                     'required': False,
                 },
-                'query': {'type': 'dict'},
+                'query': {
+                    'type': 'dict',
+                    'required': False,
+                },
             }
         },
         'async_error_timeout_sec': {
@@ -426,19 +483,24 @@ class Config(object):
         return self._config.get('status_port', Defaults.STATUS_PORT)
 
     @property
-    def feedback_config(self):
+    def feedback(self):
         feedback = self._config.get('feedback', {})
         return make_feedback_config(feedback)
 
     @property
-    def metrics_confg(self):
+    def metrics(self):
         metrics = self._config.get('metrics', {})
         return make_metrics_config(metrics)
 
     @property
-    def discovery_confg(self):
+    def discovery(self):
         discovery = self._config.get('discovery', {})
         return make_discovery_config(discovery)
+
+    @property
+    def sharding(self):
+        sharding = self._config.get('sharding', {})
+        return make_sharding_config(sharding)
 
     @property
     def control_with_ack(self):

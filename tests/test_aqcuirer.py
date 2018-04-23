@@ -1,5 +1,6 @@
 from cocaine.burlak import burlak, config
 from cocaine.burlak.context import Context, LoggerSetup
+from cocaine.burlak.sharding import ShardingSetup
 from cocaine.burlak.uniresis import catchup_an_uniresis
 
 import pytest
@@ -64,15 +65,17 @@ def acq(mocker):
 
     sentry_wrapper = mocker.Mock()
 
-    return burlak.StateAcquirer(
-        Context(
-            LoggerSetup(logger, False),
-            config.Config(mocker.Mock()),
-            '0',
-            sentry_wrapper,
-            mocker.Mock(),
-        ),
-        input_queue)
+    context = Context(
+        LoggerSetup(logger, False),
+        config.Config(mocker.Mock()),
+        '0',
+        sentry_wrapper,
+        mocker.Mock(),
+    )
+
+    uniresis = catchup_an_uniresis(use_stub_uuid=TEST_UUID)
+    sharding_setup = ShardingSetup(context, uniresis)
+    return burlak.StateAcquirer(context, sharding_setup, input_queue)
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
@@ -89,10 +92,8 @@ def test_state_subscribe_input(acq, mocker):
         side_effect=[make_mock_channel_with(*states_list)]
     )
 
-    uniresis = catchup_an_uniresis(use_stub_uuid=TEST_UUID)
-
     for state, ver in states_list:
-        yield acq.subscribe_to_state_updates(unicorn, uniresis, TEST_UUID_PFX)
+        yield acq.subscribe_to_state_updates(unicorn)
 
         inp = yield acq.input_queue.get()
         acq.input_queue.task_done()
@@ -127,11 +128,9 @@ def test_state_broken_input(acq, mocker):
     acq.input_queue = mocker.Mock()
     acq.input_queue.put = mocker.Mock(return_value=make_future(0))
 
-    uniresis = catchup_an_uniresis(use_stub_uuid=TEST_UUID)
-
     cnt = 0
     for state, ver in states_list_broken:
-        yield acq.subscribe_to_state_updates(unicorn, uniresis, TEST_UUID_PFX)
+        yield acq.subscribe_to_state_updates(unicorn)
         cnt += 1
 
     assert cnt == len(states_list_broken)
