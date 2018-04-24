@@ -22,7 +22,7 @@ from .config import Config
 from .context import Context, LoggerSetup
 from .helpers import SecureServiceFabric
 from .mokak.mokak import SharedStatus, make_status_web_handler
-from .sharding import AsyncPathProvider, ShardingSetup
+from .sharding import ShardingSetup
 from .sentry import SentryClientWrapper
 from .sys_metrics import SysMetricsGatherer
 from .uniresis import catchup_an_uniresis
@@ -130,12 +130,12 @@ def main(
 
     feedback_dumper = burlak.UnicornDumper(
         context, unicorn,
-        AsyncPathProvider(sharding_setup.get_feedback_path),
+        sharding_setup.get_feedback_route,
         state_dumper_queue
     )
     metrics_dumper = burlak.UnicornDumper(
         context, unicorn,
-        AsyncPathProvider(sharding_setup.get_metrics_path),
+        sharding_setup.get_metrics_route,
         metrics_dumper_queue
     )
 

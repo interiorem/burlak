@@ -48,10 +48,6 @@ SYNC_COMPLETION_TIMEOUT_SEC = 600
 SELF_NAME = 'app/orca'  # aka 'Killer Whale'
 
 
-def make_state_path(prefix, uuid):  # pragma nocover
-    return prefix + '/' + uuid
-
-
 # TODO: Decompose!
 DispatchMessage = namedtuple('DispatchMessage', [
     'state',
@@ -70,10 +66,6 @@ StateRecord = namedtuple('StateRecord', [
     'workers',
     'profile',
 ])
-
-
-def make_unicorn_leaf_path(path, uuid):
-    return '{}/{}'.format(path, uuid)
 
 
 def build_trie(keys):
@@ -395,22 +387,14 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
         while self.should_run():
             try:
                 self.status.mark_ok('getting `state` path')
-                self.debug(
-                    'retrieving uuid from {}',
-                    self.sharding_setup.uniresis_service_name
-                )
 
-                uuid = yield self.sharding_setup.uuid()
-                if not uuid:  # pragma nocover
-                    self.error('got broken uuid')
-                    self.status.mark_warn('got empty uuid')
-                    yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
-                    continue
-
-                to_listen = yield self.sharding_setup.get_state_path()
-                if not to_listen:
-                    self.error('got broken listen path')
-                    self.status.mark_warn('got broken state listen path')
+                uuid, to_listen = yield self.sharding_setup.get_state_route()
+                if not (uuid and to_listen):
+                    self.error(
+                        'got broken state route, uuid {} path {}',
+                        uuid, to_listen
+                    )
+                    self.status.mark_warn('got broken state listen route')
                     yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
                     continue
 
@@ -431,7 +415,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
                     if state is None and version == -1:
                         self.metrics_cnt['empty_state_node'] += 1
-                        self.info('state possibly was removed')
+                        self.info('state was possibly removed')
                         yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
                         continue
 
@@ -522,7 +506,7 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
 
     def _filter(self, payload):
         '''
-        TODO: fitler out active workers state
+        TODO: filter out active workers state
         '''
         return payload
 
@@ -568,32 +552,44 @@ class UnicornSubmitter(LoggerMixin, MetricsMixin, LoopSentry):
         self._dumper_queue = dumper_queue
 
     @gen.coroutine
-    def post_state(self, ci_state):
+    def post_committed_state(self, ci_state):
+        """
+            Sends committed state to preconfigured unicorn (feedback) node,
+            if appropriate setup flag is set:
+
+                feedback:
+                  unicorn_feedback: true
+
+        """
         if not self._config.feedback.unicorn_feedback:
-            self.debug('unicorn posting is disabled')
+            self.info('unicorn feedback posting is disabled')
             return
 
-        if ci_state.is_dirty():
+        if not ci_state.flushed:
             yield self._dumper_queue.put(ci_state.as_named_dict_ext())
-            ci_state.mark_clean()
+            ci_state.mark_flushed()
         else:
             self.info('skipping submitting of clean state')
 
 
 class UnicornDumper(LoggerMixin, MetricsMixin, LoopSentry):
-    '''UnicornDumper to_write queue listener
+    """UnicornDumper to_write queue listener
 
     Listen on FIFO for paylod to write to unicorn.
 
-    '''
-    def __init__(self, ctx, unicorn, async_path_provider,
+    """
+    def __init__(self, ctx, unicorn, async_route_provider,
             dumper_queue, **kwargs):
+        """
+        TODO: seems quite ugly to provide async method as argument
+              to another class, try to refactor someday.
+        """
         super(UnicornDumper, self).__init__(ctx, **kwargs)
 
         self._context = ctx
         self._unicorn = unicorn
 
-        self._async_path_provider = async_path_provider
+        self._async_route_provider = async_route_provider
         self._dumper_queue = dumper_queue
 
         self.sentry_wrapper = ctx.sentry_wrapper
@@ -609,7 +605,7 @@ class UnicornDumper(LoggerMixin, MetricsMixin, LoopSentry):
                 payload = yield self._dumper_queue.get()
                 self._dumper_queue.task_done()
 
-                dump_to = yield self._async_path_provider()
+                _, dump_to = yield self._async_route_provider()
 
                 self.debug('writing dumper event to unicorn path {}', dump_to)
                 yield dumper.dump(dump_to, payload)
@@ -847,6 +843,12 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         control_filter = yield self.get_filter_once()
         no_state_yet = True
 
+        try:
+            self.info('initializing feedback record')
+            yield self.poster.post_committed_state(self.ci_state)
+        except Exception as e:
+            self.error('failed to init feedback record {}', e)
+
         while self.should_run():
             self.status.mark_ok('listenning on incoming queue')
 
@@ -954,7 +956,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     self.workers_distribution.clear()
                     self.workers_distribution.update(workers_count)
 
-                    self.poster.post_state(self.ci_state)
+                    yield self.poster.post_committed_state(self.ci_state)
 
             except Exception as e:
                 self.error('failed to get control message with {}', e)
@@ -1267,7 +1269,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                     stopped_by_control.clear()
 
-                    self.poster.post_state(self.ci_state)
+                    yield self.poster.post_committed_state(self.ci_state)
                     continue
 
                 #
@@ -1374,7 +1376,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 self.metrics_cnt['state_updates'] += 1
                 self.metrics_cnt['ch_cache_size'] += len(channels_cache)
 
-                self.poster.post_state(self.ci_state)
+                yield self.poster.post_committed_state(self.ci_state)
 
                 self.info('state updated')
             except Exception as e:  # pragma nocover
