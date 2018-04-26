@@ -13,7 +13,7 @@ class Defaults(object):
     PENDING_STOP_DESCRIPTION = 'pending stop'
     FAILED_DESCRIPTION = 'unknown, study logs'
 
-    INIT_STATE_VERSION = 0
+    INIT_STATE_VERSION = -1
 
 
 class CommittedState(object):
@@ -57,6 +57,10 @@ class CommittedState(object):
         self.updated_timestamp = 0
 
         self.ch_apps = list()
+        # On startup state should be marked as not flushed in order to run
+        # unicorn feedback node creation with empty state to inform scheduler
+        # that node is online via feedback.
+        self._flushed = False
 
     def as_dict(self):
         return self.state
@@ -78,10 +82,21 @@ class CommittedState(object):
     def reset(self):
         self.reset_output_state()
         self.in_state = CommittedState.IncomingState(dict(), -1, 0)
+        self.mark_dirty()
 
     def clear(self):  # pragma nocover
         '''Alias for reset'''
         self.reset()
+
+    @property
+    def flushed(self):
+        return self._flushed
+
+    def mark_flushed(self):
+        self._flushed = True
+
+    def mark_dirty(self):
+        self._flushed = False
 
     def mark_running(self, app, workers, profile, state_version, tm):
         self.state.update(
@@ -94,6 +109,8 @@ class CommittedState(object):
                     Defaults.SUCCESS_DESCRIPTION,
                     int(tm))
             })
+
+        self.mark_dirty()
 
     def mark_failed(self, app, profile, state_version, tm, reason=None):
         if reason is None:
@@ -109,6 +126,9 @@ class CommittedState(object):
                     reason,
                     int(tm))
             })
+
+        self.mark_dirty()
+
 
     def mark_stopped(self, app, state_version, tm):
         _, workers, profile, _, description, _ = self.state.get(
@@ -133,6 +153,8 @@ class CommittedState(object):
                     description,
                     int(tm)),
             })
+
+        self.mark_dirty()
 
     def remove_old_stopped(self, expire_span):
         self.remove_old_records(expire_span, ('STOPPED',))

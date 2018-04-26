@@ -22,6 +22,7 @@ from .config import Config
 from .context import Context, LoggerSetup
 from .helpers import SecureServiceFabric
 from .mokak.mokak import SharedStatus, make_status_web_handler
+from .sharding import ShardingSetup
 from .sentry import SentryClientWrapper
 from .sys_metrics import SysMetricsGatherer
 from .uniresis import catchup_an_uniresis
@@ -103,12 +104,14 @@ def main(
     if not apps_poll_interval:
         apps_poll_interval = config.apps_poll_interval_sec
 
+    sharding_setup = ShardingSetup(context, uniresis)
+
     control_filter = burlak.ControlFilterListener(
         context, unicorn,
         filter_queue, input_queue
     )
 
-    acquirer = burlak.StateAcquirer(context, input_queue)
+    acquirer = burlak.StateAcquirer(context, sharding_setup, input_queue)
     workers_distribution = dict()
     state_processor = burlak.StateAggregator(
         context,
@@ -125,13 +128,16 @@ def main(
     if not uuid_prefix:
         uuid_prefix = config.uuid_path
 
-    feedback_path = config.feedback_config.unicorn_path
-    metrics_path = config.metrics_confg.path
-
-    state_dumper = burlak.UnicornDumper(
-        context, uniresis, unicorn, feedback_path, state_dumper_queue)
+    feedback_dumper = burlak.UnicornDumper(
+        context, unicorn,
+        sharding_setup.get_feedback_route,
+        state_dumper_queue
+    )
     metrics_dumper = burlak.UnicornDumper(
-        context, uniresis, unicorn, metrics_path, metrics_dumper_queue)
+        context, unicorn,
+        sharding_setup.get_metrics_route,
+        metrics_dumper_queue
+    )
 
     # run async poll tasks in date flow reverse order, from sink to source
     io_loop = IOLoop.current()
@@ -140,11 +146,10 @@ def main(
     io_loop.spawn_callback(apps_elysium.blessing_road)
     io_loop.spawn_callback(state_processor.process_loop)
 
-    io_loop.spawn_callback(state_dumper.listen_for_events)
+    io_loop.spawn_callback(feedback_dumper.listen_for_events)
     io_loop.spawn_callback(metrics_dumper.listen_for_events)
     io_loop.spawn_callback(
-        lambda: acquirer.subscribe_to_state_updates(
-            unicorn, uniresis, uuid_prefix))
+        lambda: acquirer.subscribe_to_state_updates(unicorn))
 
     qs = dict(input=input_queue, control=control_queue)
     units = dict(
