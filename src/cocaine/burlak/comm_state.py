@@ -11,6 +11,8 @@ class Defaults(object):
     SUCCESS_DESCRIPTION = 'success'
     STOPPED_DESCRIPTION = 'stopped'
     PENDING_STOP_DESCRIPTION = 'pending stop'
+    PENDING_START_DESCRIPTION = 'pending start'
+
     FAILED_DESCRIPTION = 'unknown, study logs'
 
     INIT_STATE_VERSION = -1
@@ -129,6 +131,19 @@ class CommittedState(object):
 
         self.mark_dirty()
 
+    def mark_pending_start(self, app, workers, profile, state_version, tm):
+        self.state.update(
+            {
+                app: CommittedState.Record(
+                    'SPOOLING',
+                    workers,
+                    profile,
+                    state_version,
+                    Defaults.PENDING_START_DESCRIPTION,
+                    int(tm)),
+            })
+
+        self.mark_dirty()
 
     def mark_stopped(self, app, state_version, tm):
         _, workers, profile, _, description, _ = self.state.get(
