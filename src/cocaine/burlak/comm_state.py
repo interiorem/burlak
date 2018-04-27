@@ -4,6 +4,13 @@ from collections import namedtuple
 from .control_filter import ControlFilter
 
 
+class States(object):
+    STOPPED = 'STOPPED'
+    SPOOLING = 'SPOOLING'
+    STARTED = 'STARTED'
+    FAILED = 'FAILED'
+
+
 class Defaults(object):
 
     NA_PROFILE_LABEL = 'n/a'
@@ -104,7 +111,7 @@ class CommittedState(object):
         self.state.update(
             {
                 app: CommittedState.Record(
-                    'STARTED',
+                    States.STARTED,
                     workers,
                     profile,
                     state_version,
@@ -121,7 +128,7 @@ class CommittedState(object):
         self.state.update(
             {
                 app: CommittedState.Record(
-                    'FAILED',
+                    States.FAILED,
                     0,
                     profile,
                     state_version,
@@ -135,7 +142,7 @@ class CommittedState(object):
         self.state.update(
             {
                 app: CommittedState.Record(
-                    'SPOOLING',
+                    States.SPOOLING,
                     workers,
                     profile,
                     state_version,
@@ -161,7 +168,7 @@ class CommittedState(object):
         self.state.update(
             {
                 app: CommittedState.Record(
-                    'STOPPED',
+                    States.STOPPED,
                     workers,
                     profile,
                     state_version,
