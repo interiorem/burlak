@@ -153,7 +153,7 @@ def test_extra1(config, status_web_path, status_port):
     'config,apps_poll_interval_sec,input_queue_size',
     [
         ('tests/assets/conf1.yaml', 100500, 1024),
-        ('tests/assets/conf2.yaml', 60, 42),
+        ('tests/assets/conf2.yaml', Defaults.APPS_POLL_INTERVAL_SEC, 42),
     ]
 )
 def test_extra2(config, apps_poll_interval_sec, input_queue_size):

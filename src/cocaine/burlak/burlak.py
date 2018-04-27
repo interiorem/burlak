@@ -45,6 +45,8 @@ DEFAULT_RETRY_EXP_BASE_SEC = 4
 
 SYNC_COMPLETION_TIMEOUT_SEC = 600
 
+INVALID_STATE_ERR_CODE = 6
+
 SELF_NAME = 'app/orca'  # aka 'Killer Whale'
 
 
@@ -1012,6 +1014,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
                 self.metrics_cnt['to_run_commands'] += len(to_run)
                 self.metrics_cnt['to_stop_commands'] += len(to_stop)
+            else:
+                self.debug('dispatch step was skipped')
 
 
 class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
@@ -1152,12 +1156,30 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         control_method = self.control_with_ack \
             if self.context.config.control_with_ack else self.control
 
+        def is_spooling_state(e):
+            """Simple guess for now, should use exception error code and
+            category to distinguish among different possible state.
+
+                TODO: check for category
+            """
+            return \
+                isinstance(e, ServiceError) and \
+                e.code == INVALID_STATE_ERR_CODE
+
         attempts = CONTROL_RETRY_ATTEMPTS
         while attempts:
             try:
                 ch = yield channels_cache.get_ch(app)
                 yield control_method(ch, to_adjust)
             except Exception as e:
+                if is_spooling_state(e):
+                    self.warn(
+                        'seems that app {} is in spooling state: {}', app, e)
+                    self.ci_state.mark_pending_start(
+                        app, to_adjust, profile, state_version, tm)
+                    yield channels_cache.close_and_remove([app])
+                    break
+
                 attempts -= 1
 
                 error_message = \
