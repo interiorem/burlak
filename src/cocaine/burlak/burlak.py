@@ -395,6 +395,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                             # reset feedback and send control(0) to all
                             # possessed apps.
                             last_state = None
+                            self.debug('state record was actually removed')
                             yield self.input_queue.put(NoStateNodeMessage())
 
                         yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
