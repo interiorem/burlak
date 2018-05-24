@@ -1,3 +1,10 @@
+cocaine-orca (0.1.36) unstable; urgency=medium
+
+  * Reset feedback state only on node uuid update,
+    not on unicorn flaps.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Thu, 24 May 2018 13:55:11 +0300
+
 cocaine-orca (0.1.35) unstable; urgency=medium
 
   * Report 'spooling' as valid state.
