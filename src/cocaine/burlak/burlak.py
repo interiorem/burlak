@@ -328,6 +328,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
     }
 
     VersionedState = namedtuple('VersionedState', [
+        'uuid',
         'state',
         'version'
     ])
@@ -381,7 +382,13 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     if state is None and version == -1:
                         self.metrics_cnt['empty_state_node'] += 1
                         self.info('state was possibly removed')
+
+                        if last_state:
+                            last_state = None
+                            yield self.input_queue.put(NoStateNodeMessage())
+
                         yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
+
                         continue
 
                     if not isinstance(state, dict):  # pragma nocover
@@ -392,7 +399,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                         )
 
                     current_state = \
-                        StateAcquirer.VersionedState(state, version)
+                        StateAcquirer.VersionedState(uuid, state, version)
 
                     if current_state == last_state:
                         self.info(
@@ -400,6 +407,12 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                             version
                         )
                         continue
+
+                    if last_state and last_state.uuid != current_state.uuid:
+                        # It was some uuid already, but new one has came,
+                        # reset feedback state.
+                        self.debug('runtime uuid has been changed')
+                        yield self.input_queue.put(ResetStateMessage())
 
                     last_state = current_state
 
@@ -437,24 +450,13 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                 self.metrics_cnt['state_timeout_error'] += 1
                 self.debug('state subscription expired {}', e)
             except Exception as e:  # pragma nocover
-                to_send = StateAcquirer.select_reset_message(e)
-                yield self.input_queue.put(to_send)
-
                 self.status.mark_warn('state not ready')
                 self.error('failed to get state, exception: "{}"', e)
 
-                last_state = None
                 yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
             finally:  # pragma nocover
                 # TODO: Is it really needed?
                 yield close_tx_safe(ch)
-
-    @staticmethod
-    def select_reset_message(error):
-        if isinstance(error, ServiceError):
-            return NoStateNodeMessage()
-        else:
-            return ResetStateMessage()
 
 
 class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
