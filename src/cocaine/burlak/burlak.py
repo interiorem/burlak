@@ -364,6 +364,13 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     yield gen.sleep(DEFAULT_RETRY_TIMEOUT_SEC)
                     continue
 
+                if last_state and last_state.uuid != uuid:
+                    # It was some uuid already, but new one has came,
+                    # reset feedback state.
+                    last_state = None
+                    self.debug('runtime uuid has been changed')
+                    yield self.input_queue.put(ResetStateMessage())
+
                 self.status.mark_ok('subscribing for state')
                 self.info('subscribing for path {}', to_listen)
 
@@ -383,7 +390,10 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                         self.metrics_cnt['empty_state_node'] += 1
                         self.info('state was possibly removed')
 
-                        if last_state:
+                        if last_state and last_state.uuid == uuid:
+                            # The same uuid, but state node has gone,
+                            # reset feedback and send control(0) to all
+                            # possessed apps.
                             last_state = None
                             yield self.input_queue.put(NoStateNodeMessage())
 
@@ -407,12 +417,6 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                             version
                         )
                         continue
-
-                    if last_state and last_state.uuid != current_state.uuid:
-                        # It was some uuid already, but new one has came,
-                        # reset feedback state.
-                        self.debug('runtime uuid has been changed')
-                        yield self.input_queue.put(ResetStateMessage())
 
                     last_state = current_state
 
