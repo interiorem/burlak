@@ -92,8 +92,17 @@ def test_state_subscribe_input(acq, mocker):
         side_effect=[make_mock_channel_with(*states_list)]
     )
 
+    init_state = True  # `uuid` first message
     for state, ver in states_list:
         yield acq.subscribe_to_state_updates(unicorn)
+
+        if init_state:
+            inp = yield acq.input_queue.get()
+            acq.input_queue.task_done()
+
+            assert isinstance(inp, burlak.DumpCommittedState)
+
+            init_state = False
 
         inp = yield acq.input_queue.get()
         acq.input_queue.task_done()

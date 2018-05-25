@@ -218,5 +218,6 @@ def test_app_poll(disp, mocker):
     yield disp.process_loop()
 
     assert disp.workers_diff.call_count == len(running_apps)
+
     for d in running_apps:
         assert disp.workers_diff.called_with(dict(), d)
