@@ -140,10 +140,6 @@ def transmute_and_filter_state(input_state):
     }
 
 
-class NoStateNodeMessage(object):
-    pass
-
-
 class StateUpdateMessage(object):
     def __init__(self, state, version, uuid):
         self._state = transmute_and_filter_state(state)
@@ -172,6 +168,14 @@ class ControlFilterMessage(object):
 
 
 class ResetStateMessage(object):
+    pass
+
+
+class NoStateNodeMessage(object):
+    pass
+
+
+class DumpCommittedState(object):
     pass
 
 
@@ -330,7 +334,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
     VersionedState = namedtuple('VersionedState', [
         'uuid',
         'state',
-        'version'
+        'version',
     ])
 
     def __init__(
@@ -370,6 +374,11 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     last_state = None
                     self.debug('runtime uuid has been changed')
                     yield self.input_queue.put(ResetStateMessage())
+
+                if last_state is None or last_state.uuid != uuid:
+                    # new uuid, recreate feedback node in unicorn
+                    self.debug('signal to dump feedback')
+                    yield self.input_queue.put(DumpCommittedState())
 
                 self.status.mark_ok('subscribing for state')
                 self.info('subscribing for path {}', to_listen)
@@ -675,9 +684,9 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def get_info(self, app, flag=0x01):  # 0x01: collect overseer info
-        '''
+        """
             TODO: make wrapper for retries
-        '''
+        """
         info = dict()
 
         attempts = DEFAULT_RETRY_ATTEMPTS
@@ -805,6 +814,13 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         self.workers_distribution.clear()
 
     @gen.coroutine
+    def dump_feedback_guarded(self):
+        try:
+            yield self.poster.post_committed_state(self.ci_state)
+        except Exception as e:
+            self.error('failed to dump feedback record {}', e)
+
+    @gen.coroutine
     def process_loop(self):
         running_apps = set()
         state, prev_state, real_state, state_version = (
@@ -815,11 +831,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         control_filter = yield self.get_filter_once()
         no_state_yet = True
 
-        try:
-            self.info('initializing feedback record')
-            yield self.poster.post_committed_state(self.ci_state)
-        except Exception as e:
-            self.error('failed to init feedback record {}', e)
+        self.info('initializing feedback record')
+        yield self.dump_feedback_guarded()
 
         while self.should_run():
             self.status.mark_ok('listenning on incoming queue')
@@ -830,8 +843,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             # Note that uuid is used to determinate was it
             # any incoming state.
             uuid, msg = None, None
-            workers_mismatch, stop_again = \
-                [set() for _ in xrange(2)]
+            workers_mismatch, stop_again = set(), set()
 
             try:
                 msg = yield self.input_queue.get(
@@ -880,6 +892,12 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 elif isinstance(msg, NoStateNodeMessage):
                     self.reset_state(state, real_state)
                     self.info('seems that there is no state node')
+                elif isinstance(msg, DumpCommittedState):
+                    self.debug('dumping committed state')
+                    self.ci_state.mark_dirty()
+                    yield self.dump_feedback_guarded()
+                    # nothing to do here, skipping next steps.
+                    continue
                 elif isinstance(msg, ControlFilterMessage):
                     control_filter = \
                         self.update_control_filter(msg.control_filter)
