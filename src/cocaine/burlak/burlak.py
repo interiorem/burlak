@@ -498,7 +498,7 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
         '''
         TODO: filter out active workers state
         '''
-        return paylod
+        return payload
 
     @gen.coroutine
     def _fetch_and_upload(self):
@@ -515,7 +515,7 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
         elapsed = time.time() - now
 
         # TODO: update internal metrics
-        self.debug('fetching and updating workers stat took {}s', elapsed)
+        self.debug('fetching and updating workers stat took {:.3f}s', elapsed)
 
     @gen.coroutine
     def poll_stats(self):
@@ -644,7 +644,6 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         self.workers_distribution = workers_distribution
 
         self.status = context.shared_status.register(StateAggregator.TASK_NAME)
-
 
     def make_prof_update_set(self, prev_state, state):
         to_update = []
@@ -985,7 +984,13 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             to_stop = running_apps - update_state_apps_set
 
             if is_state_updated:  # check for profiles change
-                to_update = self.make_prof_update_set(prev_state, state)
+                #
+                # TODO: temporary disabled, should have more flexibel schema of
+                #       profile update in future.
+                #
+                # to_update = self.make_prof_update_set(prev_state, state)
+                #
+                to_update = set()
 
                 to_run.update(to_update)
                 to_stop.update(to_update)

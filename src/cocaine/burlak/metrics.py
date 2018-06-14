@@ -1,4 +1,4 @@
-from cocaine import gen
+from tornado import gen
 
 class BaseMetrics(object):
     """Basic workers metrics provider
