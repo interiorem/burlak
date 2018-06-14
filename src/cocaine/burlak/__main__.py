@@ -22,6 +22,7 @@ from .config import Config
 from .context import Context, LoggerSetup
 from .helpers import SecureServiceFabric
 from .mokak.mokak import SharedStatus, make_status_web_handler
+from .metrics import BaseMetrics
 from .sharding import ShardingSetup
 from .sentry import SentryClientWrapper
 from .sys_metrics import SysMetricsGatherer
@@ -133,11 +134,19 @@ def main(
         sharding_setup.get_feedback_route,
         state_dumper_queue
     )
-    metrics_dumper = burlak.UnicornDumper(
-        context, unicorn,
-        sharding_setup.get_metrics_route,
-        metrics_dumper_queue
-    )
+
+    metrics_fetcher = burlak.MetricsFetcher(
+        context, BaseMetrics(config.metrics_name), input_queue)
+
+    #
+    # TODO: deprecated
+    #
+    # metrics_dumper = burlak.UnicornDumper(
+    #     context, unicorn,
+    #     sharding_setup.get_metrics_route,
+    #     metrics_dumper_queue
+    # )
+    #
 
     # run async poll tasks in date flow reverse order, from sink to source
     io_loop = IOLoop.current()
@@ -146,8 +155,13 @@ def main(
     io_loop.spawn_callback(apps_elysium.blessing_road)
     io_loop.spawn_callback(state_processor.process_loop)
 
+    #
+    # TODO: deprecated
+    #
+    # io_loop.spawn_callback(metrics_dumper.listen_for_events)
+
+    io_loop.spawn_callback(metrics_fetcher.poll_stats)
     io_loop.spawn_callback(feedback_dumper.listen_for_events)
-    io_loop.spawn_callback(metrics_dumper.listen_for_events)
     io_loop.spawn_callback(
         lambda: acquirer.subscribe_to_state_updates(unicorn))
 

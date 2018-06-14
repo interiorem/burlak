@@ -179,6 +179,15 @@ class DumpCommittedState(object):
     pass
 
 
+class MetricsMessage(object):
+    def __init__(self, metrics):
+        self._metrics = metrics
+
+    @property
+    def metrics(self):
+        return self._metrics
+
+
 class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
 
     TASK_NAME = 'control_list_listener'
@@ -477,12 +486,12 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
     '''
     TODO: WIP, not yet implemented, nor tested
     '''
-    def __init__(self, context, source, feedback_queue, **kwargs):
+    def __init__(self, context, source, input_queue, **kwargs):
         super(MetricsFetcher, self).__init__(context, **kwargs)
 
         self._config = context.config
         self._source = source
-        self._feedback_queue = feedback_queue
+        self._input_queue = input_queue
         self.sentry_wrapper = context.sentry_wrapper
 
     def _filter(self, payload):
@@ -493,24 +502,30 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def _fetch_and_upload(self):
+        if not self._config.metrics.enabled:
+            return
+
         now = time.time()
+
         payload = yield self._source.fetch({})
         payload = self._filter(payload)
 
-        elapsed = time.time() - now
-        self.debug('fetching and updating workers stat took {}s', elapsed)
+        yield self._input_queue.put(MetricsMessage(payload))
 
-        yield self._feedback_queue.put(payload)
+        elapsed = time.time() - now
+
+        # TODO: update internal metrics
+        self.debug('fetching and updating workers stat took {:.3f}s', elapsed)
 
     @gen.coroutine
-    def gain_stats(self):
+    def poll_stats(self):
         while self.should_run():
             try:
+                self.debug('metrics poll iteration')
+
+                yield self._fetch_and_upload()
+
                 to_sleep = self._config.metrics.poll_interval_sec
-
-                if self._config.metrics.enabled:
-                    yield self._fetch_and_upload()
-
                 yield gen.sleep(to_sleep)
             except Exception as e:
                 self.error('failed to fetch runtime workers stat {}', e)
@@ -629,7 +644,6 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         self.workers_distribution = workers_distribution
 
         self.status = context.shared_status.register(StateAggregator.TASK_NAME)
-
 
     def make_prof_update_set(self, prev_state, state):
         to_update = []
@@ -898,6 +912,10 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     yield self.dump_feedback_guarded()
                     # nothing to do here, skipping next steps.
                     continue
+                elif isinstance(msg, MetricsMessage):
+                    self.ci_state.metrics = msg.metrics
+                    yield self.dump_feedback_guarded()
+                    continue
                 elif isinstance(msg, ControlFilterMessage):
                     control_filter = \
                         self.update_control_filter(msg.control_filter)
@@ -966,7 +984,13 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             to_stop = running_apps - update_state_apps_set
 
             if is_state_updated:  # check for profiles change
-                to_update = self.make_prof_update_set(prev_state, state)
+                #
+                # TODO: temporary disabled, should have more flexibel schema of
+                #       profile update in future.
+                #
+                # to_update = self.make_prof_update_set(prev_state, state)
+                #
+                to_update = set()
 
                 to_run.update(to_update)
                 to_stop.update(to_update)

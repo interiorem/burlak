@@ -71,6 +71,8 @@ class CommittedState(object):
         # that node is online via feedback.
         self._flushed = False
 
+        self._metrics = dict()
+
     def as_dict(self):
         return self.state
 
@@ -80,6 +82,7 @@ class CommittedState(object):
     def as_named_dict_ext(self):
         return dict(
             state = self.as_named_dict(),
+            metrics = self.metrics,
             timestamp = self.updated_at,
             version = self.version,
         )
@@ -250,6 +253,16 @@ class CommittedState(object):
     def channels_cache_apps(self):
         return self.ch_apps
 
+    @property
+    def metrics(self):
+        return self._metrics
+
+    @metrics.setter
+    def metrics(self, metrics):
+        self._metrics = metrics
+        self.updated_at = time.time()
+        self.mark_dirty()
+
     @channels_cache_apps.setter
     def channels_cache_apps(self, ch_apps):
         self.ch_apps = ch_apps
@@ -286,6 +299,8 @@ class CommittedState(object):
                     int(tm))
             }
         )
+
+        self.mark_dirty()
 
     def running_apps_count(self):
         return sum(

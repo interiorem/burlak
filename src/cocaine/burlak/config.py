@@ -47,7 +47,7 @@ def make_metrics_config(d):
         'poll_interval_sec', Defaults.METRICS_POLL_INTERVAL_SEC)
     query = d.get('query', {})
 
-    enabled = True if d else False
+    enabled = d.get('enabled', False)
     return MetricsConfig(path, poll_interval_sec, query, enabled)
 
 
@@ -87,6 +87,7 @@ def make_sharding_config(d):
     state_subnode = d.get('state_subnode', Defaults.SHARDING_STATE_SUBNODE)
     feedback_subnode = d.get(
         'feed_subnode', Defaults.SHARDING_FEEDBACK_SUBNODE)
+    # TODO: probably deprecated
     metrics_subnode = d.get(
         'metrics_subnode', Defaults.SHARDING_METRICS_SUBNODE)
 
@@ -156,6 +157,10 @@ class Config(object):
             'required': False,
         },
         'node_service_name': {
+            'type': 'string',
+            'required': False,
+        },
+        'metrics_service_name': {
             'type': 'string',
             'required': False,
         },
@@ -402,6 +407,11 @@ class Config(object):
     def unicorn_name(self):
         return self._config.get(
             'unicorn_service_name', Defaults.UNICORN_SERVICE_NAME)
+
+    @property
+    def metrics_name(self):
+        return self._config.get(
+            'metrics_service_name', Defaults.METRICS_SERVICE_NAME)
 
     @property
     def default_profile(self):

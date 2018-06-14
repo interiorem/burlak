@@ -18,10 +18,11 @@ class Defaults(object):
     DISCOVERY_UPDATE_INTERVAL_SEC = 3600
 
     METRICS_PATH = '/darkvoice/metrics'
-    METRICS_POLL_INTERVAL_SEC = 5
+    METRICS_POLL_INTERVAL_SEC = 10
 
     NODE_SERVICE_NAME = 'node'
     UNICORN_SERVICE_NAME = 'unicorn'
+    METRICS_SERVICE_NAME = 'metrics'
 
     PROFILE_NAME = 'default'
 
@@ -62,4 +63,6 @@ class Defaults(object):
 
     SHARDING_FEEDBACK_SUBNODE = 'feedback'
     SHARDING_STATE_SUBNODE = 'state'
+
+    # TODO: probably unused
     SHARDING_METRICS_SUBNODE = 'metrics'
