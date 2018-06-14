@@ -179,6 +179,15 @@ class DumpCommittedState(object):
     pass
 
 
+class MetricsMessage(object):
+    def __init__(self, metrics):
+        self._metrics = metrics
+
+    @property
+    def metrics(self):
+        return self._metrics
+
+
 class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
 
     TASK_NAME = 'control_list_listener'
@@ -477,40 +486,46 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
     '''
     TODO: WIP, not yet implemented, nor tested
     '''
-    def __init__(self, context, source, feedback_queue, **kwargs):
+    def __init__(self, context, source, input_queue, **kwargs):
         super(MetricsFetcher, self).__init__(context, **kwargs)
 
         self._config = context.config
         self._source = source
-        self._feedback_queue = feedback_queue
+        self._input_queue = input_queue
         self.sentry_wrapper = context.sentry_wrapper
 
     def _filter(self, payload):
         '''
         TODO: filter out active workers state
         '''
-        return payload
+        return paylod
 
     @gen.coroutine
     def _fetch_and_upload(self):
+        if not self._config.metrics.enabled:
+            return
+
         now = time.time()
+
         payload = yield self._source.fetch({})
         payload = self._filter(payload)
 
+        yield self._input_queue.put(MetricsMessage(payload))
+
         elapsed = time.time() - now
+
+        # TODO: update internal metrics
         self.debug('fetching and updating workers stat took {}s', elapsed)
 
-        yield self._feedback_queue.put(payload)
-
     @gen.coroutine
-    def gain_stats(self):
+    def poll_stats(self):
         while self.should_run():
             try:
+                self.debug('metrics poll iteration')
+
+                yield self._fetch_and_upload()
+
                 to_sleep = self._config.metrics.poll_interval_sec
-
-                if self._config.metrics.enabled:
-                    yield self._fetch_and_upload()
-
                 yield gen.sleep(to_sleep)
             except Exception as e:
                 self.error('failed to fetch runtime workers stat {}', e)
@@ -897,6 +912,10 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     self.ci_state.mark_dirty()
                     yield self.dump_feedback_guarded()
                     # nothing to do here, skipping next steps.
+                    continue
+                elif isinstance(msg, MetricsMessage):
+                    self.ci_state.metrics = msg.metrics
+                    yield self.dump_feedback_guarded()
                     continue
                 elif isinstance(msg, ControlFilterMessage):
                     control_filter = \
