@@ -8,8 +8,7 @@ try:
     pp = pprint.PrettyPrinter(indent=2)
     line = sys.stdin.read()
     try:
-        data = msgpack.unpackb(line)
-        pp.pprint(data)
+        pp.pprint(msgpack.unpackb(line))
     except (
         TypeError, ValueError, msgpack.exceptions.UnpackValueError,
         msgpack.exceptions.ExtraData):
