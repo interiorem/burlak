@@ -486,12 +486,15 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
     '''
     TODO: WIP, not yet implemented, nor tested
     '''
-    def __init__(self, context, source, input_queue, **kwargs):
+    def __init__(self, context, source, committed_state, state_dumper_queue,
+                    **kwargs):
         super(MetricsFetcher, self).__init__(context, **kwargs)
 
         self._config = context.config
         self._source = source
-        self._input_queue = input_queue
+        self._ci_state = committed_state
+        self._poster = UnicornSubmitter(context, state_dumper_queue)
+
         self.sentry_wrapper = context.sentry_wrapper
 
     def _filter(self, payload):
@@ -508,9 +511,8 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
         now = time.time()
 
         payload = yield self._source.fetch({})
-        payload = self._filter(payload)
-
-        yield self._input_queue.put(MetricsMessage(payload))
+        self._ci_state.metrics = self._filter(payload)
+        self._poster.post_committed_state(self._ci_state)
 
         elapsed = time.time() - now
 
@@ -521,16 +523,14 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
     def poll_stats(self):
         while self.should_run():
             try:
+                to_sleep = self._config.metrics.poll_interval_sec
+                yield gen.sleep(to_sleep)
+
                 self.debug('metrics poll iteration')
 
                 yield self._fetch_and_upload()
-
-                to_sleep = self._config.metrics.poll_interval_sec
-                yield gen.sleep(to_sleep)
             except Exception as e:
                 self.error('failed to fetch runtime workers stat {}', e)
-                self.sentry_wrapper.capture_exception()
-
                 yield gen.sleep(self._config.async_error_timeout_sec)
 
 
@@ -845,9 +845,6 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         control_filter = yield self.get_filter_once()
         no_state_yet = True
 
-        self.info('initializing feedback record')
-        yield self.dump_feedback_guarded()
-
         while self.should_run():
             self.status.mark_ok('listenning on incoming queue')
 
@@ -911,10 +908,6 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     self.ci_state.mark_dirty()
                     yield self.dump_feedback_guarded()
                     # nothing to do here, skipping next steps.
-                    continue
-                elif isinstance(msg, MetricsMessage):
-                    self.ci_state.metrics = msg.metrics
-                    yield self.dump_feedback_guarded()
                     continue
                 elif isinstance(msg, ControlFilterMessage):
                     control_filter = \

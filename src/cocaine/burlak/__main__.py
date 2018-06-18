@@ -79,7 +79,6 @@ def main(
     control_queue = queues.Queue()
 
     state_dumper_queue = queues.Queue()
-    metrics_dumper_queue = queues.Queue()
 
     logger = Logger(config.locator_endpoints)
 
@@ -136,17 +135,9 @@ def main(
     )
 
     metrics_fetcher = burlak.MetricsFetcher(
-        context, BaseMetrics(config.metrics_name), input_queue)
-
-    #
-    # TODO: deprecated
-    #
-    # metrics_dumper = burlak.UnicornDumper(
-    #     context, unicorn,
-    #     sharding_setup.get_metrics_route,
-    #     metrics_dumper_queue
-    # )
-    #
+        context, BaseMetrics(config.metrics_name),
+        committed_state, state_dumper_queue
+    )
 
     # run async poll tasks in date flow reverse order, from sink to source
     io_loop = IOLoop.current()
