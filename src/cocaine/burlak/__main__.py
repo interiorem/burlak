@@ -79,7 +79,6 @@ def main(
     control_queue = queues.Queue()
 
     state_dumper_queue = queues.Queue()
-    metrics_dumper_queue = queues.Queue()
 
     logger = Logger(config.locator_endpoints)
 
@@ -112,41 +111,31 @@ def main(
         filter_queue, input_queue
     )
 
+    feedback_submitter = burlak.FeedbackSubmitter(
+        context, committed_state, unicorn, sharding_setup.get_feedback_route)
+
     acquirer = burlak.StateAcquirer(context, sharding_setup, input_queue)
     workers_distribution = dict()
     state_processor = burlak.StateAggregator(
         context,
         node,
         committed_state,
-        filter_queue, input_queue, control_queue, state_dumper_queue,
+        filter_queue, input_queue, control_queue,
+        feedback_submitter,
         apps_poll_interval,
         workers_distribution,
     )
 
     apps_elysium = burlak.AppsElysium(
-        context, committed_state, node, control_queue, state_dumper_queue)
+        context, committed_state, node, control_queue, feedback_submitter)
 
     if not uuid_prefix:
         uuid_prefix = config.uuid_path
 
-    feedback_dumper = burlak.UnicornDumper(
-        context, unicorn,
-        sharding_setup.get_feedback_route,
-        state_dumper_queue
-    )
-
     metrics_fetcher = burlak.MetricsFetcher(
-        context, BaseMetrics(config.metrics_name), input_queue)
-
-    #
-    # TODO: deprecated
-    #
-    # metrics_dumper = burlak.UnicornDumper(
-    #     context, unicorn,
-    #     sharding_setup.get_metrics_route,
-    #     metrics_dumper_queue
-    # )
-    #
+        context, BaseMetrics(config.metrics_name),
+        committed_state, feedback_submitter
+    )
 
     # run async poll tasks in date flow reverse order, from sink to source
     io_loop = IOLoop.current()
@@ -155,13 +144,8 @@ def main(
     io_loop.spawn_callback(apps_elysium.blessing_road)
     io_loop.spawn_callback(state_processor.process_loop)
 
-    #
-    # TODO: deprecated
-    #
-    # io_loop.spawn_callback(metrics_dumper.listen_for_events)
-
     io_loop.spawn_callback(metrics_fetcher.poll_stats)
-    io_loop.spawn_callback(feedback_dumper.listen_for_events)
+    io_loop.spawn_callback(feedback_submitter.listen_for_committed_state)
     io_loop.spawn_callback(
         lambda: acquirer.subscribe_to_state_updates(unicorn))
 

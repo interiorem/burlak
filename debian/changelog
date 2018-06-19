@@ -1,3 +1,13 @@
+cocaine-orca (0.1.40) unstable; urgency=medium
+
+  * Main loop refactoring: remove redundant state dump on
+    init and move metrics dump to separate coroutine.
+  * Merge functionality of UnicornDumper and UnicornSubmitter into
+    FeedbackSubmitter, and get rid of Dumper queue (using conditional
+    instead).
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Mon, 18 Jun 2018 14:10:15 +0300
+
 cocaine-orca (0.1.39) unstable; urgency=medium
 
   * Basic workers stat gatherer with publishing via unicorn.

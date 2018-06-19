@@ -65,6 +65,11 @@ def elysium(mocker):
         )
     )
 
+    submitter = mocker.Mock()
+    submitter.post_committed_state = mocker.Mock(
+        return_value=make_mock_channel_with(0)
+    )
+
     return burlak.AppsElysium(
         Context(
             LoggerSetup(make_logger_mock(mocker), False),
@@ -75,7 +80,9 @@ def elysium(mocker):
         ),
         CommittedState(),
         node,
-        queues.Queue(), queues.Queue())
+        queues.Queue(),
+        submitter
+    )
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
