@@ -24,6 +24,7 @@ from cerberus import Validator
 import six
 
 from tornado import gen
+from tornado import locks
 
 from .chcache import ChannelsCache, close_tx_safe
 # Config imported for filter schema
@@ -177,15 +178,6 @@ class NoStateNodeMessage(object):
 
 class DumpCommittedState(object):
     pass
-
-
-class MetricsMessage(object):
-    def __init__(self, metrics):
-        self._metrics = metrics
-
-    @property
-    def metrics(self):
-        return self._metrics
 
 
 class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
@@ -486,14 +478,13 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
     '''
     TODO: WIP, not yet implemented, nor tested
     '''
-    def __init__(self, context, source, committed_state, state_dumper_queue,
-                    **kwargs):
+    def __init__(self, context, source, committed_state, submitter, **kwargs):
         super(MetricsFetcher, self).__init__(context, **kwargs)
 
         self._config = context.config
         self._source = source
         self._ci_state = committed_state
-        self._poster = UnicornSubmitter(context, state_dumper_queue)
+        self._submitter = submitter
 
         self.sentry_wrapper = context.sentry_wrapper
 
@@ -512,7 +503,8 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
 
         payload = yield self._source.fetch({})
         self._ci_state.metrics = self._filter(payload)
-        self._poster.post_committed_state(self._ci_state)
+
+        yield self._submitter.post_committed_state()
 
         elapsed = time.time() - now
 
@@ -525,33 +517,34 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
             try:
                 to_sleep = self._config.metrics.poll_interval_sec
                 yield gen.sleep(to_sleep)
-
-                self.debug('metrics poll iteration')
-
                 yield self._fetch_and_upload()
             except Exception as e:
                 self.error('failed to fetch runtime workers stat {}', e)
                 yield gen.sleep(self._config.async_error_timeout_sec)
 
 
-class UnicornSubmitter(LoggerMixin, MetricsMixin, LoopSentry):
-    '''UnicornSubmitter wrapper over unicorn queue put operation.
+class FeedbackSubmitter(LoggerMixin, MetricsMixin, LoopSentry):
+    """Wrapper over unicorn put operation for feedback.
 
-    Provides additional app-wide checks, e.g. was unicron_feedback configured
+    Provides additional app-wide checks, e.g. was unicorn_feedback configured
     or not.
 
-    '''
-    def __init__(self, ctx, dumper_queue, **kwargs):
-        super(UnicornSubmitter, self).__init__(ctx, **kwargs)
+    """
+    def __init__(self, ctx, committed_state, unicorn, async_route_provider,
+            **kwargs):
+        super(FeedbackSubmitter, self).__init__(ctx, **kwargs)
 
         self._config = ctx.config
-        self._dumper_queue = dumper_queue
+        self._ci_state = committed_state
+        self._dumper = Dumper(ctx, unicorn)
+        self._async_route_provider = async_route_provider
+
+        self._condition = locks.Condition()
 
     @gen.coroutine
-    def post_committed_state(self, ci_state):
+    def post_committed_state(self):
         """
-            Sends committed state to preconfigured unicorn (feedback) node,
-            if appropriate setup flag is set:
+            Notify of ci_state update if appropriate setup flag is set:
 
                 feedback:
                   unicorn_feedback: true
@@ -561,57 +554,27 @@ class UnicornSubmitter(LoggerMixin, MetricsMixin, LoopSentry):
             self.info('unicorn feedback posting is disabled')
             return
 
-        if not ci_state.flushed:
-            yield self._dumper_queue.put(ci_state.as_named_dict_ext())
-            ci_state.mark_flushed()
+        if not self._ci_state.flushed:
+            self._condition.notify()
+            self._ci_state.mark_flushed()
         else:
-            self.info('skipping submitting of clean state')
-
-
-class UnicornDumper(LoggerMixin, MetricsMixin, LoopSentry):
-    """UnicornDumper to_write queue listener
-
-    Listen on FIFO for paylod to write to unicorn.
-
-    """
-    def __init__(self, ctx, unicorn, async_route_provider,
-            dumper_queue, **kwargs):
-        """
-        TODO: seems quite ugly to provide async method as argument
-              to another class, try to refactor someday.
-        """
-        super(UnicornDumper, self).__init__(ctx, **kwargs)
-
-        self._context = ctx
-        self._unicorn = unicorn
-
-        self._async_route_provider = async_route_provider
-        self._dumper_queue = dumper_queue
-
-        self.sentry_wrapper = ctx.sentry_wrapper
+            self.debug('skipping submitting of clean state')
 
     @gen.coroutine
-    def listen_for_events(self):
-
-        dumper = Dumper(self._context, self._unicorn)
-        dump_to = '<unknown>'
-
+    def listen_for_committed_state(self):
         while self.should_run():
             try:
-                payload = yield self._dumper_queue.get()
-                self._dumper_queue.task_done()
-
-                _, dump_to = yield self._async_route_provider()
-
-                self.debug('writing dumper event to unicorn path {}', dump_to)
-                yield dumper.dump(dump_to, payload)
+                yield self._condition.wait()
+                yield self._write(self._ci_state.as_named_dict_ext())
             except Exception as e:
-                self.error('failed to dump payload for path {}: {}',
-                    dump_to, e)
-                self.sentry_wrapper.capture_exception()
+                self.warn('failed to write feedback: {}', e)
 
-                to_sleep = self._context.config.async_error_timeout_sec
-                yield gen.sleep(to_sleep)
+    @gen.coroutine
+    def _write(self, payload):
+        _, dump_to = yield self._async_route_provider()
+
+        self.debug('writing feedback to unicorn path {}', dump_to)
+        yield self._dumper.dump(dump_to, payload)
 
 
 class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
@@ -622,7 +585,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             context,
             node,
             ci_state,
-            filter_queue, input_queue, control_queue, state_dumper_queue,
+            filter_queue, input_queue, control_queue, submitter,
             poll_interval_sec,
             workers_distribution,
             **kwargs):
@@ -637,7 +600,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         self.input_queue = input_queue
         self.control_queue = control_queue
 
-        self.poster = UnicornSubmitter(context, state_dumper_queue)
+        self.submitter = submitter
 
         self.poll_interval_sec = poll_interval_sec
         self.ci_state = ci_state
@@ -688,8 +651,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                 self.metrics_cnt['list_timeout_error'] += 1
                 attempts -= 1
                 self.warn(
-                    'failed to got apps list, timeout {}, attempts left {}',
-                    e, attempts
+                    'failed to got apps list, timeout, attempts left {}',
+                    attempts
                 )
             else:
                 break
@@ -830,7 +793,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
     @gen.coroutine
     def dump_feedback_guarded(self):
         try:
-            yield self.poster.post_committed_state(self.ci_state)
+            yield self.submitter.post_committed_state()
         except Exception as e:
             self.error('failed to dump feedback record {}', e)
 
@@ -957,7 +920,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     self.workers_distribution.clear()
                     self.workers_distribution.update(workers_count)
 
-                    yield self.poster.post_committed_state(self.ci_state)
+                    yield self.submitter.post_committed_state()
 
             except Exception as e:
                 self.error('failed to get control message with {}', e)
@@ -1028,12 +991,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     '''
     TASK_NAME = 'tasks_dispatch'
 
-    def __init__(
-            self,
-            context,
-            ci_state,
-            node,
-            control_queue, state_dumper_queue,
+    def __init__(self, context, ci_state, node, control_queue, submitter,
             **kwargs):
         super(AppsElysium, self).__init__(context, **kwargs)
 
@@ -1045,7 +1003,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         self.node_service = node
         self.control_queue = control_queue
 
-        self.poster = UnicornSubmitter(context, state_dumper_queue)
+        self.submitter = submitter
         self.status = context.shared_status.register(AppsElysium.TASK_NAME)
 
     @gen.coroutine
@@ -1296,7 +1254,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                     stopped_by_control.clear()
 
-                    yield self.poster.post_committed_state(self.ci_state)
+                    yield self.submitter.post_committed_state()
                     continue
 
                 #
@@ -1403,7 +1361,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 self.metrics_cnt['state_updates'] += 1
                 self.metrics_cnt['ch_cache_size'] += len(channels_cache)
 
-                yield self.poster.post_committed_state(self.ci_state)
+                yield self.submitter.post_committed_state()
 
                 self.info('state updated')
             except Exception as e:  # pragma nocover
