@@ -66,3 +66,7 @@ class Defaults(object):
 
     # TODO: probably unused
     SHARDING_METRICS_SUBNODE = 'metrics'
+
+    PROCFS_STAT = '/proc/stat'
+    PROCFS_MEMINFO = '/proc/meminfo'
+    PROCFS_LOADAVG = '/proc/loadavg'

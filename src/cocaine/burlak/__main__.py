@@ -22,7 +22,7 @@ from .config import Config
 from .context import Context, LoggerSetup
 from .helpers import SecureServiceFabric
 from .mokak.mokak import SharedStatus, make_status_web_handler
-from .metrics import BaseMetrics
+from .metrics import BasicMetrics, SystemMetrics
 from .sharding import ShardingSetup
 from .sentry import SentryClientWrapper
 from .sys_metrics import SysMetricsGatherer
@@ -132,8 +132,10 @@ def main(
     if not uuid_prefix:
         uuid_prefix = config.uuid_path
 
+    system_metrics = SystemMetrics(context)
     metrics_fetcher = burlak.MetricsFetcher(
-        context, BaseMetrics(config.metrics_name),
+        context,
+        BasicMetrics(context, config.metrics_name, system_metrics),
         committed_state, feedback_submitter
     )
 

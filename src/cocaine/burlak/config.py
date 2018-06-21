@@ -533,6 +533,18 @@ class Config(object):
     def api_timeout_by2(self):
         return 2 * self._config.get('api_timeout_sec', Defaults.API_TIMEOUT)
 
+    @property
+    def procfs_stat_name(self):
+        return Defaults.PROCFS_STAT
+
+    @property
+    def procfs_mem_name(self):
+        return Defaults.PROCFS_MEMINFO
+
+    @property
+    def procfs_loadavg_name(self):
+        return Defaults.PROCFS_LOADAVG
+
     @control_filter.setter
     def control_filter(self, control_filter):
         self._config['control_filter'] = dict(
