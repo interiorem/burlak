@@ -22,7 +22,7 @@ from .config import Config
 from .context import Context, LoggerSetup
 from .helpers import SecureServiceFabric
 from .mokak.mokak import SharedStatus, make_status_web_handler
-from .metrics import BasicMetrics, SystemMetrics
+from .metrics import MetricsFetcher, SystemMetrics
 from .sharding import ShardingSetup
 from .sentry import SentryClientWrapper
 from .sys_metrics import SysMetricsGatherer
@@ -135,7 +135,7 @@ def main(
     system_metrics = SystemMetrics(context)
     metrics_fetcher = burlak.MetricsFetcher(
         context,
-        BasicMetrics(context, config.metrics_name, system_metrics),
+        MetricsFetcher(context, system_metrics),
         committed_state, feedback_submitter
     )
 
