@@ -21,9 +21,10 @@ CAPTURED_MESSAGES = [
 def sentry_wrapper(mocker):
     mocker.patch('raven.Client', autospec=True)
     return SentryClientWrapper(
-                make_logger_mock(mocker),
-                TEST_DSN,
-                TEST_REVISION)
+        make_logger_mock(mocker),
+        TEST_DSN,
+        TEST_REVISION
+    )
 
 
 def test_capture_exceptions(sentry_wrapper):

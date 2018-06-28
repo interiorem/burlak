@@ -131,10 +131,10 @@ def app(mocker):
 
     qs = dict(input=input_queue, adjust=adjust_queue, stop=stop_queue)
     units = dict(
-            acquisition=MetricsMock(1),
-            state=MetricsMock(2),
-            slayer=MetricsMock(3),
-            resurrecter=MetricsMock(4))
+        acquisition=MetricsMock(1),
+        state=MetricsMock(2),
+        slayer=MetricsMock(3),
+        resurrecter=MetricsMock(4))
 
     uniresis = mocker.Mock()
     uniresis.uuid = mocker.Mock(return_value=make_future(TEST_UUID))
@@ -282,8 +282,7 @@ def test_get_info(http_client, base_url):
             uuid=TEST_UUID,
             uptime=TEST_UPTIME,
             version=TEST_VERSION,
-            api=API_V1,
-        )
+            api=API_V1)
 
 
 @pytest.mark.parametrize(

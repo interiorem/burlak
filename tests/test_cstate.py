@@ -111,17 +111,16 @@ def test_expire_stopped(init_state, mocker):
         del mix[app]
 
     assert init_state.as_dict() == mix
-    assert init_state.as_named_dict() == \
-        {
-            app: OrderedDict([
-                    ('state', state[0]),
-                    ('workers', state[1]),
-                    ('profile', state[2]),
-                    ('state_version', state[3]),
-                    ('state_description', state[4]),
-                    ('time_stamp', state[5]),
-                ]) for app, state in mix.iteritems()
-        }
+    assert init_state.as_named_dict() == {
+        app: OrderedDict([
+            ('state', state[0]),
+            ('workers', state[1]),
+            ('profile', state[2]),
+            ('state_version', state[3]),
+            ('state_description', state[4]),
+            ('time_stamp', state[5]),
+        ]) for app, state in mix.iteritems()
+    }
 
 
 @pytest.mark.parametrize(
@@ -152,20 +151,18 @@ def test_version(init_state):
 
 
 def test_running_apps_count(init_state):
-    assert init_state.running_apps_count() == \
-        sum(
-                1 for record in init_state.as_dict().itervalues()
-                if record.state == 'STARTED'
-        )
+    assert init_state.running_apps_count() == sum(
+        1 for record in init_state.as_dict().itervalues()
+        if record.state == 'STARTED'
+    )
 
 
 def test_workers_count(init_state):
-    assert init_state.workers_count() == \
-        sum(
-            record.workers
-            for record in init_state.as_dict().itervalues()
-            if record.state == 'STARTED'
-        )
+    assert init_state.workers_count() == sum(
+        record.workers
+        for record in init_state.as_dict().itervalues()
+        if record.state == 'STARTED'
+    )
 
 
 def test_control_filter(init_state):
