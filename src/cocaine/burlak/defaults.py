@@ -18,6 +18,7 @@ class Defaults(object):
     DISCOVERY_UPDATE_INTERVAL_SEC = 3600
 
     METRICS_PATH = '/darkvoice/metrics'
+    METRICS_ENABLED = False
     METRICS_POLL_INTERVAL_SEC = 10
 
     NODE_SERVICE_NAME = 'node'
@@ -66,3 +67,7 @@ class Defaults(object):
 
     # TODO: probably unused
     SHARDING_METRICS_SUBNODE = 'metrics'
+
+    PROCFS_STAT = '/proc/stat'
+    PROCFS_MEMINFO = '/proc/meminfo'
+    PROCFS_LOADAVG = '/proc/loadavg'

@@ -1,3 +1,4 @@
+"""Main project config."""
 import os
 
 import cerberus
@@ -42,12 +43,13 @@ def make_metrics_config(d):
         'enabled',
     ])
 
+    enabled = d.get('enabled', Defaults.METRICS_ENABLED)
+
     path = d.get('path', Defaults.METRICS_PATH)
     poll_interval_sec = d.get(
         'poll_interval_sec', Defaults.METRICS_POLL_INTERVAL_SEC)
     query = d.get('query', {})
 
-    enabled = d.get('enabled', False)
     return MetricsConfig(path, poll_interval_sec, query, enabled)
 
 
@@ -79,6 +81,7 @@ def make_sharding_config(d):
     ])
 
     enabled = d.get('enabled', Defaults.SHARDING_ENABLED)
+
     default_tag = d.get('default_tag', Defaults.FALLBACK_SHARDING_TAG)
     common_prefix = d.get('common_prefix', Defaults.SHARDING_COMMON_PREFIX)
 
@@ -87,12 +90,15 @@ def make_sharding_config(d):
     state_subnode = d.get('state_subnode', Defaults.SHARDING_STATE_SUBNODE)
     feedback_subnode = d.get(
         'feed_subnode', Defaults.SHARDING_FEEDBACK_SUBNODE)
+
     # TODO: probably deprecated
     metrics_subnode = d.get(
         'metrics_subnode', Defaults.SHARDING_METRICS_SUBNODE)
 
-    return ShardingConfig(enabled, default_tag, common_prefix, tag_key,
-        state_subnode, feedback_subnode, metrics_subnode)
+    return ShardingConfig(
+        enabled, default_tag, common_prefix, tag_key,
+        state_subnode, feedback_subnode, metrics_subnode
+    )
 
 
 #
@@ -106,7 +112,7 @@ class Config(object):
         'type': 'dict',
         'required': False,
         'schema': {
-            'apply_control':  {
+            'apply_control': {
                 'type': 'boolean',
                 'required': False,
             },
@@ -229,7 +235,11 @@ class Config(object):
             'type': 'dict',
             'required': False,
             'schema': {
-                'path': {'type': 'string'},
+                'enabled': {'type': 'boolean'},
+                'path': {
+                    'type': 'string',
+                    'required': False,
+                },
                 'poll_interval_sec': {
                     'type': 'integer',
                     'min': 0,
@@ -272,7 +282,7 @@ class Config(object):
             'type': 'string',
             'required': False,
         },
-        # TODO: add `_sec` suffix and make app-wide update
+        # TODO(Validator): add `_sec` suffix and make app-wide update
         'expire_stopped': {
             'type': 'integer',
             'required': False,
@@ -532,6 +542,18 @@ class Config(object):
     @property
     def api_timeout_by2(self):
         return 2 * self._config.get('api_timeout_sec', Defaults.API_TIMEOUT)
+
+    @property
+    def procfs_stat_name(self):
+        return Defaults.PROCFS_STAT
+
+    @property
+    def procfs_mem_name(self):
+        return Defaults.PROCFS_MEMINFO
+
+    @property
+    def procfs_loadavg_name(self):
+        return Defaults.PROCFS_LOADAVG
 
     @control_filter.setter
     def control_filter(self, control_filter):

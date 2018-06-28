@@ -1,3 +1,9 @@
+cocaine-orca (0.1.41) unstable; urgency=medium
+
+  * System stat gathered and send via feedback.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Thu, 21 Jun 2018 15:53:01 +0300
+
 cocaine-orca (0.1.40) unstable; urgency=medium
 
   * Main loop refactoring: remove redundant state dump on
