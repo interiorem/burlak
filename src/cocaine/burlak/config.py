@@ -266,10 +266,12 @@ class Config(object):
             'type': 'boolean',
             'required': False,
         },
+        # TODO(Config): deprecated, remove!
         'stop_by_control': {
             'type': 'boolean',
             'required': False,
         },
+        # TODO(Config): deprecated, remove!
         'control_with_ack': {
             'type': 'boolean',
             'required': False,
@@ -449,10 +451,6 @@ class Config(object):
             Defaults.STOP_APPS_NOT_IN_STATE)
 
     @property
-    def stop_by_control(self):
-        return self._config.get('stop_by_control', Defaults.STOP_BY_CONTROL)
-
-    @property
     def sentry_dsn(self):
         return self._config.get('sentry_dsn', Defaults.SENTRY_DSN)
 
@@ -521,10 +519,6 @@ class Config(object):
     def sharding(self):
         sharding = self._config.get('sharding', {})
         return make_sharding_config(sharding)
-
-    @property
-    def control_with_ack(self):
-        return self._config.get('control_with_ack', Defaults.CONTROL_WITH_ACK)
 
     @property
     def control_filter_path(self):

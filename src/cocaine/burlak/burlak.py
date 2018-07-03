@@ -1038,8 +1038,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def slay(self, app, state_version, tm, *unused):
-        '''Stop/pause application
-        '''
+        """Stop/pause application."""
         try:
             ch = yield self.node_service.pause_app(app)
             yield ch.rx.get(timeout=self.context.config.api_timeout)
@@ -1094,16 +1093,12 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.ci_state.mark_stopped(app, state_version, tm)
 
     @gen.coroutine
-    def control(self, ch, to_adjust):
-        yield ch.tx.write(to_adjust)
-
-    @gen.coroutine
     def control_with_ack(self, ch, to_adjust):  # pragma nocover
-        '''Send control and get (dummy) result or exception
+        """Send control and get (dummy) result or exception
 
         TODO: tests
 
-        '''
+        """
         yield ch.tx.write(to_adjust)
         yield ch.rx.get(timeout=self.context.config.api_timeout)
 
@@ -1111,13 +1106,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     def adjust_by_channel(
             self, app, profile, channels_cache, to_adjust, state_version, tm):
 
-        self.debug(
-            'control command to {} ack {} with {}',
-            app, self.context.config.control_with_ack is True, to_adjust
-        )
-
-        control_method = self.control_with_ack \
-            if self.context.config.control_with_ack else self.control
+        self.debug('control command to {} with {}', app, to_adjust)
 
         def is_spooling_state(e):
             """Simple guess for now, should use exception error code and
@@ -1133,7 +1122,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         while attempts:
             try:
                 ch = yield channels_cache.get_ch(app)
-                yield control_method(ch, to_adjust)
+                yield self.control_with_ack(ch, to_adjust)
             except Exception as e:
                 if is_spooling_state(e):
                     self.warn(
@@ -1265,11 +1254,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     self.status.mark_ok('stopping apps')
                     tm = time.time()
 
-                    stop_method = self.stop_by_control \
-                        if self.context.config.stop_by_control else self.slay
-
                     yield [
-                        stop_method(
+                        self.stop_by_control(
                             app,
                             command.state_version,
                             tm,
@@ -1292,16 +1278,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     else:
                         self.debug('remove prohibited to_stop apps from state')
                         self.ci_state.remove_listed(command.to_stop)
-
-                if not self.context.config.stop_by_control:
-                    # Close after `slay` method, but don't touch channels
-                    # cache after `stop_by_control`.
-                    self.debug('close and remove `to_stop` channels')
-                    yield channels_cache.close_and_remove(command.to_stop)
-                else:  # pragma nocover
-                    # TODO: danger zone!
-                    # Huge amount of channels could be leaked forever.
-                    pass
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.
