@@ -9,9 +9,10 @@ import pytest
 
 from tornado import queues
 
-from .common import ASYNC_TESTS_TIMEOUT, \
-    make_logger_mock, make_mock_channel_with, make_mock_channels_list_with
-
+from .common import ASYNC_TESTS_TIMEOUT
+from .common import make_logger_mock
+from .common import make_mock_channel_with, make_mock_channels_list_with
+from .common import make_mock_control_list_with
 
 to_stop_apps = [
     ['app3', 'app4', 'app5', 'app6', 'app7'],
@@ -86,46 +87,6 @@ def elysium(mocker):
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
-def test_stop(elysium, mocker):
-    stop_side_effect = [True for _ in to_stop_apps]
-    stop_side_effect.append(False)
-
-    mocker.patch.object(
-        burlak.LoopSentry, 'should_run', side_effect=stop_side_effect)
-
-    for stop_apps in to_stop_apps:
-        yield elysium.control_queue.put(
-            burlak.DispatchMessage(
-                dict(), dict(),
-                -1,
-                False,
-                set(stop_apps),
-                set(),
-                False,
-                set(), set(),
-            )
-        )
-
-    elysium.context.config._config['stop_apps'] = True
-    elysium.context.config._config['stop_by_control'] = False
-
-    elysium.node_service.pause_app = mocker.Mock(
-        side_effect=make_mock_channels_list_with(
-            xrange(count_apps(to_stop_apps))
-        )
-    )
-
-    yield elysium.blessing_road()
-
-    for apps_list in to_stop_apps:
-        for app in apps_list:
-            assert elysium.node_service.pause_app.called_with(app)
-
-    assert elysium.node_service.pause_app.call_count == \
-        sum(map(len, to_stop_apps))
-
-
-@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_stop_by_control(elysium, mocker):
     stop_side_effect = [True for _ in to_stop_apps]
     stop_side_effect.append(False)
@@ -145,7 +106,6 @@ def test_stop_by_control(elysium, mocker):
         )
 
     elysium.context.config._config['stop_apps'] = True
-    elysium.context.config._config['stop_by_control'] = True
 
     mocker.patch.object(
         ChannelsCache,
@@ -334,7 +294,9 @@ def test_control_exceptions(elysium, mocker):
             except_count += 1
 
     elysium.node_service.control = mocker.Mock(
-        side_effect=[make_mock_channel_with(v) for v in except_sequence])
+        side_effect=make_mock_control_list_with(except_sequence)
+    )
+
     yield elysium.blessing_road()
 
     for apps_list in to_run_apps:
