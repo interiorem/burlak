@@ -248,7 +248,6 @@ def test_get_state_by_app(http_client, base_url, is_legacy, state_path):
         state = loaded_state if is_legacy else loaded_state.get('state', {})
 
         assert response.code == 200
-        print 'app {} body {}'.format(app, response.body)
         assert state == {app: test_state[app]._asdict()}
 
 
