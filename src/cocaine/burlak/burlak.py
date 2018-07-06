@@ -56,6 +56,7 @@ DispatchMessage = namedtuple('DispatchMessage', [
     'real_state',
     'state_version',
     'is_state_updated',
+    'to_hard_stop',
     'to_stop',
     'to_run',
     'runtime_reborn',
@@ -132,8 +133,7 @@ def update_fake_state(ci_state, version, real_state, control_state):
 # TODO: refactor someday as hugely inefficient and redundant conversion.
 #
 def transmute_and_filter_state(input_state):
-    '''Converts raw state dictionary to (app => StateRecords) mapping
-    '''
+    """Converts raw state dictionary to (app => StateRecords) mapping."""
     return {
         app: StateRecord(int(val['workers']), str(val['profile']))
         for app, val in input_state.iteritems()
@@ -270,7 +270,9 @@ class ControlFilterListener(LoggerMixin, MetricsMixin, LoopSentry):
                             timeout=self.context.config.api_timeout_by2)
 
                     current_filter = ControlFilterListener.VersionedFilter(
-                            control_filter, version)
+                        control_filter,
+                        version
+                    )
 
                     if current_filter == last_filter:
                         self.info(
@@ -749,8 +751,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def get_filter_once(self):
-        '''Get control filter on dispatch main loop startup
-        '''
+        """Get control filter on dispatch main loop startup."""
         # Get control filter on startup
         self.debug('waiting for init control_filter')
 
@@ -769,13 +770,12 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         return control_filter
 
     def mark_broken_apps(self, state, broken_apps, state_version):
-        '''Mark broken apps from state as `failed`
+        """Mark broken apps from state as `failed`.
 
         Moved out from control loop as it more local to runtime info processing
         and simplify units interconnection a bit, but logically still a
         `control` type procedure.
-
-        '''
+        """
         now = time.time()
         for app in broken_apps:
             profile = state[app].profile if app in state else ''
@@ -799,7 +799,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def process_loop(self):
-        running_apps = set()
+        running_apps, broken_apps = set(), set()
         state, prev_state, real_state, state_version = (
             dict(), dict(), dict(), DEFAULT_UNKNOWN_VERSIONS
         )
@@ -915,6 +915,10 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     ) = yield self.runtime_state(
                         state, bool(real_state), running_apps)
 
+                    #
+                    # TODO(mark_broken_apps): could lead to app ban by
+                    # scheduler.
+                    #
                     self.mark_broken_apps(state, broken_apps, state_version)
 
                     self.workers_distribution.clear()
@@ -937,12 +941,15 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             update_state_apps_set = state.viewkeys()
 
             to_run = update_state_apps_set - running_apps
+            to_run |= broken_apps
+
             to_stop = running_apps - update_state_apps_set
+            to_hard_stop = broken_apps
 
             if is_state_updated:  # check for profiles change
                 #
-                # TODO: temporary disabled, should have more flexibel schema of
-                #       profile update in future.
+                # TODO(Profile update check): temporary disabled, should have
+                # more flexible schema profile update in future.
                 #
                 # to_update = self.make_prof_update_set(prev_state, state)
                 #
@@ -958,6 +965,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
             self.info("to_stop apps list {}", to_stop)
             self.info("to_run apps list {}", to_run)
+            self.info("to_hard_stop apps list {}", to_hard_stop)
 
             def should_dispatch():
                 return (
@@ -968,12 +976,12 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             if should_dispatch():
                 self.status.mark_ok('sending processed state to dispatch')
 
-                # TODO: refact - make separate messages for each case.
+                # TODO(DispatchMessage): make separate messages for each case.
                 yield self.control_queue.put(
                     DispatchMessage(
                         state, real_state,
                         state_version, is_state_updated,
-                        to_stop, to_run,
+                        to_hard_stop, to_stop, to_run,
                         runtime_reborn,
                         workers_mismatch,
                         stop_again,
@@ -987,8 +995,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
 
 class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
-    '''Controls life-time of applications based on supplied state
-    '''
+    """Control life-time of applications based on supplied state."""
+
     TASK_NAME = 'tasks_dispatch'
 
     def __init__(self, context, ci_state, node, control_queue, submitter,
@@ -1008,8 +1016,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def start(self, app, profile, state_version, tm, started=None):
-        '''Trying to start application with specified profile
-        '''
+        """Try to start application with specified profile."""
         try:
             ch = yield self.node_service.start_app(app, profile)
             yield ch.rx.get(timeout=self.context.config.api_timeout)
@@ -1057,13 +1064,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     @gen.coroutine
     def stop_by_control(
             self, app, state_version, tm, channels_cache, stopped_by_control):
-        '''Stop application with app.control(0)
-
-        TODO:
-            Apps will be periodically reported as running by RT,
-            so would be scheduled to stop periodically (channels would be open,
-            control would be send, channels would be closed).
-        '''
+        """Stop application with app.control(0)."""
         try:
             if app in stopped_by_control:
                 return
@@ -1094,10 +1095,9 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def control_with_ack(self, ch, to_adjust):  # pragma nocover
-        """Send control and get (dummy) result or exception
+        """Send control and get (dummy) result or exception.
 
         TODO: tests
-
         """
         yield ch.tx.write(to_adjust)
         yield ch.rx.get(timeout=self.context.config.api_timeout)
@@ -1109,7 +1109,9 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         self.debug('control command to {} with {}', app, to_adjust)
 
         def is_spooling_state(e):
-            """Simple guess for now, should use exception error code and
+            """Check for spooling state with some heuristics.
+
+            Simple guess for now, should use exception error code and
             category to distinguish among different possible state.
 
                 TODO: check for category
@@ -1174,7 +1176,17 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             yield channels_cache.close_other(to_retain)
 
     @gen.coroutine
+    def stop_hard(self, ch_cache, to_hard_stop, state_version):
+        tm = time.time()
+        yield ch_cache.close_and_remove(to_hard_stop)
+        yield [
+            self.slay(app, state_version, tm) for app in to_hard_stop
+        ]
+        self.metrics_cnt['stopped_hard'] = len(to_hard_stop)
+
+    @gen.coroutine
     def blessing_road(self):
+        """Scheduler control commands processing loop."""
         channels_cache = ChannelsCache(self, self.node_service)
         stopped_by_control = set()
 
@@ -1204,7 +1216,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 self.debug('control task: {}', command._asdict())
                 self.status.mark_ok('processing control command')
-
                 self.ci_state.version = command.state_version
 
                 if command.is_state_updated:
@@ -1237,7 +1248,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         dict(),
                     )
 
-                    channels_cache.close_and_remove_all()
+                    yield channels_cache.close_and_remove_all()
                     self.ci_state.channels_cache_apps = \
                         channels_cache.apps()
 
@@ -1260,12 +1271,20 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                             command.state_version,
                             tm,
                             channels_cache,
-                            stopped_by_control
+                            stopped_by_control,
                         )
                         for app in command.to_stop
                     ]
 
-                elif command.to_stop:
+                    self.debug('stopping hard, apps {}', command.to_hard_stop)
+
+                    yield self.stop_hard(
+                        channels_cache,
+                        command.to_hard_stop,
+                        command.state_version
+                    )
+
+                elif command.to_stop or command.to_hard_stop:
                     self.info(
                         'to_stop list not empty, but stop_apps flag is off, '
                         'skipping `stop apps` stage')
@@ -1273,16 +1292,20 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     # Default is `false`.
                     if self.context.config.pending_stop_in_state:
                         self.debug('mark prohibited to_stop apps in state')
+                        pending_stop = command.to_hard_stop | command.to_stop
                         self.mark_pending_stop(
-                            command.to_stop, command.state_version)
+                            pending_stop, command.state_version)
                     else:
                         self.debug('remove prohibited to_stop apps from state')
-                        self.ci_state.remove_listed(command.to_stop)
+                        to_remove = command.to_stop | command.to_hard_stop
+                        self.ci_state.remove_listed(to_remove)
 
                 # Should be an assertion if app is in to_run list, but not in
                 # the state, sanity redundant check.
                 self.status.mark_ok('starting apps')
+
                 started = set()
+
                 tm = time.time()
                 yield [
                     self.start(
@@ -1298,7 +1321,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
                 # Send control to every app in state, except known for
                 # start up fail.
-                to_control = set(command.state.iterkeys()) \
+                to_control = set(command.state.viewkeys()) \
                     if command.is_state_updated else started
 
                 stopped_by_control = stopped_by_control - to_control
@@ -1308,29 +1331,28 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 self.metrics_cnt['stopped_by_control'] = \
                     len(stopped_by_control)
 
+                self.debug(
+                    'control command will be send for apps: {}', to_control)
+
                 if failed_to_start:  # pragma nocover
                     self.warn(
                         'control command will be skipped for '
                         'failed to start apps: {}',
                         failed_to_start)
 
-                self.debug(
-                    'control command will be send for apps: {}', to_control)
-
-                if to_control:
-                    self.status.mark_ok('adjusting workers count')
-                    tm = time.time()
-                    yield [
-                        self.adjust_by_channel(
-                            app,
-                            state_record.profile,
-                            channels_cache,
-                            int(state_record.workers),
-                            command.state_version, tm)
-                        for app, state_record in six.iteritems(command.state)
-                        if app in to_control and
-                        app not in failed_to_start
-                    ]
+                self.status.mark_ok('adjusting workers count')
+                tm = time.time()
+                yield [
+                    self.adjust_by_channel(
+                        app,
+                        state_record.profile,
+                        channels_cache,
+                        int(state_record.workers),
+                        command.state_version, tm)
+                    for app, state_record in six.iteritems(command.state)
+                    if app in to_control and
+                    app not in failed_to_start
+                ]
 
                 self.ci_state.channels_cache_apps = channels_cache.apps()
 
