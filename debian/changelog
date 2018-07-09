@@ -1,3 +1,9 @@
+cocaine-orca (0.1.42) unstable; urgency=medium
+
+  * Restart applications in broken state.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Fri, 06 Jul 2018 19:46:43 +0300
+
 cocaine-orca (0.1.41) unstable; urgency=medium
 
   * System stat gathered and send via feedback.

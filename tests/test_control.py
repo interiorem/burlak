@@ -99,7 +99,7 @@ def test_stop_by_control(elysium, mocker):
             burlak.DispatchMessage(
                 dict(), dict(),
                 -1, False,
-                set(stop_apps), set(),
+                set(), set(stop_apps), set(),
                 False,
                 set(), set(),
             )
@@ -146,7 +146,7 @@ def test_stop_apps_disabled(elysium, mocker, log_pending_stop):
             burlak.DispatchMessage(
                 dict(), dict(),
                 -1, False,
-                set(stop_apps), set(),
+                set(), set(stop_apps), set(),
                 False,
                 set(), set(),
             )
@@ -174,13 +174,10 @@ def test_run(elysium, mocker):
             burlak.DispatchMessage(
                 run_apps,
                 dict(),
-                -1,
+                -1, False,
+                set(), set(), set(run_apps.iterkeys()),
                 False,
-                set(),
-                set(run_apps.iterkeys()),
-                False,
-                set(),
-                set(),
+                set(), set(),
             )
         )
 
@@ -199,8 +196,7 @@ def test_run(elysium, mocker):
                 record.profile
             )
 
-    assert \
-        elysium.node_service.start_app.call_count == \
+    assert elysium.node_service.start_app.call_count == \
         count_apps(to_run_apps)
 
 
@@ -217,13 +213,10 @@ def test_control(elysium, mocker):
             burlak.DispatchMessage(
                 run_apps,
                 dict(),
-                -1,
-                True,
-                set(),
-                set(run_apps.iterkeys()),
+                -1, True,
+                set(), set(), set(run_apps.iterkeys()),
                 False,
-                set(),
-                set(),
+                set(), set(),
             )
         )
 
@@ -269,13 +262,10 @@ def test_control_exceptions(elysium, mocker):
             burlak.DispatchMessage(
                 run_apps,
                 dict(),
-                -1,
-                True,
-                set(),
-                set(run_apps.iterkeys()),
+                -1, True,
+                set(), set(), set(run_apps.iterkeys()),
                 False,
-                set(),
-                set(),
+                set(), set(),
             )
         )
 
@@ -346,10 +336,8 @@ def skipped_test_gapped_control(elysium, mocker):
             burlak.DispatchMessage(
                 gap_state,
                 dict(),
-                -1,
-                True,
-                set(),
-                set(state.iterkeys()),
+                -1, True,
+                set(), set(), set(state.iterkeys()),
                 False,
                 set(),
                 set(),

@@ -289,7 +289,7 @@ class Config(object):
             'type': 'integer',
             'required': False,
         },
-        'console_log_level': {  # see ConsoleLogger.LEVELS for valie values
+        'console_log_level': {  # see ConsoleLogger.LEVELS for possible values
             'type': 'integer',
             'required': False,
         },
