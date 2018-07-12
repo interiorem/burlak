@@ -428,7 +428,7 @@ class Network(ProcfsMetric):
         """
         if iface not in self._speed_files_cache:
             path = IfSpeed.make_path(self._speed_file_pfx, iface)
-            self._speed_files_cache[iface] = IfSpeed()
+            self._speed_files_cache[iface] = IfSpeed(path)
 
         speed = yield self._speed_files_cache[iface].read()
         raise gen.Return(speed)
