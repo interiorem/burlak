@@ -1031,7 +1031,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 message="can't start app",
                 extra=dict(
                     app=app,
-                    profile=profile
+                    profile=profile,
                 ),
             )
 

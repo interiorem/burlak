@@ -330,6 +330,10 @@ class Config(object):
                 ],
             },
         },
+        'netlink_speed_mb': {  # in megabits!
+            'type': 'integer',
+            'required': False,
+        },
         'control_filter_path': {
             'type': 'string',
             'required': False,
@@ -529,6 +533,13 @@ class Config(object):
         d = self._config.get('control_filter', dict())
         return ControlFilter.from_dict(d)
 
+    @control_filter.setter
+    def control_filter(self, control_filter):
+        self._config['control_filter'] = dict(
+            apply_control=control_filter.apply_control,
+            white_list=control_filter.white_list
+        )
+
     @property
     def api_timeout(self):
         return self._config.get('api_timeout_sec', Defaults.API_TIMEOUT)
@@ -549,12 +560,17 @@ class Config(object):
     def procfs_loadavg_name(self):
         return Defaults.PROCFS_LOADAVG
 
-    @control_filter.setter
-    def control_filter(self, control_filter):
-        self._config['control_filter'] = dict(
-            apply_control=control_filter.apply_control,
-            white_list=control_filter.white_list
-        )
+    @property
+    def procfs_netstat_name(self):
+        return Defaults.PROCFS_NETSTAT
+
+    @property
+    def sysfs_network_prefix(self):
+        return Defaults.SYSFS_NET_PREFIX
+
+    @property
+    def netlink_speed_mb(self):
+        return self._config.get('netlink_speed_mb', Defaults.NETLINK_SPEED_MB)
 
     # TODO:
     #   refactor to single method?
