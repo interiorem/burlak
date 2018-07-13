@@ -284,14 +284,14 @@ def test_system_metrics(mocker, context):
     assert network['lan0']['speed_mbits'] == LAN0_SPEED
     assert network['lan0']['rx'] == 110
     assert network['lan0']['tx'] == 220
-    assert network['lan0']['rx_delta'] == 10 * NET_TICKS_PER_SEC
-    assert network['lan0']['tx_delta'] == 20 * NET_TICKS_PER_SEC
+    assert network['lan0']['rx_bps'] == 10 * NET_TICKS_PER_SEC
+    assert network['lan0']['tx_bps'] == 20 * NET_TICKS_PER_SEC
 
     assert network['lan1']['speed_mbits'] == LAN1_SPEED
     assert network['lan1']['rx'] == 230
     assert network['lan1']['tx'] == 340
-    assert network['lan1']['rx_delta'] == 30 * NET_TICKS_PER_SEC
-    assert network['lan1']['tx_delta'] == 40 * NET_TICKS_PER_SEC
+    assert network['lan1']['rx_bps'] == 30 * NET_TICKS_PER_SEC
+    assert network['lan1']['tx_bps'] == 40 * NET_TICKS_PER_SEC
 
     if LAN0_SPEED < LAN1_SPEED:
         assert network['node_summary']['speed_mbits'] == LAN1_SPEED
@@ -301,9 +301,9 @@ def test_system_metrics(mocker, context):
     assert network['node_summary']['rx'] == 340
     assert network['node_summary']['tx'] == 560
 
-    assert network['node_summary']['rx_delta'] == \
+    assert network['node_summary']['rx_bps'] == \
         (10 + 30) * NET_TICKS_PER_SEC
-    assert network['node_summary']['tx_delta'] == \
+    assert network['node_summary']['tx_bps'] == \
         (20 + 40) * NET_TICKS_PER_SEC
 
 

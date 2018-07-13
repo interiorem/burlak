@@ -33,7 +33,9 @@ from .control_filter import ControlFilter
 from .dumper import Dumper
 from .logger import ConsoleLogger, VoidLogger
 from .loop_sentry import LoopSentry
+from .metrics import MetricsSource
 from .patricia.patricia import trie
+
 from .mixins import *
 
 
@@ -477,52 +479,65 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
 
 
 class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
-    '''
+    """
     TODO: WIP, not yet implemented, nor tested
-    '''
-    def __init__(self, context, source, committed_state, submitter, **kwargs):
+    """
+    def __init__(self, context, hub, **kwargs):
         super(MetricsFetcher, self).__init__(context, **kwargs)
 
         self._config = context.config
-        self._source = source
-        self._ci_state = committed_state
-        self._submitter = submitter
+        self._source = MetricsSource(context, hub)
 
         self.sentry_wrapper = context.sentry_wrapper
 
-    def _filter(self, payload):
-        '''
-        TODO: filter out active workers state
-        '''
-        return payload
-
     @gen.coroutine
-    def _fetch_and_upload(self):
+    def _fetch(self):
         if not self._config.metrics.enabled:
             return
 
         now = time.time()
-
-        payload = yield self._source.fetch({})
-        self._ci_state.metrics = self._filter(payload)
-
-        yield self._submitter.post_committed_state()
-
+        yield self._source.fetch({})
         elapsed = time.time() - now
 
         # TODO: update internal metrics
-        self.debug('fetching and updating workers stat took {:.3f}s', elapsed)
+        self.debug('fetching stat took {:.3f}s', elapsed)
 
     @gen.coroutine
     def poll_stats(self):
         while self.should_run():
             try:
-                to_sleep = self._config.metrics.poll_interval_sec
+                to_sleep = self._config.metrics.gather_interval_sec
+
                 yield gen.sleep(to_sleep)
-                yield self._fetch_and_upload()
+                yield self._fetch()
+
             except Exception as e:
-                self.error('failed to fetch runtime workers stat {}', e)
+                self.error('failed to fetch runtime stat {}', e)
                 yield gen.sleep(self._config.async_error_timeout_sec)
+
+
+class MetricsSubmitter(LoggerMixin, MetricsMixin, LoopSentry):
+    """Submit the state with current metrics snapshot."""
+
+    def __init__(self, context, committed_state, hub, submitter, **kwargs):
+        super(MetricsSubmitter, self).__init__(context, **kwargs)
+        self._config = context.config
+        self._ci_state = committed_state
+        self._hub = hub
+        self._submitter = submitter
+
+    @gen.coroutine
+    def post_metrics(self):
+        while(self.should_run()):
+            to_sleep = self._config.metrics.poll_interval_sec
+            yield gen.sleep(to_sleep)
+
+            try:
+                # Mark state as `dirty`
+                self._ci_state.metrics = self._hub.metrics
+                yield self._submitter.post_committed_state()
+            except Exception as e:
+                self.warn('failed to submit metrics feedback: {}', e)
 
 
 class FeedbackSubmitter(LoggerMixin, MetricsMixin, LoopSentry):

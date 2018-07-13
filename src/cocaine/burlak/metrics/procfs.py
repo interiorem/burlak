@@ -10,6 +10,7 @@ from collections import namedtuple
 
 from tornado import gen
 
+from .ewma import EWMA
 from .exceptions import MetricsException
 
 from ..common import clamp
@@ -346,18 +347,21 @@ class Network(ProcfsMetric):
     IGNORE_LIST_PFX = {'lo', 'tun', 'dummy', 'wlan', 'docker', 'br'}
     UNKNOWN_SPEED = -1
 
-    Net = namedtuple('Net', 'speed_mbits rx tx rx_delta tx_delta')
+    Net = namedtuple('Net', 'speed_mbits rx tx rx_bps tx_bps')
 
-    def __init__(
-            self,
-            path, sysfs_path_pfx, default_netlink, netlink_speed_mbits):
+    Rates = namedtuple('Rates', 'rx_ma tx_ma')
+
+    def __init__(self, path, sysfs_path_pfx, netlink_conf):
         """Init procfs network metric with specified path."""
         super(Network, self).__init__(path)
 
-        self._netlink_speed_mbits = netlink_speed_mbits
         self._speed_file_pfx = sysfs_path_pfx
         self._speed_files_cache = {}
-        self._default_netlink = default_netlink
+
+        self._netlink_speed_mbits = netlink_conf.speed_mbits
+        self._default_netlink = netlink_conf.default_name
+
+        self._rates = {}
 
     @gen.coroutine
     def read(self):
@@ -381,6 +385,11 @@ class Network(ProcfsMetric):
             drx = int(NET_TICKS_PER_SEC * (net2.rx - net1.rx))
             dtx = int(NET_TICKS_PER_SEC * (net2.tx - net1.tx))
 
+            rates = self.rates(iface)
+
+            rates.rx_ma.update(drx)
+            rates.tx_ma.update(dtx)
+
             if_speed = Network.UNKNOWN_SPEED
 
             try:
@@ -390,39 +399,18 @@ class Network(ProcfsMetric):
                 pass
 
             if iface == self._default_netlink:
-                results['node_default'] = \
-                    Network.Net(
-                        self._netlink_speed_mbits, net2.rx, net2.tx, drx, dtx)
+                results['node_default'] = Network.Net(
+                    self._netlink_speed_mbits,
+                    net2.rx, net2.tx,
+                    int(rates.rx_ma.value),
+                    int(rates.tx_ma.value)
+                )
 
-            results[iface] = Network.Net(if_speed, net2.rx, net2.tx, drx, dtx)
-
-        #
-        # Count summary for all active interfaces.
-        # Note that some ifaces stats could be included in some other,
-        # so it is possibility of overcount, correct accounting is subject
-        # of further investigation.
-        #
-        summary_rx, summary_tx, delta_rx, delta_tx, max_speed = 0, 0, 0, 0, 0
-        for net in six.itervalues(results):
-            summary_rx += net.rx
-            summary_tx += net.tx
-
-            delta_rx += net.rx_delta
-            delta_tx += net.tx_delta
-
-            if net.speed_mbits > max_speed:
-                max_speed = net.speed_mbits
-
-        if max_speed <= 0:  # e.g. KVM
-            max_speed = self._netlink_speed_mbits
-
-        results['node_summary'] = Network.Net(
-            max_speed,
-            summary_rx,
-            summary_tx,
-            delta_rx,
-            delta_tx,
-        )
+            results[iface] = Network.Net(
+                if_speed,
+                net2.rx, net2.tx,
+                int(rates.rx_ma.value), int(rates.tx_ma.value)
+            )
 
         raise gen.Return(results)
 
@@ -439,6 +427,10 @@ class Network(ProcfsMetric):
 
         speed = yield self._speed_files_cache[iface].read()
         raise gen.Return(speed)
+
+    def rates(self, iface):
+        """Get (constract) rates structure."""
+        return self._rates.get(iface, Network.Rates(EWMA(), EWMA()))
 
     @staticmethod
     def _parse(lines):

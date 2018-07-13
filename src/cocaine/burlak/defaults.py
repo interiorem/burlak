@@ -19,7 +19,8 @@ class Defaults(object):
 
     METRICS_PATH = '/darkvoice/metrics'
     METRICS_ENABLED = False
-    METRICS_POLL_INTERVAL_SEC = 10
+    METRICS_POLL_INTERVAL_SEC = 20
+    METRICS_GATHER_INTERVAL_SEC = 5
 
     NODE_SERVICE_NAME = 'node'
     UNICORN_SERVICE_NAME = 'unicorn'

@@ -17,18 +17,15 @@ class SystemMetrics(LoggerMixin):
     def __init__(self, context, **kwargs):
         super(SystemMetrics, self).__init__(context, **kwargs)
 
-        self._config = context.config
+        conf = context.config
+        self._config = conf
 
         # System metrics
-        self._cpu = ProcfsCPU(context.config.procfs_stat_path)
-        self._memory = ProcfsMemory(context.config.procfs_mem_path)
-        self._loadavg = ProcfsLoadavg(context.config.procfs_loadavg_path)
+        self._cpu = ProcfsCPU(conf.procfs_stat_path)
+        self._memory = ProcfsMemory(conf.procfs_mem_path)
+        self._loadavg = ProcfsLoadavg(conf.procfs_loadavg_path)
         self._network = ProcfsNetwork(
-            context.config.procfs_netstat_path,
-            context.config.sysfs_network_prefix,
-            context.config.netlink_default_name,
-            context.config.netlink_speed_mbits,
-        )
+            conf.procfs_netstat_path, conf.sysfs_network_prefix, conf.netlink)
 
     @gen.coroutine
     def poll(self):

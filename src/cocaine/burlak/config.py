@@ -39,6 +39,7 @@ def make_metrics_config(d):
     MetricsConfig = namedtuple('MetricsConfig', [
         'path',
         'poll_interval_sec',
+        'gather_interval_sec',
         'query',
         'enabled',
     ])
@@ -46,11 +47,17 @@ def make_metrics_config(d):
     enabled = d.get('enabled', Defaults.METRICS_ENABLED)
 
     path = d.get('path', Defaults.METRICS_PATH)
+
     poll_interval_sec = d.get(
         'poll_interval_sec', Defaults.METRICS_POLL_INTERVAL_SEC)
+
+    gather_interval_sec = \
+        d.get('gather_interval_sec', Defaults.METRICS_GATHER_INTERVAL_SEC)
+
     query = d.get('query', {})
 
-    return MetricsConfig(path, poll_interval_sec, query, enabled)
+    return MetricsConfig(
+        path, poll_interval_sec, gather_interval_sec, query, enabled)
 
 
 def make_discovery_config(d):
@@ -98,6 +105,21 @@ def make_sharding_config(d):
     return ShardingConfig(
         enabled, default_tag, common_prefix, tag_key,
         state_subnode, feedback_subnode, metrics_subnode
+    )
+
+
+def make_netlink_config(d):
+    Netlink = namedtuple('Netlink', [
+        'default_name',
+        'speed_mbits',
+    ])
+
+    default_name = d.get('default_name', Defaults.NETLINK_SPEED_MBITS)
+    speed_mbits = d.get('speed_mbits', Defaults.NETLINK_NAME)
+
+    return Netlink(
+        default_name,
+        speed_mbits,
     )
 
 
@@ -246,11 +268,23 @@ class Config(object):
                     'max': 2**16,
                     'required': False,
                 },
+                'post_interval': {
+                    'type': 'integer',
+                    'min': 0,
+                    'max': 2**16,
+                    'required': False,
+                },
+                'gather_interval': {
+                    'type': 'integer',
+                    'min': 0,
+                    'max': 2**16,
+                    'required': False,
+                },
                 'query': {
                     'type': 'dict',
                     'required': False,
                 },
-            }
+            },
         },
         'async_error_timeout_sec': {
             'type': 'integer',
@@ -330,13 +364,21 @@ class Config(object):
                 ],
             },
         },
-        'netlink_speed_mbits': {  # in megabits!
-            'type': 'integer',
+        'netlink': {
+            'type': 'dict',
             'required': False,
-        },
-        'netlink_default_name': {
-            'type': 'string',
-            'required': False,
+            'schema': {
+                'speed_mbits': {  # in megabits!
+                    'type': 'integer',
+                    'min': 0,
+                    'max': 2**16,
+                    'required': False,
+                },
+                'default_name': {
+                    'type': 'string',
+                    'required': False,
+                },
+            },
         },
         'control_filter_path': {
             'type': 'string',
@@ -573,13 +615,9 @@ class Config(object):
         return Defaults.SYSFS_NET_PREFIX
 
     @property
-    def netlink_speed_mbits(self):
-        return self._config.get(
-            'netlink_speed_mbits', Defaults.NETLINK_SPEED_MBITS)
-
-    @property
-    def netlink_default_name(self):
-        return self._config.get('netlink_default_name', Defaults.NETLINK_NAME)
+    def netlink(self):
+        netlink = self._config.get('netlink', {})
+        return make_netlink_config(netlink)
 
     # TODO:
     #   refactor to single method?
