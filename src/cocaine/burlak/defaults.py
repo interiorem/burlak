@@ -76,4 +76,5 @@ class Defaults(object):
 
     SYSFS_NET_PREFIX = '/sys/class/net'
 
-    NETLINK_SPEED_MB = 10000  # Megabits
+    NETLINK_SPEED_MBITS = 10000  # Megabits
+    NETLINK_NAME = 'veth0'

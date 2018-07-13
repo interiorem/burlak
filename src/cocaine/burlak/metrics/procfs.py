@@ -59,8 +59,7 @@ class ProcfsMetric(object):
         """Read all lines from start of file until first non empty found."""
         try:
             self._file.seek(0)
-            _ = [self._file.readline() for _ in xrange(to_skip)]
-            return [ln for ln in self._file]
+            return self._file.readlines()[to_skip:]
         except Exception as e:
             self.reopen()
             raise
@@ -347,15 +346,18 @@ class Network(ProcfsMetric):
     IGNORE_LIST_PFX = {'lo', 'tun', 'dummy', 'wlan', 'docker', 'br'}
     UNKNOWN_SPEED = -1
 
-    Net = namedtuple('Net', 'speed_mbits rx tx rx_delta tx_delta')
+    Net = namedtuple('Net', 'speed_mbits rx tx rx_bps tx_bps')
 
-    def __init__(self, path, sysfs_path_pfx, netlink_speed_mb):
+    def __init__(
+            self,
+            path, sysfs_path_pfx, default_netlink, netlink_speed_mbits):
         """Init procfs network metric with specified path."""
         super(Network, self).__init__(path)
 
-        self._netlink_speed_mb = netlink_speed_mb
+        self._netlink_speed_mbits = netlink_speed_mbits
         self._speed_file_pfx = sysfs_path_pfx
         self._speed_files_cache = {}
+        self._default_netlink = default_netlink
 
     @gen.coroutine
     def read(self):
@@ -387,6 +389,11 @@ class Network(ProcfsMetric):
                 # probably no sysfs on node, ignore silently
                 pass
 
+            if iface == self._default_netlink:
+                results['node_default'] = \
+                    Network.Net(
+                        self._netlink_speed_mbits, net2.rx, net2.tx, drx, dtx)
+
             results[iface] = Network.Net(if_speed, net2.rx, net2.tx, drx, dtx)
 
         #
@@ -400,14 +407,14 @@ class Network(ProcfsMetric):
             summary_rx += net.rx
             summary_tx += net.tx
 
-            delta_rx += net.rx_delta
-            delta_tx += net.tx_delta
+            delta_rx += net.rx_bps
+            delta_tx += net.tx_bps
 
             if net.speed_mbits > max_speed:
                 max_speed = net.speed_mbits
 
         if max_speed <= 0:  # e.g. KVM
-            max_speed = self._netlink_speed_mb
+            max_speed = self._netlink_speed_mbits
 
         results['node_summary'] = Network.Net(
             max_speed,
@@ -460,8 +467,4 @@ class Network(ProcfsMetric):
     @staticmethod
     def as_named_dict(d):
         """Convert mapping of namedtuples to dictionary of dictionaries."""
-        result = {}
-        for iface in d:
-            result[iface] = d[iface]._asdict()
-
-        return result
+        return {iface: net._asdict() for iface, net in six.iteritems(d)}

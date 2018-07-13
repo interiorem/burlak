@@ -16,7 +16,7 @@
 import time
 
 from cocaine.exceptions import ServiceError
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from datetime import timedelta
 
 from cerberus import Validator
