@@ -3,9 +3,9 @@ import os
 
 import cerberus
 
-import yaml
-
 from collections import namedtuple
+
+import yaml
 
 from .control_filter import ControlFilter
 from .defaults import Defaults
@@ -330,8 +330,12 @@ class Config(object):
                 ],
             },
         },
-        'netlink_speed_mb': {  # in megabits!
+        'netlink_speed_mbits': {  # in megabits!
             'type': 'integer',
+            'required': False,
+        },
+        'netlink_default_name': {
+            'type': 'string',
             'required': False,
         },
         'control_filter_path': {
@@ -549,19 +553,19 @@ class Config(object):
         return 2 * self._config.get('api_timeout_sec', Defaults.API_TIMEOUT)
 
     @property
-    def procfs_stat_name(self):
+    def procfs_stat_path(self):
         return Defaults.PROCFS_STAT
 
     @property
-    def procfs_mem_name(self):
+    def procfs_mem_path(self):
         return Defaults.PROCFS_MEMINFO
 
     @property
-    def procfs_loadavg_name(self):
+    def procfs_loadavg_path(self):
         return Defaults.PROCFS_LOADAVG
 
     @property
-    def procfs_netstat_name(self):
+    def procfs_netstat_path(self):
         return Defaults.PROCFS_NETSTAT
 
     @property
@@ -569,8 +573,13 @@ class Config(object):
         return Defaults.SYSFS_NET_PREFIX
 
     @property
-    def netlink_speed_mb(self):
-        return self._config.get('netlink_speed_mb', Defaults.NETLINK_SPEED_MB)
+    def netlink_speed_mbits(self):
+        return self._config.get(
+            'netlink_speed_mbits', Defaults.NETLINK_SPEED_MBITS)
+
+    @property
+    def netlink_default_name(self):
+        return self._config.get('netlink_default_name', Defaults.NETLINK_NAME)
 
     # TODO:
     #   refactor to single method?

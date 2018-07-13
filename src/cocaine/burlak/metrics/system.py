@@ -20,13 +20,14 @@ class SystemMetrics(LoggerMixin):
         self._config = context.config
 
         # System metrics
-        self._cpu = ProcfsCPU(context.config.procfs_stat_name)
-        self._memory = ProcfsMemory(context.config.procfs_mem_name)
-        self._loadavg = ProcfsLoadavg(context.config.procfs_loadavg_name)
+        self._cpu = ProcfsCPU(context.config.procfs_stat_path)
+        self._memory = ProcfsMemory(context.config.procfs_mem_path)
+        self._loadavg = ProcfsLoadavg(context.config.procfs_loadavg_path)
         self._network = ProcfsNetwork(
-            context.config.procfs_netstat_name,
+            context.config.procfs_netstat_path,
             context.config.sysfs_network_prefix,
-            context.config.netlink_speed_mb,
+            context.config.netlink_default_name,
+            context.config.netlink_speed_mbits,
         )
 
     @gen.coroutine
