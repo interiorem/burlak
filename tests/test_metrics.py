@@ -143,6 +143,15 @@ class _MockFile(object):
 
         return ln
 
+    def readlines(self):
+        to_return = self._data
+
+        if self._data_after:
+            self._data, self._data_after = self._data_after, self._data
+        self._index = 0
+
+        return to_return
+
     def close(self):
         pass
 
@@ -176,6 +185,13 @@ def context(mocker):
     )
 
 
+def make_open_stub(*args):
+    """Generate ProcfsMetric.open method stub."""
+    def dummy_open(self, _path):
+        self._file = _MockFile(*args)
+    return dummy_open
+
+
 @pytest.fixture
 def system_metrics(mocker, context):
     return SystemMetrics(context)
@@ -200,22 +216,40 @@ def test_fetcher(mocker, fetcher):
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_system_metrics(mocker, context):
     """Test system metrics in composition."""
-    mocker.patch(
-        OPEN_TO_PATCH,
-        side_effect=[
-            _MockFile(CPU_STAT_CONTENT_1, CPU_STAT_CONTENT_2),
-            _MockFile(MEMINFO_CONTENT_1),
-            _MockFile(LOADAVG_CONTENT),
-            _MockFile(NETWORK_CONTENT_1, NETWORK_CONTENT_2),
-            _MockFile([str(LAN0_SPEED)]),
-            _MockFile([str(LAN1_SPEED)])
-        ]
-    )
+
+    #
+    # TODO(test_system_metrics): refactor this part, it seems ugly.
+    #
+    state = {'index': 0}
+    side_effect = [
+        _MockFile(CPU_STAT_CONTENT_1, CPU_STAT_CONTENT_2),
+        _MockFile(MEMINFO_CONTENT_1),
+        _MockFile(LOADAVG_CONTENT),
+        _MockFile(NETWORK_CONTENT_1, NETWORK_CONTENT_2),
+    ]
+
+    def dummy_open(self, _path):
+        self._file = side_effect[state['index']]
+        state['index'] += 1
+
+    mocker.patch.object(
+        ProcfsMetric, 'open', autospec=True, side_effect=dummy_open)
+
+    def dummy_get_speed(self, iface):
+        if iface == 'lan0':
+            return make_future(LAN0_SPEED)
+        elif iface == 'lan1':
+            return make_future(LAN1_SPEED)
+
+        return -100  # unreachable
+
+    mocker.patch.object(
+        Network, '_get_link_speed', side_effect=dummy_get_speed, autospec=True)
 
     system_metrics = SystemMetrics(context)
-
     metrics = yield system_metrics.poll()
-    metrics_set = set([
+
+    assert metrics.viewkeys() == {
         'loadavg',
         'cpu.load',
         'cpu.usable',
@@ -225,9 +259,7 @@ def test_system_metrics(mocker, context):
         'mem.used',
         'mem.total',
         'network',
-    ])
-
-    assert metrics.viewkeys() == metrics_set
+    }
 
     eps = .02
 
@@ -242,37 +274,36 @@ def test_system_metrics(mocker, context):
     assert metrics['mem.free'] == MEM_FREE_BYTES
     assert metrics['mem.cached'] == MEM_CACHED_BYTES
 
-    assert 'lan0' in metrics['network']
-    assert 'lan1' in metrics['network']
-    assert 'dummy0' not in metrics['network']
+    network = metrics['network']
+    assert 'dummy0' not in network
 
-    assert 'node_summary' in metrics['network']
+    should_have_iface = ['lan0', 'lan1', 'node_summary']
+    for iface in should_have_iface:
+        assert iface in network
 
-    print 'metrics', metrics['network']
+    assert network['lan0']['speed_mbits'] == LAN0_SPEED
+    assert network['lan0']['rx'] == 110
+    assert network['lan0']['tx'] == 220
+    assert network['lan0']['rx_delta'] == 10 * NET_TICKS_PER_SEC
+    assert network['lan0']['tx_delta'] == 20 * NET_TICKS_PER_SEC
 
-    assert metrics['network']['lan0']['speed_mbits'] == LAN0_SPEED
-    assert metrics['network']['lan0']['rx'] == 110
-    assert metrics['network']['lan0']['tx'] == 220
-    assert metrics['network']['lan0']['rx_delta'] == 10 * NET_TICKS_PER_SEC
-    assert metrics['network']['lan0']['tx_delta'] == 20 * NET_TICKS_PER_SEC
-
-    assert metrics['network']['lan1']['speed_mbits'] == LAN1_SPEED
-    assert metrics['network']['lan1']['rx'] == 230
-    assert metrics['network']['lan1']['tx'] == 340
-    assert metrics['network']['lan1']['rx_delta'] == 30 * NET_TICKS_PER_SEC
-    assert metrics['network']['lan1']['tx_delta'] == 40 * NET_TICKS_PER_SEC
+    assert network['lan1']['speed_mbits'] == LAN1_SPEED
+    assert network['lan1']['rx'] == 230
+    assert network['lan1']['tx'] == 340
+    assert network['lan1']['rx_delta'] == 30 * NET_TICKS_PER_SEC
+    assert network['lan1']['tx_delta'] == 40 * NET_TICKS_PER_SEC
 
     if LAN0_SPEED < LAN1_SPEED:
-        assert metrics['network']['node_summary']['speed_mbits'] == LAN1_SPEED
+        assert network['node_summary']['speed_mbits'] == LAN1_SPEED
     else:
-        assert metrics['network']['node_summary']['speed_mbits'] == LAN0_SPEED
+        assert network['node_summary']['speed_mbits'] == LAN0_SPEED
 
-    assert metrics['network']['node_summary']['rx'] == 340
-    assert metrics['network']['node_summary']['tx'] == 560
+    assert network['node_summary']['rx'] == 340
+    assert network['node_summary']['tx'] == 560
 
-    assert metrics['network']['node_summary']['rx_delta'] == \
+    assert network['node_summary']['rx_delta'] == \
         (10 + 30) * NET_TICKS_PER_SEC
-    assert metrics['network']['node_summary']['tx_delta'] == \
+    assert network['node_summary']['tx_delta'] == \
         (20 + 40) * NET_TICKS_PER_SEC
 
 
@@ -297,10 +328,9 @@ def test_system_metrics_exception(mocker, context):
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_procfs_multiple_times(mocker, context):
 
-    mocker.patch(
-        OPEN_TO_PATCH,
-        return_value=_MockFile(CPU_STAT_CONTENT_1, CPU_STAT_CONTENT_2)
-    )
+    mocker.patch.object(
+        ProcfsMetric, 'open', autospec=True,
+        side_effect=make_open_stub(CPU_STAT_CONTENT_1, CPU_STAT_CONTENT_2))
 
     p = ProcfsMetric('/profs/stat')
 
@@ -311,10 +341,10 @@ def test_procfs_multiple_times(mocker, context):
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_procfs_multiple_lines(mocker, context):
-    mocker.patch(
-        OPEN_TO_PATCH,
-        return_value=_MockFile(MEMINFO_CONTENT_1, MEMINFO_CONTENT_2)
-    )
+
+    mocker.patch.object(
+        ProcfsMetric, 'open', autospec=True,
+        side_effect=make_open_stub(MEMINFO_CONTENT_1, MEMINFO_CONTENT_2))
 
     p = ProcfsMetric('/profs/stat')
 
@@ -334,10 +364,11 @@ def test_cpu_read_exceptions(mocker):
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_cpu_empty_record(mocker):
-    mocker.patch(
-        OPEN_TO_PATCH,
-        return_value=_MockFile(CPU_STAT_EMPTY_CONTENT, CPU_STAT_EMPTY_CONTENT)
-    )
+
+    stub = make_open_stub(CPU_STAT_EMPTY_CONTENT, CPU_STAT_EMPTY_CONTENT)
+    mocker.patch.object(
+        ProcfsMetric, 'open', autospec=True,
+        side_effect=stub)
 
     c = Cpu('/proc/stat')
     c = yield c.read()
@@ -353,10 +384,10 @@ def test_cpu_empty_record(mocker):
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_cpu_overflow(mocker):
-    mocker.patch(
-        OPEN_TO_PATCH,
-        return_value=_MockFile(CPU_STAT_CONTENT_2, CPU_STAT_CONTENT_1)
-    )
+
+    mocker.patch.object(
+        ProcfsMetric, 'open', autospec=True,
+        side_effect=make_open_stub(CPU_STAT_CONTENT_2, CPU_STAT_CONTENT_1))
 
     c = Cpu('/proc/stat')
     c = yield c.read()
@@ -372,10 +403,11 @@ def test_cpu_overflow(mocker):
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_mem_zeroes_record(mocker):
-    mocker.patch(
-        OPEN_TO_PATCH,
-        return_value=_MockFile(MEMINFO_ZEROES)
-    )
+    mocker.patch.object(
+        ProcfsMetric, 'open', autospec=True,
+        side_effect=make_open_stub(MEMINFO_ZEROES))
+
+    mocker.patch(OPEN_TO_PATCH, return_value=_MockFile(MEMINFO_ZEROES))
 
     m = Memory('/proc/stat')
     m = yield m.read()
@@ -394,10 +426,9 @@ def test_mem_zeroes_record(mocker):
 
 
 def test_procfs_metrics(mocker):
-    mocker.patch(
-        OPEN_TO_PATCH,
-        return_value=_MockFile(MEMINFO_CONTENT_1)
-    )
+    mocker.patch.object(
+        ProcfsMetric, 'open', autospec=True,
+        side_effect=make_open_stub(MEMINFO_CONTENT_1))
 
     test_path = '/procfs/some/file'
 
@@ -417,10 +448,9 @@ def test_procfs_metrics(mocker):
 
 @pytest.mark.xfail(raises=Exception)
 def test_procfs_metrics_exception(mocker):
-    mocker.patch(
-        OPEN_TO_PATCH,
-        return_value=_MockFile(MEMINFO_CONTENT_1, should_throw=True)
-    )
+    mocker.patch.object(
+        ProcfsMetric, 'open', autospec=True,
+        side_effect=make_open_stub(MEMINFO_CONTENT_1, should_throw=True))
 
     test_path = '/procfs/some/file'
 
