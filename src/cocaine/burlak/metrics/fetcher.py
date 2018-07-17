@@ -1,3 +1,4 @@
+"""Metrics fetcher abstraction."""
 import time
 
 from tornado import gen
@@ -6,12 +7,13 @@ from ..mixins import LoggerMixin
 
 
 class MetricsFetcher(LoggerMixin):
-    """Basic metrics provider
+    """Basic metrics provider.
 
     Includes metrics:
         system - memory, cpu load, ect
         applications - TBD
     """
+
     def __init__(self, context, system_metrics, **kwargs):
         super(MetricsFetcher, self).__init__(context, **kwargs)
 
@@ -19,7 +21,7 @@ class MetricsFetcher(LoggerMixin):
 
     @gen.coroutine
     def fetch(self, _query, _type="tree"):
-        """Try to mimic Cocaine metrics service API
+        """Try to mimic Cocaine metrics service API.
 
         Note that API very likely subject of changes!
         """

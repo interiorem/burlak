@@ -3,9 +3,9 @@ import os
 
 import cerberus
 
-import yaml
-
 from collections import namedtuple
+
+import yaml
 
 from .control_filter import ControlFilter
 from .defaults import Defaults
@@ -330,6 +330,14 @@ class Config(object):
                 ],
             },
         },
+        'netlink_speed_mbits': {  # in megabits!
+            'type': 'integer',
+            'required': False,
+        },
+        'netlink_default_name': {
+            'type': 'string',
+            'required': False,
+        },
         'control_filter_path': {
             'type': 'string',
             'required': False,
@@ -529,6 +537,13 @@ class Config(object):
         d = self._config.get('control_filter', dict())
         return ControlFilter.from_dict(d)
 
+    @control_filter.setter
+    def control_filter(self, control_filter):
+        self._config['control_filter'] = dict(
+            apply_control=control_filter.apply_control,
+            white_list=control_filter.white_list
+        )
+
     @property
     def api_timeout(self):
         return self._config.get('api_timeout_sec', Defaults.API_TIMEOUT)
@@ -538,23 +553,33 @@ class Config(object):
         return 2 * self._config.get('api_timeout_sec', Defaults.API_TIMEOUT)
 
     @property
-    def procfs_stat_name(self):
+    def procfs_stat_path(self):
         return Defaults.PROCFS_STAT
 
     @property
-    def procfs_mem_name(self):
+    def procfs_mem_path(self):
         return Defaults.PROCFS_MEMINFO
 
     @property
-    def procfs_loadavg_name(self):
+    def procfs_loadavg_path(self):
         return Defaults.PROCFS_LOADAVG
 
-    @control_filter.setter
-    def control_filter(self, control_filter):
-        self._config['control_filter'] = dict(
-            apply_control=control_filter.apply_control,
-            white_list=control_filter.white_list
-        )
+    @property
+    def procfs_netstat_path(self):
+        return Defaults.PROCFS_NETSTAT
+
+    @property
+    def sysfs_network_prefix(self):
+        return Defaults.SYSFS_NET_PREFIX
+
+    @property
+    def netlink_speed_mbits(self):
+        return self._config.get(
+            'netlink_speed_mbits', Defaults.NETLINK_SPEED_MBITS)
+
+    @property
+    def netlink_default_name(self):
+        return self._config.get('netlink_default_name', Defaults.NETLINK_NAME)
 
     # TODO:
     #   refactor to single method?

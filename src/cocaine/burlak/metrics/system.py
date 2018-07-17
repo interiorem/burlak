@@ -1,25 +1,34 @@
+"""System matrics gather interface."""
 from tornado import gen
 
 from ..mixins import LoggerMixin
 from .procfs import Cpu as ProcfsCPU
 from .procfs import Loadavg as ProcfsLoadavg
 from .procfs import Memory as ProcfsMemory
+from .procfs import Network as ProcfsNetwork
 
 
 class SystemMetrics(LoggerMixin):
-    """Gets system wide metrics
+    """Get system wide metrics.
 
     TODO: overlaps with sys_metrics.py code, should be merged someday.
     """
+
     def __init__(self, context, **kwargs):
         super(SystemMetrics, self).__init__(context, **kwargs)
 
         self._config = context.config
 
         # System metrics
-        self._cpu = ProcfsCPU(context.config.procfs_stat_name)
-        self._memory = ProcfsMemory(context.config.procfs_mem_name)
-        self._loadavg = ProcfsLoadavg(context.config.procfs_loadavg_name)
+        self._cpu = ProcfsCPU(context.config.procfs_stat_path)
+        self._memory = ProcfsMemory(context.config.procfs_mem_path)
+        self._loadavg = ProcfsLoadavg(context.config.procfs_loadavg_path)
+        self._network = ProcfsNetwork(
+            context.config.procfs_netstat_path,
+            context.config.sysfs_network_prefix,
+            context.config.netlink_default_name,
+            context.config.netlink_speed_mbits,
+        )
 
     @gen.coroutine
     def poll(self):
@@ -33,7 +42,8 @@ class SystemMetrics(LoggerMixin):
          - mem.total
          - mem.free
          - mem.used
-        :rtype: dict[str, numeric]
+         - network: mapping of network interfaces
+        :rtype: dict[str, int | float | dict[str, int | float ]]
 
         TODO(SystemMetrics): seems that try/exept blocks is code repititions
         """
@@ -65,5 +75,12 @@ class SystemMetrics(LoggerMixin):
             to_return.update({'loadavg': loadavg})
         except Exception as e:
             self.error('failed to get system metrics [loadavg] {}', e)
+
+        try:
+            network = yield self._network.read()
+            network = ProcfsNetwork.as_named_dict(network)
+            to_return.update({'network': network})
+        except Exception as e:
+            self.error('failed to get system metrics [network] {}', e)
 
         raise gen.Return(to_return)

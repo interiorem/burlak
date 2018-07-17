@@ -3,6 +3,9 @@
 Links:
  - read `man 5 proc` for procfs stat files formats.
 """
+import itertools
+import six
+
 from collections import namedtuple
 
 from tornado import gen
@@ -15,7 +18,11 @@ from ..mixins import LoggerMixin
 
 # Time to async sleep between two cpu load measurements
 CPU_POLL_TICK = .25  # 250ms
+NET_POLL_TICK = .25  # 250ms
+NET_TICKS_PER_SEC = 1. / NET_POLL_TICK
+
 CPU_FIELDS_COUNT = 11  # one label field "cpu" + 10 ticks fields
+NET_FIELDS_COUNT = 17
 
 
 class ProcfsMetric(object):
@@ -44,6 +51,15 @@ class ProcfsMetric(object):
         try:
             self._file.seek(0)
             return [self._file.readline() for _ in xrange(to_read)]
+        except Exception as e:
+            self.reopen()
+            raise
+
+    def read_all_lines(self, to_skip=0):
+        """Read all lines from start of file until first non empty found."""
+        try:
+            self._file.seek(0)
+            return self._file.readlines()[to_skip:]
         except Exception as e:
             self.reopen()
             raise
@@ -275,3 +291,180 @@ class Memory(ProcfsMetric):
             used = used - cached
 
         return clamp(used / float(total), .0, 1.0)
+
+
+class IfSpeed(ProcfsMetric):
+    """Read NIC speed from sysfs.
+
+    TODO(IfSpeed): Deprecated: it seems that there is no any portable way
+    to get real network speed bandwidth, e.g. for kvm
+        sysfs:/sys/class/network/*/speed
+    could be unavailable (is is useless here), or it could be set incorrectly
+    for virtual interfaces in container (arguable, needs investigation).
+    """
+    SYSFS_FNAME = 'speed'
+
+    def __init__(self, path):
+        """Init procfs network metric with specified path."""
+        super(IfSpeed, self).__init__(path)
+
+    @gen.coroutine
+    def read(self):
+        """Read netlink speed in Mbs."""
+        return IfSpeed._parse(self.read_nfirst_lines())
+
+    @staticmethod
+    def _parse(lines):
+        return int(lines[0])
+
+    @staticmethod
+    def make_path(prefix, iface):
+        """Construct sysfs path for iface speed file."""
+        return '{}/{}/{}'.format(prefix, iface, IfSpeed.SYSFS_FNAME)
+
+
+class Network(ProcfsMetric):
+    """Read network stat from /proc/net/dev.
+
+    TODO: it should be configurable interfaces name (prefix) or way to obtain
+    correct config, not `node_summary` and error prone IGNORE_LIST_PFX checks.
+    Seems that interface along with speed limit should be set by admin
+    explicitly in config, as we don't have raliable way to obtain it from
+    container.
+    """
+
+    #     0
+    # Iface,
+    #        1         2       3         4        5         6       7      8
+    #    bytes,  packets, errors,    drops,    fifo,    frame,   comp, mcast,
+    #                                                                     16
+    IF_NAME, \
+        RX_BTS, RX_PCKS, RX_ERR, RX_DROPS, RX_FIFO, RX_FRAME, RX_CMP, RX_MC, \
+        TX_BTS, TX_PCKS, TX_ERR, TX_DROPS, TX_FIFO, TX_FRAME, TX_CMP, TX_MC  \
+        = xrange(NET_FIELDS_COUNT)
+
+    IGNORE_LIST_PFX = {'lo', 'tun', 'dummy', 'wlan', 'docker', 'br'}
+    UNKNOWN_SPEED = -1
+
+    Net = namedtuple('Net', 'speed_mbits rx tx rx_delta tx_delta')
+
+    def __init__(
+            self,
+            path, sysfs_path_pfx, default_netlink, netlink_speed_mbits):
+        """Init procfs network metric with specified path."""
+        super(Network, self).__init__(path)
+
+        self._netlink_speed_mbits = netlink_speed_mbits
+        self._speed_file_pfx = sysfs_path_pfx
+        self._speed_files_cache = {}
+        self._default_netlink = default_netlink
+
+    @gen.coroutine
+    def read(self):
+        """Read network stat from procfs.
+
+        :return: dictionary of inftercase with their stat
+        :rtype: dict[str, Network.Net]
+        """
+        network1 = Network._parse(self.read_all_lines(to_skip=2))
+        yield gen.sleep(NET_POLL_TICK)
+        network2 = Network._parse(self.read_all_lines(to_skip=2))
+
+        to_process = [
+            (iface, network1[iface], network2[iface])
+            for iface in network1 if iface in network2
+        ]
+
+        results = {}
+        for (iface, net1, net2) in to_process:
+
+            drx = int(NET_TICKS_PER_SEC * (net2.rx - net1.rx))
+            dtx = int(NET_TICKS_PER_SEC * (net2.tx - net1.tx))
+
+            if_speed = Network.UNKNOWN_SPEED
+
+            try:
+                if_speed = yield self._get_link_speed(iface)
+            except Exception as e:
+                # probably no sysfs on node, ignore silently
+                pass
+
+            if iface == self._default_netlink:
+                results['node_default'] = \
+                    Network.Net(
+                        self._netlink_speed_mbits, net2.rx, net2.tx, drx, dtx)
+
+            results[iface] = Network.Net(if_speed, net2.rx, net2.tx, drx, dtx)
+
+        #
+        # Count summary for all active interfaces.
+        # Note that some ifaces stats could be included in some other,
+        # so it is possibility of overcount, correct accounting is subject
+        # of further investigation.
+        #
+        summary_rx, summary_tx, delta_rx, delta_tx, max_speed = 0, 0, 0, 0, 0
+        for net in six.itervalues(results):
+            summary_rx += net.rx
+            summary_tx += net.tx
+
+            delta_rx += net.rx_delta
+            delta_tx += net.tx_delta
+
+            if net.speed_mbits > max_speed:
+                max_speed = net.speed_mbits
+
+        if max_speed <= 0:  # e.g. KVM
+            max_speed = self._netlink_speed_mbits
+
+        results['node_summary'] = Network.Net(
+            max_speed,
+            summary_rx,
+            summary_tx,
+            delta_rx,
+            delta_tx,
+        )
+
+        raise gen.Return(results)
+
+    @gen.coroutine
+    def _get_link_speed(self, iface):
+        """Temporary stub for iface speed acquisition.
+
+        TODO(profs.Network): should be redesign as it is no portable way to
+        aqcuire link speed.
+        """
+        if iface not in self._speed_files_cache:
+            path = IfSpeed.make_path(self._speed_file_pfx, iface)
+            self._speed_files_cache[iface] = IfSpeed(path)
+
+        speed = yield self._speed_files_cache[iface].read()
+        raise gen.Return(speed)
+
+    @staticmethod
+    def _parse(lines):
+        def in_black_list(s):
+            return any(s.startswith(pfx) for pfx in Network.IGNORE_LIST_PFX)
+
+        result = {}
+        lines = [ln.strip() for ln in lines]
+
+        for ln in itertools.ifilter(lambda s: not in_black_list(s), lines):
+            net_info = ln.split()
+
+            # remove colon from iface name
+            net_info[Network.IF_NAME] = net_info[Network.IF_NAME][:-1]
+
+            result[net_info[Network.IF_NAME]] = Network.Net(
+                Network.UNKNOWN_SPEED,
+                int(net_info[Network.RX_BTS]),
+                int(net_info[Network.TX_BTS]),
+                0,
+                0,
+            )
+
+        return result
+
+    @staticmethod
+    def as_named_dict(d):
+        """Convert mapping of namedtuples to dictionary of dictionaries."""
+        return {iface: net._asdict() for iface, net in six.iteritems(d)}

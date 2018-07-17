@@ -16,7 +16,7 @@
 import time
 
 from cocaine.exceptions import ServiceError
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from datetime import timedelta
 
 from cerberus import Validator
@@ -1031,7 +1031,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 message="can't start app",
                 extra=dict(
                     app=app,
-                    profile=profile
+                    profile=profile,
                 ),
             )
 

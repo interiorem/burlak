@@ -71,3 +71,10 @@ class Defaults(object):
     PROCFS_STAT = '/proc/stat'
     PROCFS_MEMINFO = '/proc/meminfo'
     PROCFS_LOADAVG = '/proc/loadavg'
+
+    PROCFS_NETSTAT = '/proc/net/dev'
+
+    SYSFS_NET_PREFIX = '/sys/class/net'
+
+    NETLINK_SPEED_MBITS = 10000  # Megabits
+    NETLINK_NAME = 'veth0'
