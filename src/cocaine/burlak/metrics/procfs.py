@@ -430,7 +430,12 @@ class Network(ProcfsMetric):
 
     def rates(self, iface):
         """Get (constract) rates structure."""
-        return self._rates.get(iface, Network.Rates(EWMA(), EWMA()))
+        r = self._rates.get(iface)
+        if r is None:
+            r = Network.Rates(EWMA(), EWMA())
+            self._rates[iface] = r
+
+        return r
 
     @staticmethod
     def _parse(lines):

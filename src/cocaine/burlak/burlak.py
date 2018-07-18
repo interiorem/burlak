@@ -506,7 +506,7 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
     def poll_stats(self):
         while self.should_run():
             try:
-                to_sleep = self._config.metrics.gather_interval_sec
+                to_sleep = self._config.metrics.poll_interval_sec
 
                 yield gen.sleep(to_sleep)
                 yield self._fetch()
@@ -528,16 +528,18 @@ class MetricsSubmitter(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def post_metrics(self):
+        """Post metrics to unicorn submitter."""
         while(self.should_run()):
-            to_sleep = self._config.metrics.poll_interval_sec
-            yield gen.sleep(to_sleep)
-
             try:
+                to_sleep = self._config.metrics.post_interval_sec
+                yield gen.sleep(to_sleep)
+
                 # Mark state as `dirty`
                 self._ci_state.metrics = self._hub.metrics
                 yield self._submitter.post_committed_state()
             except Exception as e:
                 self.warn('failed to submit metrics feedback: {}', e)
+                yield gen.sleep(self._config.async_error_timeout_sec)
 
 
 class FeedbackSubmitter(LoggerMixin, MetricsMixin, LoopSentry):

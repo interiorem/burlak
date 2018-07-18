@@ -18,7 +18,6 @@ class SystemMetrics(LoggerMixin):
         super(SystemMetrics, self).__init__(context, **kwargs)
 
         conf = context.config
-        self._config = conf
 
         # System metrics
         self._cpu = ProcfsCPU(conf.procfs_stat_path)
