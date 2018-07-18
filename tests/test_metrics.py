@@ -13,7 +13,6 @@ from cocaine.burlak.metrics.exceptions import MetricsException
 from cocaine.burlak.metrics.hub import Hub
 from cocaine.burlak.metrics.procfs import Cpu, Loadavg, Memory, Network
 from cocaine.burlak.metrics.procfs import IfSpeed
-from cocaine.burlak.metrics.procfs import NET_TICKS_PER_SEC
 from cocaine.burlak.metrics.procfs import ProcfsMetric
 from cocaine.burlak.metrics.source import MetricsSource
 from cocaine.burlak.metrics.system import SystemMetrics
@@ -254,6 +253,8 @@ def test_system_metrics(mocker, context):
         Network, '_get_link_speed', side_effect=dummy_get_speed, autospec=True)
 
     system_metrics = SystemMetrics(context)
+
+    yield system_metrics.poll()
     metrics = yield system_metrics.poll()
 
     assert metrics.viewkeys() == {
@@ -293,18 +294,15 @@ def test_system_metrics(mocker, context):
     assert network['lan0']['tx'] == 220
 
     lan0_rx_ma, lan0_tx_ma = EWMA(), EWMA()
-    lan0_rx_ma.update(10 * NET_TICKS_PER_SEC)
-    lan0_tx_ma.update(20 * NET_TICKS_PER_SEC)
+    lan0_rx_ma.update(10 / context.config.metrics.poll_interval_sec)
+    lan0_tx_ma.update(20 / context.config.metrics.poll_interval_sec)
 
     assert network['lan0']['rx_bps'] == int(lan0_rx_ma.value)
     assert network['lan0']['tx_bps'] == int(lan0_tx_ma.value)
 
-    # assert network['lan0']['rx_bps'] == 10 * NET_TICKS_PER_SEC
-    # assert network['lan0']['tx_bps'] == 20 * NET_TICKS_PER_SEC
-
     lan1_rx_ma, lan1_tx_ma = EWMA(), EWMA()
-    lan1_rx_ma.update(30 * NET_TICKS_PER_SEC)
-    lan1_tx_ma.update(40 * NET_TICKS_PER_SEC)
+    lan1_rx_ma.update(30 / context.config.metrics.poll_interval_sec)
+    lan1_tx_ma.update(40 / context.config.metrics.poll_interval_sec)
 
     assert network['lan1']['speed_mbits'] == LAN1_SPEED
 
