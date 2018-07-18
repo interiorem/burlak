@@ -24,7 +24,11 @@ class SystemMetrics(LoggerMixin):
         self._memory = ProcfsMemory(conf.procfs_mem_path)
         self._loadavg = ProcfsLoadavg(conf.procfs_loadavg_path)
         self._network = ProcfsNetwork(
-            conf.procfs_netstat_path, conf.sysfs_network_prefix, conf.netlink)
+            conf.procfs_netstat_path,
+            conf.sysfs_network_prefix,
+            conf.netlink,
+            conf.metrics.poll_interval_sec
+        )
 
     @gen.coroutine
     def poll(self):

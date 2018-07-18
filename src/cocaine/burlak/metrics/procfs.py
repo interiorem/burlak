@@ -344,14 +344,13 @@ class Network(ProcfsMetric):
         TX_BTS, TX_PCKS, TX_ERR, TX_DROPS, TX_FIFO, TX_FRAME, TX_CMP, TX_MC  \
         = xrange(NET_FIELDS_COUNT)
 
-    IGNORE_LIST_PFX = {'lo', 'tun', 'dummy', 'wlan', 'docker', 'br'}
+    IGNORE_LIST_PFX = {'lo', 'tun', 'dummy', 'docker', 'br', 'wlan'}
     UNKNOWN_SPEED = -1
 
     Net = namedtuple('Net', 'speed_mbits rx tx rx_bps tx_bps')
-
     Rates = namedtuple('Rates', 'rx_ma tx_ma')
 
-    def __init__(self, path, sysfs_path_pfx, netlink_conf):
+    def __init__(self, path, sysfs_path_pfx, netlink_conf, poll_interval_sec):
         """Init procfs network metric with specified path."""
         super(Network, self).__init__(path)
 
@@ -361,7 +360,12 @@ class Network(ProcfsMetric):
         self._netlink_speed_mbits = netlink_conf.speed_mbits
         self._default_netlink = netlink_conf.default_name
 
+        self._poll_inteval_sec = 1
+        if poll_interval_sec:
+            self._poll_interval_sec = poll_interval_sec
+
         self._rates = {}
+        self._prev_stat = {}
 
     @gen.coroutine
     def read(self):
@@ -370,49 +374,49 @@ class Network(ProcfsMetric):
         :return: dictionary of inftercase with their stat
         :rtype: dict[str, Network.Net]
         """
-        network1 = Network._parse(self.read_all_lines(to_skip=2))
-        yield gen.sleep(NET_POLL_TICK)
-        network2 = Network._parse(self.read_all_lines(to_skip=2))
-
-        to_process = [
-            (iface, network1[iface], network2[iface])
-            for iface in network1 if iface in network2
-        ]
+        networks = Network._parse(self.read_all_lines(to_skip=2))
 
         results = {}
-        for (iface, net1, net2) in to_process:
-
-            drx = int(NET_TICKS_PER_SEC * (net2.rx - net1.rx))
-            dtx = int(NET_TICKS_PER_SEC * (net2.tx - net1.tx))
-
-            rates = self.rates(iface)
-
-            rates.rx_ma.update(drx)
-            rates.tx_ma.update(dtx)
-
-            if_speed = Network.UNKNOWN_SPEED
-
-            try:
-                if_speed = yield self._get_link_speed(iface)
-            except Exception as e:
-                # probably no sysfs on node, ignore silently
-                pass
-
-            if iface == self._default_netlink:
-                results['node_default'] = Network.Net(
-                    self._netlink_speed_mbits,
-                    net2.rx, net2.tx,
-                    int(rates.rx_ma.value),
-                    int(rates.tx_ma.value)
-                )
-
-            results[iface] = Network.Net(
-                if_speed,
-                net2.rx, net2.tx,
-                int(rates.rx_ma.value), int(rates.tx_ma.value)
-            )
+        for iface, net in six.iteritems(networks):
+            yield self._fill_results(results, iface, net)
 
         raise gen.Return(results)
+
+    @gen.coroutine
+    def _fill_results(self, results, iface, net):
+        rates = self.rates(iface)
+
+        net_prev = self._prev_stat.get(iface)
+        if net_prev:
+            rx_rate = (net.rx - net_prev.rx) / self._poll_interval_sec
+            tx_rate = (net.tx - net_prev.tx) / self._poll_interval_sec
+
+            rates.rx_ma.update(rx_rate)
+            rates.tx_ma.update(tx_rate)
+
+        if_speed = Network.UNKNOWN_SPEED
+
+        try:
+            if_speed = yield self._get_link_speed(iface)
+        except Exception as e:
+            # probably no sysfs on node, ignore silently
+            pass
+
+        if iface == self._default_netlink:
+            results['node_default'] = Network.Net(
+                self._netlink_speed_mbits,
+                net.rx, net.tx,
+                int(rates.rx_ma.value),
+                int(rates.tx_ma.value)
+            )
+
+        to_add = Network.Net(
+            if_speed,
+            net.rx, net.tx,
+            int(rates.rx_ma.value), int(rates.tx_ma.value)
+        )
+
+        results[iface] = self._prev_stat[iface] = to_add
 
     @gen.coroutine
     def _get_link_speed(self, iface):
@@ -429,7 +433,7 @@ class Network(ProcfsMetric):
         raise gen.Return(speed)
 
     def rates(self, iface):
-        """Get (constract) rates structure."""
+        """Get (construct) rates structure."""
         r = self._rates.get(iface)
         if r is None:
             r = Network.Rates(EWMA(), EWMA())
