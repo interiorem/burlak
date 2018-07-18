@@ -8,12 +8,16 @@ import sys
 
 from cocaine.burlak import config
 from cocaine.burlak.context import Context, LoggerSetup
+from cocaine.burlak.metrics.ewma import EWMA
 from cocaine.burlak.metrics.exceptions import MetricsException
-from cocaine.burlak.metrics.fetcher import MetricsFetcher
+from cocaine.burlak.metrics.hub import Hub
 from cocaine.burlak.metrics.procfs import Cpu, Loadavg, Memory, Network
+from cocaine.burlak.metrics.procfs import IfSpeed
 from cocaine.burlak.metrics.procfs import NET_TICKS_PER_SEC
 from cocaine.burlak.metrics.procfs import ProcfsMetric
+from cocaine.burlak.metrics.source import MetricsSource
 from cocaine.burlak.metrics.system import SystemMetrics
+
 
 import pytest
 
@@ -146,6 +150,9 @@ class _MockFile(object):
     def readlines(self):
         to_return = self._data
 
+        if self._should_throw:
+            raise Exception('fuh!')
+
         if self._data_after:
             self._data, self._data_after = self._data_after, self._data
         self._index = 0
@@ -185,10 +192,10 @@ def context(mocker):
     )
 
 
-def make_open_stub(*args):
+def make_open_stub(*args, **kwargs):
     """Generate ProcfsMetric.open method stub."""
     def dummy_open(self, _path):
-        self._file = _MockFile(*args)
+        self._file = _MockFile(*args, **kwargs)
     return dummy_open
 
 
@@ -198,16 +205,16 @@ def system_metrics(mocker, context):
 
 
 @pytest.fixture
-def fetcher(mocker, context, system_metrics):
-    return MetricsFetcher(context, system_metrics)
+def source(mocker, context):
+    return MetricsSource(context, Hub())
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
-def test_fetcher(mocker, fetcher):
-    fetcher._system_metrics.poll = \
+def test_source(mocker, source):
+    source._system_metrics.poll = \
         mocker.Mock(return_value=make_future(metrics_poll_result))
 
-    metrics = yield fetcher.fetch({})
+    metrics = yield source.fetch({})
 
     assert 'system' in metrics
     assert metrics['system'] == metrics_poll_result
@@ -277,34 +284,35 @@ def test_system_metrics(mocker, context):
     network = metrics['network']
     assert 'dummy0' not in network
 
-    should_have_iface = ['lan0', 'lan1', 'node_summary']
+    should_have_iface = ['lan0', 'lan1']
     for iface in should_have_iface:
         assert iface in network
 
     assert network['lan0']['speed_mbits'] == LAN0_SPEED
     assert network['lan0']['rx'] == 110
     assert network['lan0']['tx'] == 220
-    assert network['lan0']['rx_bps'] == 10 * NET_TICKS_PER_SEC
-    assert network['lan0']['tx_bps'] == 20 * NET_TICKS_PER_SEC
+
+    lan0_rx_ma, lan0_tx_ma = EWMA(), EWMA()
+    lan0_rx_ma.update(10 * NET_TICKS_PER_SEC)
+    lan0_tx_ma.update(20 * NET_TICKS_PER_SEC)
+
+    assert network['lan0']['rx_bps'] == int(lan0_rx_ma.value)
+    assert network['lan0']['tx_bps'] == int(lan0_tx_ma.value)
+
+    # assert network['lan0']['rx_bps'] == 10 * NET_TICKS_PER_SEC
+    # assert network['lan0']['tx_bps'] == 20 * NET_TICKS_PER_SEC
+
+    lan1_rx_ma, lan1_tx_ma = EWMA(), EWMA()
+    lan1_rx_ma.update(30 * NET_TICKS_PER_SEC)
+    lan1_tx_ma.update(40 * NET_TICKS_PER_SEC)
 
     assert network['lan1']['speed_mbits'] == LAN1_SPEED
+
     assert network['lan1']['rx'] == 230
     assert network['lan1']['tx'] == 340
-    assert network['lan1']['rx_bps'] == 30 * NET_TICKS_PER_SEC
-    assert network['lan1']['tx_bps'] == 40 * NET_TICKS_PER_SEC
 
-    if LAN0_SPEED < LAN1_SPEED:
-        assert network['node_summary']['speed_mbits'] == LAN1_SPEED
-    else:
-        assert network['node_summary']['speed_mbits'] == LAN0_SPEED
-
-    assert network['node_summary']['rx'] == 340
-    assert network['node_summary']['tx'] == 560
-
-    assert network['node_summary']['rx_bps'] == \
-        (10 + 30) * NET_TICKS_PER_SEC
-    assert network['node_summary']['tx_bps'] == \
-        (20 + 40) * NET_TICKS_PER_SEC
+    assert network['lan1']['rx_bps'] == int(lan1_rx_ma.value)
+    assert network['lan1']['tx_bps'] == int(lan1_tx_ma.value)
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
@@ -367,8 +375,7 @@ def test_cpu_empty_record(mocker):
 
     stub = make_open_stub(CPU_STAT_EMPTY_CONTENT, CPU_STAT_EMPTY_CONTENT)
     mocker.patch.object(
-        ProcfsMetric, 'open', autospec=True,
-        side_effect=stub)
+        ProcfsMetric, 'open', autospec=True, side_effect=stub)
 
     c = Cpu('/proc/stat')
     c = yield c.read()
@@ -456,3 +463,78 @@ def test_procfs_metrics_exception(mocker):
 
     p = ProcfsMetric(test_path)
     p.read_nfirst_lines(2)
+
+
+def test_procfs_metrics_reopen(mocker):
+    mocker.patch.object(
+        ProcfsMetric, 'open', autospec=True,
+        side_effect=make_open_stub(MEMINFO_CONTENT_1, should_throw=True))
+
+    p = ProcfsMetric('/procfs/some/file')
+    p.reopen = mocker.Mock()
+
+    try:
+        p.read_nfirst_lines()
+    except Exception:
+        pass
+
+    try:
+        p.read_all_lines()
+    except Exception:
+        pass
+
+    assert p.reopen.call_count == 2
+
+
+@pytest.mark.parametrize('sequence,result', [
+    ([0, 1, 2, 3, 4, 5], 4.57),
+    ([5, 4, -1, 200, 42], 71.44),
+    ([], 0.0),
+    ([-1, -2, -3, -2], -2.175),
+])
+def test_ewma(sequence, result):
+    ewma = EWMA()
+    for x in sequence:
+        ewma.update(x)
+    assert ewma.value == pytest.approx(result, 0.01)
+
+
+@pytest.mark.parametrize('system,apps,metrics', [
+    ({'a': 1, 'b': 2}, {}, {'system': {'a': 1, 'b': 2}, 'applications': {}})
+])
+def test_hub(system, apps, metrics):
+    hub = Hub()
+    hub.system = system
+    hub.applications = apps
+
+    assert hub.system == system
+    assert hub.applications == apps
+
+    assert hub.metrics == metrics
+
+
+@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
+@pytest.mark.parametrize('expected', [
+    ((['100'], ['200'])),
+    ((['100'], ['100'])),
+])
+def test_ifspeed(mocker, expected):
+    mocker.patch.object(
+        ProcfsMetric, 'open', autospec=True,
+        side_effect=make_open_stub(expected[0], expected[1])
+    )
+
+    isp = IfSpeed('/dev/null')
+
+    for sp in expected:
+        speed = yield isp.read()
+
+        assert int(sp[0]) == speed
+
+
+@pytest.mark.parametrize('a,b,expect', [
+    ('a', 'b', 'a/b/' + IfSpeed.SYSFS_FNAME),
+    ('z', 'x', 'z/x/' + IfSpeed.SYSFS_FNAME),
+])
+def test_ifspeed_make_path(a, b, expect):
+    assert IfSpeed.make_path(a, b) == expect
