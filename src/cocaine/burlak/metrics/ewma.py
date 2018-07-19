@@ -33,3 +33,8 @@ class EWMA(object):
     def value(self):
         """Get current moving avarage."""
         return self._s
+
+    @property
+    def int_of_value(self):
+        """Get current moving avarage as integer."""
+        return int(self._s)

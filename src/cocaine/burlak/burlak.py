@@ -490,13 +490,12 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
 
         self.sentry_wrapper = context.sentry_wrapper
 
-    @gen.coroutine
     def _fetch(self):
         if not self._config.metrics.enabled:
             return
 
         now = time.time()
-        yield self._source.fetch({})
+        self._source.fetch({})
         elapsed = time.time() - now
 
         # TODO: update internal metrics
@@ -509,7 +508,7 @@ class MetricsFetcher(LoggerMixin, MetricsMixin, LoopSentry):
                 to_sleep = self._config.metrics.poll_interval_sec
 
                 yield gen.sleep(to_sleep)
-                yield self._fetch()
+                self._fetch()
 
             except Exception as e:
                 self.error('failed to fetch runtime stat {}', e)

@@ -8,8 +8,6 @@ import six
 
 from collections import namedtuple
 
-from tornado import gen
-
 from .ewma import EWMA
 from .exceptions import MetricsException
 
@@ -80,7 +78,6 @@ class Loadavg(ProcfsMetric):
         """Init procfs metrics parser from string."""
         super(Loadavg, self).__init__(path)
 
-    @gen.coroutine
     def read(self):
         """Read tuple of system load avarage from procfs.
 
@@ -90,7 +87,7 @@ class Loadavg(ProcfsMetric):
         :rtype: (float, float, float)
         """
         loadavg_lines = self.read_nfirst_lines()
-        raise gen.Return(Loadavg._parse(loadavg_lines))
+        return Loadavg._parse(loadavg_lines)
 
     @staticmethod
     def _parse(lines):
@@ -137,7 +134,9 @@ class Cpu(ProcfsMetric):
         """Set metrics reader from 'path'."""
         super(Cpu, self).__init__(path)
 
-    @gen.coroutine
+        self._prev_cpu = None
+        self._load_ma, self._usable_ma = EWMA(), EWMA()
+
     def read(self, to_sleep=CPU_POLL_TICK):
         """CPU load based on procfs 'stat' file.
 
@@ -151,13 +150,17 @@ class Cpu(ProcfsMetric):
           load - usage / total ratio
         :rtype: Cpu.CpuTicks
         """
-        cpu1 = Cpu._parse(self.read_nfirst_lines())
-        yield gen.sleep(to_sleep)
-        cpu2 = Cpu._parse(self.read_nfirst_lines())
+        cpu = Cpu._parse(self.read_nfirst_lines())
 
-        usage = cpu2.usage - cpu1.usage
-        idle = cpu2.idle - cpu1.idle
-        total = cpu2.total - cpu1.total
+        if self._prev_cpu is None:
+            self._prev_cpu = cpu
+            return cpu
+
+        usage = cpu.usage - self._prev_cpu.usage
+        idle = cpu.idle - self._prev_cpu.idle
+        total = cpu.total - self._prev_cpu.total
+
+        self._prev_cpu = cpu
 
         # Overflow cases (should appear on few billions of years)
         if usage < 0:
@@ -170,12 +173,15 @@ class Cpu(ProcfsMetric):
             idle = 0
 
         if not total:
-            raise gen.Return(Cpu.CpuTicks(total, usage, idle, .0, .0))
+            return Cpu.CpuTicks(total, usage, idle, .0, 1.0)
 
-        load = clamp(usage / float(total), .0, 1.0)
-        usable = clamp(idle / float(total), .0, 1.0)
+        self._load_ma.update(usage)
+        self._usable_ma.update(idle)
 
-        raise gen.Return(Cpu.CpuTicks(total, usage, idle, load, usable))
+        load = clamp(self._load_ma.value / float(total), .0, 1.0)
+        usable = clamp(self._usable_ma.value / float(total), .0, 1.0)
+
+        return Cpu.CpuTicks(total, usage, idle, load, usable)
 
     @staticmethod
     def _parse(lines):
@@ -227,13 +233,15 @@ class Memory(ProcfsMetric):
         'cached',
         'used',
         'load',
+        'usable',
+        'free_and_cached_ma',
     ])
 
     def __init__(self, path):
         """Init procfs memory metric with specified path."""
         super(Memory, self).__init__(path)
+        self._free_and_cached_ma = EWMA()
 
-    @gen.coroutine
     def read(self):
         """Read memory stat from procfs.
 
@@ -241,8 +249,20 @@ class Memory(ProcfsMetric):
         plus memory 'load' ratio.
         :rtype: Memory.Mem
         """
-        lines = self.read_nfirst_lines(5)
-        raise gen.Return(Memory._parse(lines))
+        mem = Memory._parse(self.read_nfirst_lines(5))
+
+        self._free_and_cached_ma.update(mem.free + mem.cached)
+
+        load_ma, usable_ma = self._calc_load_ma(mem)
+        return Memory.Mem(
+            mem.total,
+            mem.free,
+            mem.cached,
+            mem.used,
+            load_ma,
+            usable_ma,
+            self._free_and_cached_ma.int_of_value,
+        )
 
     @staticmethod
     def _parse(lines):
@@ -262,7 +282,9 @@ class Memory(ProcfsMetric):
             free_kb << 10,
             cached_kb << 10,
             used_kb << 10,
-            Memory.calc_load(total_kb, used_kb, cached_kb),
+            .0,
+            .0,
+            .0,
         )
 
     @staticmethod
@@ -281,17 +303,16 @@ class Memory(ProcfsMetric):
         assert splitted[Memory.CACHED][Memory.UNITS_FIELD] == \
             Memory.SUFFIXES
 
-    @staticmethod
-    def calc_load(total, used, cached):
-        """Memory load ratio in [0, 1] interval."""
-        if not total:
-            return .0
+    def _calc_load_ma(self, mem):
+        """Memory (load, usable) ratios in [0, 1] interval."""
+        if not mem.total:
+            return .0, .0
 
-        if used > cached:
-            # should be some kind of fault in other case.
-            used = used - cached
+        load = mem.total - self._free_and_cached_ma.value
 
-        return clamp(used / float(total), .0, 1.0)
+        return \
+            clamp(load / float(mem.total), .0, 1.0), \
+            clamp(self._free_and_cached_ma.value / float(mem.total), .0, 1.0)
 
 
 class IfSpeed(ProcfsMetric):
@@ -303,13 +324,13 @@ class IfSpeed(ProcfsMetric):
     could be unavailable (is is useless here), or it could be set incorrectly
     for virtual interfaces in container (arguable, needs investigation).
     """
+
     SYSFS_FNAME = 'speed'
 
     def __init__(self, path):
         """Init procfs network metric with specified path."""
         super(IfSpeed, self).__init__(path)
 
-    @gen.coroutine
     def read(self):
         """Read netlink speed in Mbs."""
         return IfSpeed._parse(self.read_nfirst_lines())
@@ -367,7 +388,6 @@ class Network(ProcfsMetric):
         self._rates = {}
         self._prev_stat = {}
 
-    @gen.coroutine
     def read(self):
         """Read network stat from procfs.
 
@@ -378,26 +398,24 @@ class Network(ProcfsMetric):
 
         results = {}
         for iface, net in six.iteritems(networks):
-            yield self._fill_results(results, iface, net)
+            self._fill_results(results, iface, net)
 
-        raise gen.Return(results)
+        return results
 
-    @gen.coroutine
     def _fill_results(self, results, iface, net):
         rates = self.rates(iface)
 
         net_prev = self._prev_stat.get(iface)
         if net_prev:
-            rx_rate = (net.rx - net_prev.rx) / self._poll_interval_sec
-            tx_rate = (net.tx - net_prev.tx) / self._poll_interval_sec
+            span = self._poll_interval_sec
 
-            rates.rx_ma.update(rx_rate)
-            rates.tx_ma.update(tx_rate)
+            rates.rx_ma.update((net.rx - net_prev.rx) / span)
+            rates.tx_ma.update((net.tx - net_prev.tx) / span)
 
         if_speed = Network.UNKNOWN_SPEED
 
         try:
-            if_speed = yield self._get_link_speed(iface)
+            if_speed = self._get_link_speed(iface)
         except Exception as e:
             # probably no sysfs on node, ignore silently
             pass
@@ -406,19 +424,19 @@ class Network(ProcfsMetric):
             results['node_default'] = Network.Net(
                 self._netlink_speed_mbits,
                 net.rx, net.tx,
-                int(rates.rx_ma.value),
-                int(rates.tx_ma.value)
+                rates.rx_ma.int_of_value,
+                rates.tx_ma.int_of_value
             )
 
         to_add = Network.Net(
             if_speed,
             net.rx, net.tx,
-            int(rates.rx_ma.value), int(rates.tx_ma.value)
+            rates.rx_ma.int_of_value,
+            rates.tx_ma.int_of_value
         )
 
         results[iface] = self._prev_stat[iface] = to_add
 
-    @gen.coroutine
     def _get_link_speed(self, iface):
         """Temporary stub for iface speed acquisition.
 
@@ -429,8 +447,7 @@ class Network(ProcfsMetric):
             path = IfSpeed.make_path(self._speed_file_pfx, iface)
             self._speed_files_cache[iface] = IfSpeed(path)
 
-        speed = yield self._speed_files_cache[iface].read()
-        raise gen.Return(speed)
+        return self._speed_files_cache[iface].read()
 
     def rates(self, iface):
         """Get (construct) rates structure."""

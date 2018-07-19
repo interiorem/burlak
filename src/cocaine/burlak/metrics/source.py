@@ -1,8 +1,6 @@
 """Metrics source abstraction."""
 import time
 
-from tornado import gen
-
 from .system import SystemMetrics
 from ..mixins import LoggerMixin
 
@@ -23,13 +21,12 @@ class MetricsSource(LoggerMixin):
         self._system_metrics = SystemMetrics(context)
         self._hub = hub
 
-    @gen.coroutine
     def fetch(self, _query, _type="tree"):
         """Try to mimic Cocaine metrics service API.
 
         Note that API very likely subject of change!
         """
-        system = yield self._system_metrics.poll()
+        system = self._system_metrics.poll()
         self._hub.system = system
 
-        raise gen.Return(self._hub.metrics)
+        return self._hub.metrics
