@@ -3,7 +3,6 @@
 TODO: checks for network link speed not available for (1) some NICs,
      (2) all NICs
 """
-
 import sys
 
 from cocaine.burlak import config
@@ -20,8 +19,9 @@ from cocaine.burlak.metrics.system import SystemMetrics
 
 import pytest
 
-from .common import ASYNC_TESTS_TIMEOUT
-from .common import make_future, make_logger_mock
+import six
+
+from .common import make_logger_mock
 
 
 if (sys.version_info < (3, 0)):
@@ -42,7 +42,7 @@ CPU_STAT_EMPTY_CONTENT = ['cpu  0 0 0 0 0 0 0 0 0 0']
 CPU_STAT_CONTENT_1 = ['cpu  1 2 3 0 2 0 1 0 0 0']
 CPU_STAT_CONTENT_2 = ['cpu  5 4 3 2 2 0 1 0 0 0']
 
-CPU_LOAD = .75
+CPU_LOAD = .52
 
 MEMINFO_CONTENT_1 = [
     'MemTotal:         100500 kB',
@@ -208,21 +208,18 @@ def source(mocker, context):
     return MetricsSource(context, Hub())
 
 
-@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_source(mocker, source):
     source._system_metrics.poll = \
-        mocker.Mock(return_value=make_future(metrics_poll_result))
+        mocker.Mock(return_value=metrics_poll_result)
 
-    metrics = yield source.fetch({})
+    metrics = source.fetch({})
 
     assert 'system' in metrics
     assert metrics['system'] == metrics_poll_result
 
 
-@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_system_metrics(mocker, context):
     """Test system metrics in composition."""
-
     #
     # TODO(test_system_metrics): refactor this part, it seems ugly.
     #
@@ -243,9 +240,9 @@ def test_system_metrics(mocker, context):
 
     def dummy_get_speed(self, iface):
         if iface == 'lan0':
-            return make_future(LAN0_SPEED)
+            return LAN0_SPEED
         elif iface == 'lan1':
-            return make_future(LAN1_SPEED)
+            return LAN1_SPEED
 
         return -100  # unreachable
 
@@ -254,8 +251,8 @@ def test_system_metrics(mocker, context):
 
     system_metrics = SystemMetrics(context)
 
-    yield system_metrics.poll()
-    metrics = yield system_metrics.poll()
+    system_metrics.poll()
+    metrics = system_metrics.poll()
 
     assert metrics.viewkeys() == {
         'loadavg',
@@ -264,9 +261,12 @@ def test_system_metrics(mocker, context):
         'mem.free',
         'mem.cached',
         'mem.load',
+        'mem.usable',
+        'mem.free_and_cached_ma',
         'mem.used',
         'mem.total',
         'network',
+        'poll_inteval_sec',
     }
 
     eps = .02
@@ -276,7 +276,7 @@ def test_system_metrics(mocker, context):
     assert metrics['loadavg'][2] == pytest.approx(1.00, eps)
 
     assert metrics['cpu.load'] == pytest.approx(CPU_LOAD, eps)
-    assert metrics['cpu.usable'] == pytest.approx(1.0 - CPU_LOAD, eps)
+    assert metrics['cpu.usable'] == pytest.approx(0.175, eps)
 
     assert metrics['mem.total'] == MEM_TOTAL_BYTES
     assert metrics['mem.free'] == MEM_FREE_BYTES
@@ -313,27 +313,19 @@ def test_system_metrics(mocker, context):
     assert network['lan1']['tx_bps'] == int(lan1_tx_ma.value)
 
 
-@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_system_metrics_exception(mocker, context):
-    cpu_exception = make_future(Exception('Boom CPU'))
-    mem_exception = make_future(Exception('Boom Mem'))
-    la_exception = make_future(Exception('Boom LA'))
-    net_exception = make_future(Exception('Boom Net'))
-
-    mocker.patch.object(Cpu, 'read', return_value=cpu_exception)
-    mocker.patch.object(Memory, 'read', return_value=mem_exception)
-    mocker.patch.object(Loadavg, 'read', return_value=la_exception)
-    mocker.patch.object(Network, 'read', return_value=net_exception)
+    mocker.patch.object(Cpu, 'read', side_effect=Exception('Boom CPU'))
+    mocker.patch.object(Memory, 'read', side_effect=Exception('Boom Mem'))
+    mocker.patch.object(Loadavg, 'read', side_effect=Exception('Boom LA'))
+    mocker.patch.object(Network, 'read', side_effect=Exception('Boom Net'))
 
     system_metrics = SystemMetrics(context)
 
-    metrics = yield system_metrics.poll()
-    assert metrics == {}
+    metrics = system_metrics.poll()
+    assert six.viewkeys(metrics) == {'poll_inteval_sec'}
 
 
-@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_procfs_multiple_times(mocker, context):
-
     mocker.patch.object(
         ProcfsMetric, 'open', autospec=True,
         side_effect=make_open_stub(CPU_STAT_CONTENT_1, CPU_STAT_CONTENT_2))
@@ -345,9 +337,7 @@ def test_procfs_multiple_times(mocker, context):
     assert p.read_nfirst_lines(1) == CPU_STAT_CONTENT_1
 
 
-@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_procfs_multiple_lines(mocker, context):
-
     mocker.patch.object(
         ProcfsMetric, 'open', autospec=True,
         side_effect=make_open_stub(MEMINFO_CONTENT_1, MEMINFO_CONTENT_2))
@@ -362,21 +352,18 @@ def test_procfs_multiple_lines(mocker, context):
 
 
 @pytest.mark.xfail(raises=MetricsException)
-@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_cpu_read_exceptions(mocker):
     c = Cpu('/dev/null')
-    yield c.read()
+    c.read()
 
 
-@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_cpu_empty_record(mocker):
-
     stub = make_open_stub(CPU_STAT_EMPTY_CONTENT, CPU_STAT_EMPTY_CONTENT)
     mocker.patch.object(
         ProcfsMetric, 'open', autospec=True, side_effect=stub)
 
     c = Cpu('/proc/stat')
-    c = yield c.read()
+    c = c.read()
 
     assert isinstance(c.total, int)
     assert isinstance(c.usage, int)
@@ -387,26 +374,26 @@ def test_cpu_empty_record(mocker):
     assert c.load == .0
 
 
-@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_cpu_overflow(mocker):
-
     mocker.patch.object(
         ProcfsMetric, 'open', autospec=True,
         side_effect=make_open_stub(CPU_STAT_CONTENT_2, CPU_STAT_CONTENT_1))
 
-    c = Cpu('/proc/stat')
-    c = yield c.read()
+    source = Cpu('/proc/stat')
+    source.read()
+    c = source.read()
 
     assert isinstance(c.total, int)
     assert isinstance(c.usage, int)
     assert isinstance(c.load, float)
+    assert isinstance(c.usable, float)
 
     assert c.total == 0
     assert c.usage == 0
     assert c.load == .0
+    assert c.usable == 1.
 
 
-@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 def test_mem_zeroes_record(mocker):
     mocker.patch.object(
         ProcfsMetric, 'open', autospec=True,
@@ -415,7 +402,7 @@ def test_mem_zeroes_record(mocker):
     mocker.patch(OPEN_TO_PATCH, return_value=_MockFile(MEMINFO_ZEROES))
 
     m = Memory('/proc/stat')
-    m = yield m.read()
+    m = m.read()
 
     assert isinstance(m.total, int)
     assert isinstance(m.free, int)
@@ -511,7 +498,6 @@ def test_hub(system, apps, metrics):
     assert hub.metrics == metrics
 
 
-@pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
 @pytest.mark.parametrize('expected', [
     ((['100'], ['200'])),
     ((['100'], ['100'])),
@@ -525,7 +511,7 @@ def test_ifspeed(mocker, expected):
     isp = IfSpeed('/dev/null')
 
     for sp in expected:
-        speed = yield isp.read()
+        speed = isp.read()
 
         assert int(sp[0]) == speed
 
