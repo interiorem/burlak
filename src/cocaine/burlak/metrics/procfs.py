@@ -130,12 +130,12 @@ class Cpu(ProcfsMetric):
         'usable',
     ])
 
-    def __init__(self, path):
+    def __init__(self, path, alpha):
         """Set metrics reader from 'path'."""
         super(Cpu, self).__init__(path)
 
         self._prev_cpu = None
-        self._load_ma, self._usable_ma = EWMA(), EWMA()
+        self._load_ma, self._usable_ma = EWMA(alpha), EWMA(alpha)
 
     def read(self, to_sleep=CPU_POLL_TICK):
         """CPU load based on procfs 'stat' file.
@@ -237,10 +237,10 @@ class Memory(ProcfsMetric):
         'free_and_cached_ma',
     ])
 
-    def __init__(self, path):
+    def __init__(self, path, alpha):
         """Init procfs memory metric with specified path."""
         super(Memory, self).__init__(path)
-        self._free_and_cached_ma = EWMA()
+        self._free_and_cached_ma = EWMA(alpha)
 
     def read(self):
         """Read memory stat from procfs.
@@ -371,7 +371,9 @@ class Network(ProcfsMetric):
     Net = namedtuple('Net', 'speed_mbits rx tx rx_bps tx_bps')
     Rates = namedtuple('Rates', 'rx_ma tx_ma')
 
-    def __init__(self, path, sysfs_path_pfx, netlink_conf, poll_interval_sec):
+    def __init__(
+            self, path, sysfs_path_pfx, netlink_conf,
+            poll_interval_sec, alpha):
         """Init procfs network metric with specified path."""
         super(Network, self).__init__(path)
 
@@ -387,6 +389,8 @@ class Network(ProcfsMetric):
 
         self._rates = {}
         self._prev_stat = {}
+
+        self._alpha = alpha
 
     def read(self):
         """Read network stat from procfs.
@@ -409,8 +413,8 @@ class Network(ProcfsMetric):
         if net_prev:
             span = self._poll_interval_sec
 
-            rates.rx_ma.update((net.rx - net_prev.rx) / span)
-            rates.tx_ma.update((net.tx - net_prev.tx) / span)
+            rates.rx_ma.update((net.rx - net_prev.rx) / float(span))
+            rates.tx_ma.update((net.tx - net_prev.tx) / float(span))
 
         if_speed = Network.UNKNOWN_SPEED
 
@@ -425,14 +429,14 @@ class Network(ProcfsMetric):
                 self._netlink_speed_mbits,
                 net.rx, net.tx,
                 rates.rx_ma.int_of_value,
-                rates.tx_ma.int_of_value
+                rates.tx_ma.int_of_value,
             )
 
         to_add = Network.Net(
             if_speed,
             net.rx, net.tx,
             rates.rx_ma.int_of_value,
-            rates.tx_ma.int_of_value
+            rates.tx_ma.int_of_value,
         )
 
         results[iface] = self._prev_stat[iface] = to_add
@@ -453,7 +457,7 @@ class Network(ProcfsMetric):
         """Get (construct) rates structure."""
         r = self._rates.get(iface)
         if r is None:
-            r = Network.Rates(EWMA(), EWMA())
+            r = Network.Rates(EWMA(self._alpha), EWMA(self._alpha))
             self._rates[iface] = r
 
         return r

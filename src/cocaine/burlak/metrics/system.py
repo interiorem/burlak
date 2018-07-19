@@ -5,6 +5,7 @@ from .procfs import Cpu as ProcfsCPU
 from .procfs import Loadavg as ProcfsLoadavg
 from .procfs import Memory as ProcfsMemory
 from .procfs import Network as ProcfsNetwork
+from .ewma import EWMA
 
 
 class SystemMetrics(LoggerMixin):
@@ -17,16 +18,23 @@ class SystemMetrics(LoggerMixin):
         super(SystemMetrics, self).__init__(context, **kwargs)
 
         config = self._config = context.config
+        metrics_config = config.metrics
+
+        alpha = EWMA.alpha(
+            metrics_config.poll_interval_sec,
+            metrics_config.post_interval_sec,
+        )
 
         # System metrics
-        self._cpu = ProcfsCPU(config.procfs_stat_path)
-        self._memory = ProcfsMemory(config.procfs_mem_path)
+        self._cpu = ProcfsCPU(config.procfs_stat_path, alpha)
+        self._memory = ProcfsMemory(config.procfs_mem_path, alpha)
         self._loadavg = ProcfsLoadavg(config.procfs_loadavg_path)
         self._network = ProcfsNetwork(
             config.procfs_netstat_path,
             config.sysfs_network_prefix,
             config.netlink,
-            config.metrics.poll_interval_sec
+            config.metrics.poll_interval_sec,
+            alpha,
         )
 
     def poll(self):

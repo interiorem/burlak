@@ -533,8 +533,10 @@ class MetricsSubmitter(LoggerMixin, MetricsMixin, LoopSentry):
                 to_sleep = self._config.metrics.post_interval_sec
                 yield gen.sleep(to_sleep)
 
-                # Mark state as `dirty`
-                self._ci_state.metrics = self._hub.metrics
+                if self._config.metrics.enabled:
+                    # Mark state as `dirty`
+                    self._ci_state.metrics = self._hub.metrics
+
                 yield self._submitter.post_committed_state()
             except Exception as e:
                 self.warn('failed to submit metrics feedback: {}', e)

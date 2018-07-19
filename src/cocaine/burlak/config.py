@@ -59,22 +59,6 @@ def make_metrics_config(d):
         path, poll_interval_sec, post_interval_sec, query, enabled)
 
 
-def make_discovery_config(d):
-    DiscoveryConfig = namedtuple('DiscoveryConfig', [
-        'path',
-        'update_interval_sec',
-        'enabled',
-    ])
-
-    path = d.get('path', Defaults.DISCOVERY_PATH)
-    update_interval_sec = d.get(
-        'update_interval_sec', Defaults.DISCOVERY_PATH)
-
-    enabled = True if d else False
-
-    return DiscoveryConfig(path, update_interval_sec, enabled)
-
-
 def make_sharding_config(d):
     ShardingConfig = namedtuple('ShardingConfig', [
         'enabled',
@@ -211,19 +195,6 @@ class Config(object):
             'schema': {
                 'unicorn_path': {'type': 'string'},
                 'unicorn_feedback': {'type': 'boolean'}
-            }
-        },
-        'discovery': {
-            'type': 'dict',
-            'required': False,
-            'schema': {
-                'path': {'type': 'string'},
-                'update_interval_sec': {
-                    'type': 'integer',
-                    'min': 0,
-                    'max': 2**24,
-                    'required': False,
-                }
             }
         },
         'sharding': {
@@ -553,11 +524,6 @@ class Config(object):
     def metrics(self):
         metrics = self._config.get('metrics', {})
         return make_metrics_config(metrics)
-
-    @property
-    def discovery(self):
-        discovery = self._config.get('discovery', {})
-        return make_discovery_config(discovery)
 
     @property
     def sharding(self):
