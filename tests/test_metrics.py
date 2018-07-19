@@ -5,8 +5,9 @@ TODO: checks for network link speed not available for (1) some NICs,
 """
 import sys
 
-from cocaine.burlak import config
+from cocaine.burlak.config import Config
 from cocaine.burlak.context import Context, LoggerSetup
+from cocaine.burlak.defaults import Defaults
 from cocaine.burlak.metrics.ewma import EWMA
 from cocaine.burlak.metrics.exceptions import MetricsException
 from cocaine.burlak.metrics.hub import Hub
@@ -23,6 +24,8 @@ import six
 
 from .common import make_logger_mock
 
+
+TEST_ALPHA = 0.7
 
 if (sys.version_info < (3, 0)):
     OPEN_TO_PATCH = '__builtin__.open'
@@ -42,7 +45,7 @@ CPU_STAT_EMPTY_CONTENT = ['cpu  0 0 0 0 0 0 0 0 0 0']
 CPU_STAT_CONTENT_1 = ['cpu  1 2 3 0 2 0 1 0 0 0']
 CPU_STAT_CONTENT_2 = ['cpu  5 4 3 2 2 0 1 0 0 0']
 
-CPU_LOAD = .52
+CPU_LOAD = .1659
 
 MEMINFO_CONTENT_1 = [
     'MemTotal:         100500 kB',
@@ -182,9 +185,13 @@ def context(mocker):
     logger = make_logger_mock(mocker)
     sentry_wrapper = mocker.Mock()
 
+    config = Config(mocker.Mock())
+    mocker.patch.object(
+        Defaults, 'NETLINK_NAME', return_value='lan0')
+
     return Context(
         LoggerSetup(logger, False),
-        config.Config(mocker.Mock()),
+        config,
         '0',
         sentry_wrapper,
         mocker.Mock(),
@@ -269,14 +276,14 @@ def test_system_metrics(mocker, context):
         'poll_inteval_sec',
     }
 
-    eps = .02
+    eps = .0001
 
     assert metrics['loadavg'][0] == pytest.approx(1.02, eps)
     assert metrics['loadavg'][1] == pytest.approx(0.99, eps)
     assert metrics['loadavg'][2] == pytest.approx(1.00, eps)
 
     assert metrics['cpu.load'] == pytest.approx(CPU_LOAD, eps)
-    assert metrics['cpu.usable'] == pytest.approx(0.175, eps)
+    assert metrics['cpu.usable'] == pytest.approx(0.055299804, eps)
 
     assert metrics['mem.total'] == MEM_TOTAL_BYTES
     assert metrics['mem.free'] == MEM_FREE_BYTES
@@ -293,24 +300,30 @@ def test_system_metrics(mocker, context):
     assert network['lan0']['rx'] == 110
     assert network['lan0']['tx'] == 220
 
-    lan0_rx_ma, lan0_tx_ma = EWMA(), EWMA()
-    lan0_rx_ma.update(10 / context.config.metrics.poll_interval_sec)
-    lan0_tx_ma.update(20 / context.config.metrics.poll_interval_sec)
+    alpha = EWMA.alpha(
+        context.config.metrics.poll_interval_sec,
+        context.config.metrics.post_interval_sec,
+    )
+    span = context.config.metrics.poll_interval_sec
 
-    assert network['lan0']['rx_bps'] == int(lan0_rx_ma.value)
-    assert network['lan0']['tx_bps'] == int(lan0_tx_ma.value)
+    lan0_rx_ma, lan0_tx_ma = EWMA(alpha), EWMA(alpha)
+    lan0_rx_ma.update(10 / span)
+    lan0_tx_ma.update(20 / span)
 
-    lan1_rx_ma, lan1_tx_ma = EWMA(), EWMA()
-    lan1_rx_ma.update(30 / context.config.metrics.poll_interval_sec)
-    lan1_tx_ma.update(40 / context.config.metrics.poll_interval_sec)
+    assert network['lan0']['rx_bps'] == lan0_rx_ma.int_of_value
+    assert network['lan0']['tx_bps'] == lan0_tx_ma.int_of_value
+
+    lan1_rx_ma, lan1_tx_ma = EWMA(alpha), EWMA(alpha)
+    lan1_rx_ma.update(30 / span)
+    lan1_tx_ma.update(40 / span)
 
     assert network['lan1']['speed_mbits'] == LAN1_SPEED
 
     assert network['lan1']['rx'] == 230
     assert network['lan1']['tx'] == 340
 
-    assert network['lan1']['rx_bps'] == int(lan1_rx_ma.value)
-    assert network['lan1']['tx_bps'] == int(lan1_tx_ma.value)
+    assert network['lan1']['rx_bps'] == lan1_rx_ma.int_of_value
+    assert network['lan1']['tx_bps'] == lan1_tx_ma.int_of_value
 
 
 def test_system_metrics_exception(mocker, context):
@@ -353,7 +366,7 @@ def test_procfs_multiple_lines(mocker, context):
 
 @pytest.mark.xfail(raises=MetricsException)
 def test_cpu_read_exceptions(mocker):
-    c = Cpu('/dev/null')
+    c = Cpu('/dev/null', TEST_ALPHA)
     c.read()
 
 
@@ -362,7 +375,7 @@ def test_cpu_empty_record(mocker):
     mocker.patch.object(
         ProcfsMetric, 'open', autospec=True, side_effect=stub)
 
-    c = Cpu('/proc/stat')
+    c = Cpu('/proc/stat', TEST_ALPHA)
     c = c.read()
 
     assert isinstance(c.total, int)
@@ -379,7 +392,7 @@ def test_cpu_overflow(mocker):
         ProcfsMetric, 'open', autospec=True,
         side_effect=make_open_stub(CPU_STAT_CONTENT_2, CPU_STAT_CONTENT_1))
 
-    source = Cpu('/proc/stat')
+    source = Cpu('/proc/stat', TEST_ALPHA)
     source.read()
     c = source.read()
 
@@ -401,7 +414,7 @@ def test_mem_zeroes_record(mocker):
 
     mocker.patch(OPEN_TO_PATCH, return_value=_MockFile(MEMINFO_ZEROES))
 
-    m = Memory('/proc/stat')
+    m = Memory('/proc/stat', TEST_ALPHA)
     m = m.read()
 
     assert isinstance(m.total, int)
@@ -478,10 +491,32 @@ def test_procfs_metrics_reopen(mocker):
     ([-1, -2, -3, -2], -2.175),
 ])
 def test_ewma(sequence, result):
-    ewma = EWMA()
+    ewma = EWMA(TEST_ALPHA)
     for x in sequence:
         ewma.update(x)
     assert ewma.value == pytest.approx(result, 0.01)
+
+
+@pytest.mark.xfail(raises=ValueError)
+@pytest.mark.parametrize('alpha', [
+    (-1),
+    (100500),
+    (3.14),
+    (-100),
+])
+def test_ewma_broken_alpha(alpha):
+    EWMA(alpha)
+
+
+@pytest.mark.xfail(raises=ValueError)
+@pytest.mark.parametrize('dt, tau', [
+    (-1, 0.1),
+    (0., -2),
+    (-10, -20.),
+    (0., 0.),
+])
+def test_ewma_time_constant(dt, tau):
+    EWMA.alpha(dt, tau)
 
 
 @pytest.mark.parametrize('system,apps,metrics', [
