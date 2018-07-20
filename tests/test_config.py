@@ -260,3 +260,33 @@ def test_api_timeout(config, expected_to):
     cfg.update([config])
 
     assert cfg.api_timeout == expected_to
+
+
+@pytest.mark.parametrize(
+    'config,path,enabled',
+    [
+        ('tests/assets/conf1.yaml', '/foo/bar', True),
+        ('tests/assets/conf2.yaml', '/foo/bar', False),
+        ('tests/assets/conf3.yaml', Defaults.FEEDBACK_PATH, False),
+    ]
+)
+def test_feeadback_conf(config, path, enabled):
+    cfg = Config(shared_status)
+    cfg.update([config])
+
+    assert cfg.feedback.unicorn_path == path
+    assert cfg.feedback.unicorn_feedback == enabled
+
+
+@pytest.mark.parametrize(
+    'config,timeout',
+    [
+        ('tests/assets/conf1.yaml', 42),
+        ('tests/assets/conf2.yaml', Defaults.ON_AYNC_ERROR_TIMEOUT_SEC),
+    ]
+)
+def test_async_error(config, timeout):
+    cfg = Config(shared_status)
+    cfg.update([config])
+
+    assert cfg.async_error_timeout_sec == timeout
