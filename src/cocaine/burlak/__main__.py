@@ -5,6 +5,7 @@
 #   - endpoints for logger
 #
 import burlak
+import metrics
 
 import click
 
@@ -22,7 +23,6 @@ from .config import Config
 from .context import Context, LoggerSetup
 from .helpers import SecureServiceFabric
 from .mokak.mokak import SharedStatus, make_status_web_handler
-from .metrics import MetricsFetcher, SystemMetrics
 from .sharding import ShardingSetup
 from .sentry import SentryClientWrapper
 from .sys_metrics import SysMetricsGatherer
@@ -132,21 +132,21 @@ def main(
     if not uuid_prefix:
         uuid_prefix = config.uuid_path
 
-    system_metrics = SystemMetrics(context)
-    metrics_fetcher = burlak.MetricsFetcher(
-        context,
-        MetricsFetcher(context, system_metrics),
-        committed_state, feedback_submitter
-    )
+    hub = metrics.Hub()
+    metrics_fetcher = burlak.MetricsFetcher(context, hub)
+    metrics_submitter = burlak.MetricsSubmitter(
+        context, committed_state, hub, feedback_submitter)
 
     # run async poll tasks in date flow reverse order, from sink to source
     io_loop = IOLoop.current()
 
+    # Note that while dependency is avoided, sometime order matters!
     io_loop.spawn_callback(control_filter.subscribe_to_control_filter)
     io_loop.spawn_callback(apps_elysium.blessing_road)
     io_loop.spawn_callback(state_processor.process_loop)
 
     io_loop.spawn_callback(metrics_fetcher.poll_stats)
+    io_loop.spawn_callback(metrics_submitter.post_metrics)
     io_loop.spawn_callback(feedback_submitter.listen_for_committed_state)
     io_loop.spawn_callback(
         lambda: acquirer.subscribe_to_state_updates(unicorn))
@@ -174,8 +174,8 @@ def main(
             workers_distribution,
             __version__,
         )
-        web_app = make_web_app_v1(wopts) # noqa F841
-        status_app = make_status_web_handler( # noqa F841
+        web_app = make_web_app_v1(wopts)  # noqa F841
+        status_app = make_status_web_handler(  # noqa F841
             shared_status, config.status_web_path, config.status_port)
 
         click.secho('orca is starting...', fg='green')

@@ -1,11 +1,11 @@
 """System matrics gather interface."""
-from tornado import gen
 
 from ..mixins import LoggerMixin
 from .procfs import Cpu as ProcfsCPU
 from .procfs import Loadavg as ProcfsLoadavg
 from .procfs import Memory as ProcfsMemory
 from .procfs import Network as ProcfsNetwork
+from .ewma import EWMA
 
 
 class SystemMetrics(LoggerMixin):
@@ -17,20 +17,26 @@ class SystemMetrics(LoggerMixin):
     def __init__(self, context, **kwargs):
         super(SystemMetrics, self).__init__(context, **kwargs)
 
-        self._config = context.config
+        config = self._config = context.config
+        metrics_config = config.metrics
 
-        # System metrics
-        self._cpu = ProcfsCPU(context.config.procfs_stat_path)
-        self._memory = ProcfsMemory(context.config.procfs_mem_path)
-        self._loadavg = ProcfsLoadavg(context.config.procfs_loadavg_path)
-        self._network = ProcfsNetwork(
-            context.config.procfs_netstat_path,
-            context.config.sysfs_network_prefix,
-            context.config.netlink_default_name,
-            context.config.netlink_speed_mbits,
+        alpha = EWMA.alpha(
+            metrics_config.poll_interval_sec,
+            metrics_config.post_interval_sec,
         )
 
-    @gen.coroutine
+        # System metrics
+        self._cpu = ProcfsCPU(config.procfs_stat_path, alpha)
+        self._memory = ProcfsMemory(config.procfs_mem_path, alpha)
+        self._loadavg = ProcfsLoadavg(config.procfs_loadavg_path)
+        self._network = ProcfsNetwork(
+            config.procfs_netstat_path,
+            config.sysfs_network_prefix,
+            config.netlink,
+            config.metrics.poll_interval_sec,
+            alpha,
+        )
+
     def poll(self):
         """Poll procfs metrics.
 
@@ -47,10 +53,12 @@ class SystemMetrics(LoggerMixin):
 
         TODO(SystemMetrics): seems that try/exept blocks is code repititions
         """
-        to_return = {}
+        to_return = {
+            'poll_inteval_sec': self._config.metrics.poll_interval_sec
+        }
 
         try:
-            cpu = yield self._cpu.read()
+            cpu = self._cpu.read()
             to_return.update({
                 'cpu.load': cpu.load,
                 'cpu.usable': cpu.usable,
@@ -59,28 +67,30 @@ class SystemMetrics(LoggerMixin):
             self.error('failed to get system metrics [cpu] {}', e)
 
         try:
-            memory = yield self._memory.read()
+            memory = self._memory.read()
             to_return.update({
                 'mem.load': memory.load,
+                'mem.usable': memory.usable,
                 'mem.cached': memory.cached,
                 'mem.free': memory.free,
                 'mem.used': memory.used,
                 'mem.total': memory.total,
+                'mem.free_and_cached_ma': memory.free_and_cached_ma,
             })
         except Exception as e:
             self.error('failed to get system metrics [memory] {}', e)
 
         try:
-            loadavg = yield self._loadavg.read()
+            loadavg = self._loadavg.read()
             to_return.update({'loadavg': loadavg})
         except Exception as e:
             self.error('failed to get system metrics [loadavg] {}', e)
 
         try:
-            network = yield self._network.read()
+            network = self._network.read()
             network = ProcfsNetwork.as_named_dict(network)
             to_return.update({'network': network})
         except Exception as e:
             self.error('failed to get system metrics [network] {}', e)
 
-        raise gen.Return(to_return)
+        return to_return

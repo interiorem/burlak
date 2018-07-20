@@ -21,3 +21,6 @@ expire_stopped: 42
 status_web_path: /boo
 
 input_queue_size: 42
+
+feedback:
+    unicorn_path: /foo/bar

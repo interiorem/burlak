@@ -16,3 +16,9 @@ control_filter_path: 'some/path'
 control_filter:
     apply_control: true
     white_list: ['z', '42']
+
+feedback:
+    unicorn_path: /foo/bar
+    unicorn_feedback: true
+
+async_error_timeout_sec: 42
