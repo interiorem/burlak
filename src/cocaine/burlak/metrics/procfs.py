@@ -15,11 +15,6 @@ from ..common import clamp
 from ..mixins import LoggerMixin
 
 
-# Time to async sleep between two cpu load measurements
-CPU_POLL_TICK = .25  # 250ms
-NET_POLL_TICK = .25  # 250ms
-NET_TICKS_PER_SEC = 1. / NET_POLL_TICK
-
 CPU_FIELDS_COUNT = 11  # one label field "cpu" + 10 ticks fields
 NET_FIELDS_COUNT = 17
 
@@ -86,8 +81,7 @@ class Loadavg(ProcfsMetric):
 
         :rtype: (float, float, float)
         """
-        loadavg_lines = self.read_nfirst_lines()
-        return Loadavg._parse(loadavg_lines)
+        return Loadavg._parse(self.read_nfirst_lines())
 
     @staticmethod
     def _parse(lines):
@@ -137,11 +131,8 @@ class Cpu(ProcfsMetric):
         self._prev_cpu = None
         self._load_ma, self._usable_ma = EWMA(alpha), EWMA(alpha)
 
-    def read(self, to_sleep=CPU_POLL_TICK):
+    def read(self):
         """CPU load based on procfs 'stat' file.
-
-        :param to_sleep: gap in seconds of sequental cpu ticks poll
-        :type to_sleep: int
 
         :return: named tuple with fields:
           total - cumulative ticks count of all cpus in `to_sleep` interval
@@ -225,7 +216,7 @@ class Memory(ProcfsMetric):
     FREE_FIELD_NAME = 'MemFree:'
     CACHED_FIELD_NAME = 'Cached:'
 
-    SUFFIXES = 'kB'
+    SUFFIX = 'kB'
 
     Mem = namedtuple('Mem', [
         'total',
@@ -297,22 +288,23 @@ class Memory(ProcfsMetric):
             Memory.CACHED_FIELD_NAME
 
         assert splitted[Memory.TOTAL][Memory.UNITS_FIELD] == \
-            Memory.SUFFIXES
+            Memory.SUFFIX
         assert splitted[Memory.FREE][Memory.UNITS_FIELD] == \
-            Memory.SUFFIXES
+            Memory.SUFFIX
         assert splitted[Memory.CACHED][Memory.UNITS_FIELD] == \
-            Memory.SUFFIXES
+            Memory.SUFFIX
 
     def _calc_load_ma(self, mem):
         """Memory (load, usable) ratios in [0, 1] interval."""
         if not mem.total:
             return .0, .0
 
-        load = mem.total - self._free_and_cached_ma.value
+        free = self._free_and_cached_ma.value
+        load = mem.total - free
 
         return \
             clamp(load / float(mem.total), .0, 1.0), \
-            clamp(self._free_and_cached_ma.value / float(mem.total), .0, 1.0)
+            clamp(free / float(mem.total), .0, 1.0)
 
 
 class IfSpeed(ProcfsMetric):
@@ -365,7 +357,7 @@ class Network(ProcfsMetric):
         TX_BTS, TX_PCKS, TX_ERR, TX_DROPS, TX_FIFO, TX_FRAME, TX_CMP, TX_MC  \
         = xrange(NET_FIELDS_COUNT)
 
-    IGNORE_LIST_PFX = {'lo', 'tun', 'dummy', 'docker', 'br', 'wlan'}
+    IGNORE_LIST_PFX = {'lo', 'tun', 'dummy', 'docker', 'wlan'}
     UNKNOWN_SPEED = -1
 
     Net = namedtuple('Net', 'speed_mbits rx tx rx_bps tx_bps')
@@ -432,14 +424,12 @@ class Network(ProcfsMetric):
                 rates.tx_ma.int_of_value,
             )
 
-        to_add = Network.Net(
+        results[iface] = self._prev_stat[iface] = Network.Net(
             if_speed,
             net.rx, net.tx,
             rates.rx_ma.int_of_value,
             rates.tx_ma.int_of_value,
         )
-
-        results[iface] = self._prev_stat[iface] = to_add
 
     def _get_link_speed(self, iface):
         """Temporary stub for iface speed acquisition.
