@@ -45,7 +45,8 @@ CPU_STAT_EMPTY_CONTENT = ['cpu  0 0 0 0 0 0 0 0 0 0']
 CPU_STAT_CONTENT_1 = ['cpu  1 2 3 0 2 0 1 0 0 0']
 CPU_STAT_CONTENT_2 = ['cpu  5 4 3 2 2 0 1 0 0 0']
 
-CPU_LOAD = .1659
+CPU_LOAD = .21260
+CPU_USABLE = 0.0708671
 
 MEMINFO_CONTENT_1 = [
     'MemTotal:         100500 kB',
@@ -283,7 +284,7 @@ def test_system_metrics(mocker, context):
     assert metrics['loadavg'][2] == pytest.approx(1.00, eps)
 
     assert metrics['cpu.load'] == pytest.approx(CPU_LOAD, eps)
-    assert metrics['cpu.usable'] == pytest.approx(0.055299804, eps)
+    assert metrics['cpu.usable'] == pytest.approx(CPU_USABLE, eps)
 
     assert metrics['mem.total'] == MEM_TOTAL_BYTES
     assert metrics['mem.free'] == MEM_FREE_BYTES
