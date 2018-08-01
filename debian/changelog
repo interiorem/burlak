@@ -1,3 +1,9 @@
+cocaine-orca (0.1.45) unstable; urgency=low
+
+  * Stop broken apps which are not in state.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Wed, 01 Aug 2018 13:14:20 +0300
+
 cocaine-orca (0.1.44) unstable; urgency=medium
 
   * Separate metrics poll and post loops.
