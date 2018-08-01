@@ -52,7 +52,7 @@ SYNC_COMPLETION_TIMEOUT_SEC = 600
 INVALID_STATE_ERR_CODE = 6
 
 
-# TODO: Decompose!
+# TODO(burlak): Decompose!
 DispatchMessage = namedtuple('DispatchMessage', [
     'state',
     'real_state',
@@ -70,6 +70,13 @@ DispatchMessage = namedtuple('DispatchMessage', [
 StateRecord = namedtuple('StateRecord', [
     'workers',
     'profile',
+])
+
+
+"""Lists of broken apps."""
+BrokenRecord = namedtuple('BrokenRecord', [
+    'broken',
+    'broken_in_state',
 ])
 
 
@@ -740,13 +747,12 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         info = yield self.get_apps_info(running_apps)
         workers_count = self.workers_per_app(info)
 
-        broken_apps, stop_again = set(), set()
+        broken_apps, state_broken_apps, stop_again = \
+            set(), set(), set()
 
         if real_state_nonempty:
-            broken_apps = {
-                app for app in self.get_broken_apps(info)
-                if app in state
-            }
+            broken_apps = self.get_broken_apps(info)
+            state_broken_apps = {app for app in broken_apps if app in state}
             stop_again = {
                 app for app in workers_count
                 if app not in state and workers_count[app] > 0
@@ -755,7 +761,9 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         workers_mismatch = self.workers_diff(state, workers_count)
 
         self.debug('real state non empty {}', real_state_nonempty)
-        self.debug('in broken state {}', broken_apps)
+        self.debug(
+            'apps in broken state: all {}, in state {}',
+            broken_apps, state_broken_apps)
         self.debug('current workers count {}', workers_count)
         self.debug('stop command should be resent to {}', stop_again)
         self.debug('workers mismatch {}', workers_mismatch)
@@ -764,7 +772,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             workers_count,
             workers_mismatch,
             stop_again,
-            broken_apps,
+            BrokenRecord(broken_apps, state_broken_apps),
         ))
 
     @gen.coroutine
@@ -817,7 +825,9 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def process_loop(self):
-        running_apps, broken_apps = set(), set()
+        running_apps = set()
+        broken = BrokenRecord(set(), set())
+
         state, prev_state, real_state, state_version = (
             dict(), dict(), dict(), DEFAULT_UNKNOWN_VERSIONS
         )
@@ -929,7 +939,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                         workers_count,
                         workers_mismatch,
                         stop_again,
-                        broken_apps,
+                        broken
                     ) = yield self.runtime_state(
                         state, bool(real_state), running_apps)
 
@@ -937,7 +947,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     # TODO(mark_broken_apps): could lead to app ban by
                     # scheduler.
                     #
-                    self.mark_broken_apps(state, broken_apps, state_version)
+                    self.mark_broken_apps(
+                        state, broken.broken_in_state, state_version)
 
                     self.workers_distribution.clear()
                     self.workers_distribution.update(workers_count)
@@ -958,11 +969,17 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
             update_state_apps_set = state.viewkeys()
 
+            # If application is in current state, but was marked as broken,
+            # it should be restarted by node service `app stop/start` sequence,
+            # so all such applications (in current state and broken) should be
+            # added to run list, but all of broken applications, even if they
+            # are not in state should be stopped hardly (with node service's
+            # pause_app command) so all of them added to `to_hard_stop` set.
             to_run = update_state_apps_set - running_apps
-            to_run |= broken_apps
+            to_run |= broken.broken_in_state
 
             to_stop = running_apps - update_state_apps_set
-            to_hard_stop = broken_apps
+            to_hard_stop = broken.broken
 
             if is_state_updated:  # check for profiles change
                 #
