@@ -88,9 +88,6 @@ def main(
 
     node = Service(config.node_name, config.locator_endpoints)
 
-    uniresis = catchup_an_uniresis(
-        uniresis_stub_uuid, config.locator_endpoints)
-
     sentry_wrapper = SentryClientWrapper(
         logger, dsn=config.sentry_dsn, revision=__version__)
 
@@ -100,6 +97,9 @@ def main(
         __version__,
         sentry_wrapper,
         shared_status)
+
+    uniresis = catchup_an_uniresis(
+        context, uniresis_stub_uuid, config.locator_endpoints)
 
     if not apps_poll_interval:
         apps_poll_interval = config.apps_poll_interval_sec

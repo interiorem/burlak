@@ -7,12 +7,15 @@ LoggerSetup = namedtuple('LoggerSetup', [
 ])
 
 
-'''Application wide internal state holders, handlers, e.g.:
-- config
-- logger
-- sentry_wrapper
-...
-'''
+"""Application wide internal state holders.
+
+Handlers:
+ - config
+ - logger
+ - sentry_wrapper
+   ...
+
+"""
 Context = namedtuple('Context', [
     'logger_setup',
     'config',

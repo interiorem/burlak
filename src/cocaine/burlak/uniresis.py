@@ -27,25 +27,40 @@ class ResoursesProxy(object):
 
 class UniresisProxy(ResoursesProxy):
 
-    def __init__(self, endpoints, name):
+    def __init__(self, context, endpoints, name):
+        self.config = context.config
+
         self.name = name
         self.uniresis = \
             Service(name, endpoints) if endpoints else Service(name)
 
     @property
     def service_name(self):
+        """Return name of backend service.
+
+        Shoud return either 'locator' or 'uniresis'.
+
+        """
         return self.name
 
     @gen.coroutine
     def uuid(self):
+        """Resquest uuid from uniresis service."""
         ch = yield self.uniresis.uuid()
-        uuid = yield ch.rx.get()
+        uuid = yield ch.rx.get(timeout=self.config.api_timeout)
+
         raise gen.Return(uuid)
 
     @gen.coroutine
     def extra(self):
+        """Resquest extra records from uniresis/locator service.
+
+        Cluster name of main intrest in 'extra' json.
+
+        """
         ch = yield self.uniresis.extra()
-        extra = yield ch.rx.get()
+        extra = yield ch.rx.get(timeout=self.config.api_timeout)
+
         raise gen.Return(extra)
 
 
@@ -75,12 +90,13 @@ class DummyProxy():
 
 
 def catchup_an_uniresis(
-    use_stub_uuid=None, endpoints=None, service_name='uniresis'):
-    '''
-    Note that former `service_name` was uniresis, which is deprecated now.
-    '''
+        context, use_stub_uuid=None, endpoints=None, service_name='uniresis'):
+    """Construct uniresis proxy.
 
+    Note that `service_name` must be locator, uniresis will be deprecated
+    someday.
+    """
     if use_stub_uuid:
         return DummyProxy(use_stub_uuid)
     else:
-        return UniresisProxy(endpoints, service_name)
+        return UniresisProxy(context, endpoints, service_name)
