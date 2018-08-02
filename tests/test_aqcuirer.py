@@ -73,7 +73,7 @@ def acq(mocker):
         mocker.Mock(),
     )
 
-    uniresis = catchup_an_uniresis(use_stub_uuid=TEST_UUID)
+    uniresis = catchup_an_uniresis(context, use_stub_uuid=TEST_UUID)
     sharding_setup = ShardingSetup(context, uniresis)
     return burlak.StateAcquirer(context, sharding_setup, input_queue)
 
