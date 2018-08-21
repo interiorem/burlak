@@ -172,6 +172,7 @@ def main(
             committed_state, metrics_gatherer,
             qs, units,
             workers_distribution,
+            apps_elysium,
             __version__,
         )
         web_app = make_web_app_v1(wopts)  # noqa F841

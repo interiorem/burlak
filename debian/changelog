@@ -1,3 +1,9 @@
+cocaine-orca (0.1.46) unstable; urgency=medium
+
+  * add web handle with zero write to control channel of app
+
+ -- Boris Litvinenko <borislitv@yandex-team.ru>  Thu, 23 Aug 2018 19:13:07 +0300
+
 cocaine-orca (0.1.45) unstable; urgency=low
 
   * Stop broken apps which are not in state.

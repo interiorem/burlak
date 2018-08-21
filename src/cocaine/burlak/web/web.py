@@ -20,6 +20,7 @@ WebOptions = namedtuple('WebOptions', [
     'qs',
     'units',
     'workers_distribution',
+    'apps_elysium',
     'version',
 ])
 
@@ -50,6 +51,8 @@ def make_web_app_v1(opts):
         (make_url(opts.prefix, API_V1, r'distribution(/?[^/]*)'),
             WorkersDistribution,
             dict(workers_distribution=opts.workers_distribution)),
+        (make_url(opts.prefix, API_V1, r'zerocontrol'), ZeroControlHandler,
+            dict(apps_elysium=opts.apps_elysium)),
         (opts.prefix + r'/failed', FailedStateHandle,
             dict(committed_state=opts.committed_state)),
         (
@@ -168,6 +171,18 @@ class StateV1Handler(web.RequestHandler):
 
         state_with_meta['state'] = state_to_client
         self.write(state_with_meta)
+
+
+class ZeroControlHandler(web.RequestHandler):
+    def initialize(self, apps_elysium):
+        self.apps_elysium = apps_elysium
+
+    @gen.coroutine
+    def get(self):
+        app = self.get_argument('app')
+        yield self.apps_elysium.zero_to_channel(app)
+        self.write('Ok')
+        self.flush()
 
 
 class FailedStateHandle(web.RequestHandler):
