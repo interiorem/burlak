@@ -403,7 +403,7 @@ class StateAcquirer(LoggerMixin, MetricsMixin, LoopSentry):
                     self.debug(info_message)
 
                     state, version = yield ch.rx.get(
-                            timeout=self.context.config.api_timeout_by2)
+                        timeout=self.context.config.api_timeout_by2)
 
                     assert isinstance(version, int)
 
@@ -557,8 +557,10 @@ class FeedbackSubmitter(LoggerMixin, MetricsMixin, LoopSentry):
     or not.
 
     """
-    def __init__(self, ctx, committed_state, unicorn, async_route_provider,
+    def __init__(
+            self, ctx, committed_state, unicorn, async_route_provider,
             **kwargs):
+
         super(FeedbackSubmitter, self).__init__(ctx, **kwargs)
 
         self._config = ctx.config
@@ -649,8 +651,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         return set(to_update)
 
     def workers_diff(self, state, running_workers):
-        '''Find mismatch between last state and current runtime state
-        '''
+        """Find mismatch between last state and current runtime state."""
         # In case if app is not in running_workers it would be started
         # on next control iteration, so it isn't any need to mark it
         # `failed` in common state.
@@ -663,9 +664,9 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def get_running_apps_set(self):
-        '''
-            TODO: make wrapper for retries
-        '''
+        """
+        TODO: make wrapper for retries.
+        """
         apps_list = set()
 
         attempts = DEFAULT_RETRY_ATTEMPTS

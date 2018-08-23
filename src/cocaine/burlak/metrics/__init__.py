@@ -5,8 +5,8 @@ TODO(metrics):
   - For some metrics zero values returned on error, but this values could
     lead to wrong scheduling, it should be better to raise exception.
 """
-from .source import MetricsSource
 from .hub import Hub
+from .source import MetricsSource
 from .system import SystemMetrics
 
 __all__ = ['MetricsSource', 'Hub', 'SystemMetrics']

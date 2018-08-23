@@ -16,6 +16,7 @@ def context(mocker):
     type(context.config).api_timeout = mocker.PropertyMock(return_value=100500)
     return context
 
+
 @pytest.mark.gen_test
 def test_uniresis(context):
     uuid = yield catchup_an_uniresis(
