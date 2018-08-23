@@ -1049,6 +1049,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         self.submitter = submitter
         self.status = context.shared_status.register(AppsElysium.TASK_NAME)
 
+        self.channels_cache = ChannelsCache(self, node)
+
     @gen.coroutine
     def start(self, app, profile, state_version, tm, started=None):
         """Try to start application with specified profile."""
@@ -1098,19 +1100,18 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     @gen.coroutine
     def stop_by_control(
-            self, app, state_version, tm, channels_cache, stopped_by_control):
+            self, app, state_version, tm, stopped_by_control):
         """Stop application with app.control(0)."""
         try:
             if app in stopped_by_control:
                 return
 
             yield self.adjust_by_channel(
-                app,
-                '',
-                channels_cache,
-                0,
-                state_version,
-                tm,
+                app=app,
+                profile='',
+                to_adjust=0,
+                state_version=state_version,
+                tm=tm,
             )
 
             stopped_by_control.add(app)
@@ -1129,6 +1130,13 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.ci_state.mark_stopped(app, state_version, tm)
 
     @gen.coroutine
+    def zero_to_channel(self, app):
+        """Special handle to pipeline for restart aplication.
+        Send zero to control channel of app without write to state.
+        """
+        yield self.write_to_channel(app, 0)
+
+    @gen.coroutine
     def control_with_ack(self, ch, to_adjust):  # pragma nocover
         """Send control and get (dummy) result or exception.
 
@@ -1138,10 +1146,14 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         yield ch.rx.get(timeout=self.context.config.api_timeout)
 
     @gen.coroutine
-    def adjust_by_channel(
-            self, app, profile, channels_cache, to_adjust, state_version, tm):
-
+    def write_to_channel(self, app, to_adjust):
         self.debug('control command to {} with {}', app, to_adjust)
+        ch = yield self.channels_cache.get_ch(app)
+        yield self.control_with_ack(ch, to_adjust)
+
+    @gen.coroutine
+    def adjust_by_channel(
+            self, app, profile, to_adjust, state_version, tm):
 
         def is_spooling_state(e):
             """Check for spooling state with some heuristics.
@@ -1158,15 +1170,14 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         attempts = CONTROL_RETRY_ATTEMPTS
         while attempts:
             try:
-                ch = yield channels_cache.get_ch(app)
-                yield self.control_with_ack(ch, to_adjust)
+                yield self.write_to_channel(app, to_adjust)
             except Exception as e:
                 if is_spooling_state(e):
                     self.warn(
                         'seems that app {} is in spooling state: {}', app, e)
                     self.ci_state.mark_pending_start(
                         app, to_adjust, profile, state_version, tm)
-                    yield channels_cache.close_and_remove([app])
+                    yield self.channels_cache.close_and_remove([app])
                     break
 
                 attempts -= 1
@@ -1182,7 +1193,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 self.metrics_cnt['errors_of_control'] += 1
                 self.sentry_wrapper.capture_exception()
 
-                yield channels_cache.close_and_remove([app])
+                yield self.channels_cache.close_and_remove([app])
                 yield gen.sleep(DEFAULT_RETRY_EXP_BASE_SEC)
 
                 self.ci_state.mark_failed(
@@ -1203,12 +1214,12 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
             self.ci_state.mark_pending_stop(app, state_version, now)
 
     @gen.coroutine
-    def apply_filter(self, channels_cache, control_filter):
+    def apply_filter(self, control_filter):
         self.info('applying control filter {}', control_filter.as_dict())
         if control_filter.white_list:
             to_retain = \
-                filter_apps(channels_cache.apps(), control_filter.white_list)
-            yield channels_cache.close_other(to_retain)
+                filter_apps(self.channels_cache.apps(), control_filter.white_list)
+            yield self.channels_cache.close_other(to_retain)
 
     @gen.coroutine
     def stop_hard(self, ch_cache, to_hard_stop, state_version):
@@ -1222,7 +1233,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     @gen.coroutine
     def blessing_road(self):
         """Scheduler control commands processing loop."""
-        channels_cache = ChannelsCache(self, self.node_service)
         stopped_by_control = set()
 
         control_filter = None
@@ -1239,7 +1249,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 if isinstance(command, ControlFilterMessage):
                     # State is already pruned in dispatch in those case
                     control_filter = command.control_filter
-                    yield self.apply_filter(channels_cache, control_filter)
+                    yield self.apply_filter(self.channels_cache, control_filter)
                     continue
                 elif not isinstance(command, DispatchMessage):
                     error_message = 'wrong command type in control subsystem'
@@ -1283,9 +1293,9 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         dict(),
                     )
 
-                    yield channels_cache.close_and_remove_all()
+                    yield self.channels_cache.close_and_remove_all()
                     self.ci_state.channels_cache_apps = \
-                        channels_cache.apps()
+                        self.channels_cache.apps()
 
                     stopped_by_control.clear()
 
@@ -1305,7 +1315,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                             app,
                             command.state_version,
                             tm,
-                            channels_cache,
                             stopped_by_control,
                         )
                         for app in command.to_stop
@@ -1314,7 +1323,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     self.debug('stopping hard, apps {}', command.to_hard_stop)
 
                     yield self.stop_hard(
-                        channels_cache,
+                        self.channels_cache,
                         command.to_hard_stop,
                         command.state_version
                     )
@@ -1381,7 +1390,6 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     self.adjust_by_channel(
                         app,
                         state_record.profile,
-                        channels_cache,
                         int(state_record.workers),
                         command.state_version, tm)
                     for app, state_record in six.iteritems(command.state)
@@ -1389,10 +1397,10 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     app not in failed_to_start
                 ]
 
-                self.ci_state.channels_cache_apps = channels_cache.apps()
+                self.ci_state.channels_cache_apps = self.channels_cache.apps()
 
                 self.metrics_cnt['state_updates'] += 1
-                self.metrics_cnt['ch_cache_size'] += len(channels_cache)
+                self.metrics_cnt['ch_cache_size'] += len(self.channels_cache)
 
                 yield self.submitter.post_committed_state()
 
