@@ -12,6 +12,8 @@ from math import ceil, cos, sin
 
 import click
 
+from collections import namedtuple
+
 from cocaine.services import Service
 
 from tornado import gen, httpclient
@@ -29,14 +31,22 @@ UNICORN_STATE_PREFIX = '/state'
 DEFAULT_SLEEP_TO_SEC = 4
 DEFAULT_SLEEP_ON_ERROR_SEC = 10
 
-X_INC = 0.05
-AMPF = 20
+X_INC = 0.2
+AMPF = 3
 DEFAULT_DISABLE_PROPORTION = 0.0
 
 DEFAULT_PROFILE1 = 'IsoProcess'
 DEFAULT_PROFILE2 = 'IsoProcess2'
 
 TO_ZERO_ON = 11
+
+
+class FakeContext(object):
+
+    @property
+    def config(self):
+        Config = namedtuple('Config', ['api_timeout'])
+        return Config(10)
 
 
 def sample_sin(a, x):
@@ -79,7 +89,8 @@ def state_pusher(
         unicorn, path_prefix, uniresis_stub_uuid, working_state,
         max_workers, to_sleep, verify_url, stop_proportion):
 
-    uniresis = catchup_an_uniresis(uniresis_stub_uuid)
+    fake_context = FakeContext()
+    uniresis = catchup_an_uniresis(fake_context, uniresis_stub_uuid)
 
     uuid = yield uniresis.uuid()
     path = make_state_path(path_prefix, uuid)
