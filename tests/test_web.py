@@ -152,6 +152,7 @@ def app(mocker):
         qs,
         units,
         workers_distribution,
+        mocker.Mock(),
         TEST_VERSION
     )
     return make_web_app_v1(wops)
