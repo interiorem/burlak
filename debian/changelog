@@ -1,3 +1,9 @@
+cocaine-orca (0.1.47) unstable; urgency=medium
+
+  * Take cluster-wide 'semaphore' type lock for applications startup.
+
+ -- Alex Karev <karapuz@yandex-team.ru>  Tue, 04 Sep 2018 20:59:28 +0300
+
 cocaine-orca (0.1.46) unstable; urgency=medium
 
   * add web handle with zero write to control channel of app
