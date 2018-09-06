@@ -12,8 +12,7 @@ def compose_path(prefix, tag, subnode):
 
 
 class ShardingSetup(object):
-    """Provides sharding environment routes.
-    """
+    """Provides sharding environment routes."""
     def __init__(self, context, uniresis):
         self._ctx = context
         self._uniresis = uniresis
@@ -36,6 +35,18 @@ class ShardingSetup(object):
             setup, fallback_path, setup.feedback_subnode)
 
         raise gen.Return((uuid, path))
+
+    @gen.coroutine
+    def get_semaphore_route(self):
+        path = self._ctx.config.semaphore.locks_path
+        setup = self._ctx.config.sharding
+
+        if setup.enabled:
+            tag = yield self._get_dc_tag(setup.tag_key, setup.default_tag)
+            path = \
+                compose_path(setup.common_prefix, tag, setup.semaphore_subnode)
+
+        raise gen.Return((None, path))
 
     @gen.coroutine
     def get_metrics_route(self):
@@ -71,7 +82,7 @@ class ShardingSetup(object):
             tag = extra.get(tag_key, default)
         except Exception as e:
             # Note: print log, ignore
-            self._logger.info(
+            self._logger.debug(
                 'method uniresis::extra not implemented, '
                 'using default tag [%s]', tag
             )

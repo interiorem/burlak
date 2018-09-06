@@ -23,8 +23,9 @@ from .config import Config
 from .context import Context, LoggerSetup
 from .helpers import SecureServiceFabric
 from .mokak.mokak import SharedStatus, make_status_web_handler
-from .sharding import ShardingSetup
+from .semaphore import Semaphore
 from .sentry import SentryClientWrapper
+from .sharding import ShardingSetup
 from .sys_metrics import SysMetricsGatherer
 from .uniresis import catchup_an_uniresis
 from .web import Uptime, WebOptions, make_web_app_v1
@@ -126,8 +127,15 @@ def main(
         workers_distribution,
     )
 
+    semaphore = Semaphore(context, unicorn, sharding_setup)
+
     apps_elysium = burlak.AppsElysium(
-        context, committed_state, node, control_queue, feedback_submitter)
+        context,
+        committed_state,
+        node,
+        control_queue,
+        feedback_submitter,
+    )
 
     if not uuid_prefix:
         uuid_prefix = config.uuid_path
@@ -142,8 +150,8 @@ def main(
 
     # Note that while dependency is avoided, sometime order matters!
     io_loop.spawn_callback(control_filter.subscribe_to_control_filter)
-    io_loop.spawn_callback(apps_elysium.blessing_road)
-    io_loop.spawn_callback(state_processor.process_loop)
+    io_loop.spawn_callback(lambda: apps_elysium.blessing_road(semaphore))
+    io_loop.spawn_callback(lambda: state_processor.process_loop(semaphore))
 
     io_loop.spawn_callback(metrics_fetcher.poll_stats)
     io_loop.spawn_callback(metrics_submitter.post_metrics)
