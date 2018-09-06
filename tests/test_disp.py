@@ -13,6 +13,7 @@ from tornado import queues
 
 from .common import ASYNC_TESTS_TIMEOUT, \
     make_future, make_logger_mock, make_mock_channel_with
+from .common import MockSemaphore
 
 
 running_app_lists = [
@@ -128,7 +129,7 @@ def test_state_input(disp, mocker):
         return_value=make_mock_channel_with(*running_apps_list))
     disp.node_service.info = mocker.Mock(side_effect=info_mock)
 
-    yield disp.process_loop()
+    yield disp.process_loop(MockSemaphore())
 
     msg = yield disp.control_queue.get()
     disp.control_queue.task_done()
@@ -215,7 +216,7 @@ def test_app_poll(disp, mocker):
 
     yield disp.filter_queue.put(burlak.ControlFilterMessage(control_filter))
 
-    yield disp.process_loop()
+    yield disp.process_loop(MockSemaphore())
 
     assert disp.workers_diff.call_count == len(running_apps)
 

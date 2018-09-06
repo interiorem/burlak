@@ -282,7 +282,7 @@ def test_feeadback_conf(config, path, enabled):
     'config,timeout',
     [
         ('tests/assets/conf1.yaml', 42),
-        ('tests/assets/conf2.yaml', Defaults.ON_AYNC_ERROR_TIMEOUT_SEC),
+        ('tests/assets/conf2.yaml', Defaults.ON_ASYNC_ERROR_TIMEOUT_SEC),
     ]
 )
 def test_async_error(config, timeout):
