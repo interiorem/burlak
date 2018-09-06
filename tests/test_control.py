@@ -4,15 +4,19 @@ from cocaine.burlak.chcache import ChannelsCache, _AppsCache
 from cocaine.burlak.comm_state import CommittedState
 from cocaine.burlak.config import Config
 from cocaine.burlak.context import Context, LoggerSetup
+from cocaine.burlak.semaphore import LockHolder
+
 
 import pytest
 
 from tornado import queues
 
 from .common import ASYNC_TESTS_TIMEOUT
+from .common import MockSemaphore
 from .common import make_logger_mock
 from .common import make_mock_channel_with, make_mock_channels_list_with
 from .common import make_mock_control_list_with
+
 
 to_stop_apps = [
     ['app3', 'app4', 'app5', 'app6', 'app7'],
@@ -40,6 +44,11 @@ to_run_apps = [
 
 def count_apps(list_of_dict):
     return sum(map(len, (d for d in list_of_dict)))
+
+
+@pytest.fixture
+def semaphore(mocker):
+    return MockSemaphore()
 
 
 @pytest.fixture
@@ -102,6 +111,7 @@ def test_stop_by_control(elysium, mocker):
                 set(), set(stop_apps), set(),
                 False,
                 set(), set(),
+                LockHolder(),
             )
         )
 
@@ -113,7 +123,7 @@ def test_stop_by_control(elysium, mocker):
         return_value=make_mock_channel_with(0)
     )
 
-    yield elysium.blessing_road()
+    yield elysium.blessing_road(MockSemaphore())
 
     for apps_list in to_stop_apps:
         for app in apps_list:
@@ -149,6 +159,7 @@ def test_stop_apps_disabled(elysium, mocker, log_pending_stop):
                 set(), set(stop_apps), set(),
                 False,
                 set(), set(),
+                LockHolder(),
             )
         )
 
@@ -158,7 +169,7 @@ def test_stop_apps_disabled(elysium, mocker, log_pending_stop):
         )
     )
 
-    yield elysium.blessing_road()
+    yield elysium.blessing_road(MockSemaphore())
     assert elysium.node_service.pause_app.call_count == 0
 
 
@@ -178,6 +189,7 @@ def test_run(elysium, mocker):
                 set(), set(), set(run_apps.iterkeys()),
                 False,
                 set(), set(),
+                LockHolder(),
             )
         )
 
@@ -187,7 +199,7 @@ def test_run(elysium, mocker):
         return_value=make_mock_channel_with(0)
     )
 
-    yield elysium.blessing_road()
+    yield elysium.blessing_road(MockSemaphore())
 
     for apps_list in to_run_apps:
         for app, record in apps_list.iteritems():
@@ -201,7 +213,7 @@ def test_run(elysium, mocker):
 
 
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
-def test_control(elysium, mocker):
+def test_control(elysium, semaphore, mocker):
     stop_side_effect = [True for _ in to_run_apps]
     stop_side_effect.append(False)
 
@@ -217,6 +229,7 @@ def test_control(elysium, mocker):
                 set(), set(), set(run_apps.iterkeys()),
                 False,
                 set(), set(),
+                LockHolder(),
             )
         )
 
@@ -226,7 +239,7 @@ def test_control(elysium, mocker):
         return_value=make_mock_channel_with(0)
     )
 
-    yield elysium.blessing_road()
+    yield elysium.blessing_road(MockSemaphore())
 
     for apps_list in to_run_apps:
         for app, record in apps_list.iteritems():
@@ -250,7 +263,7 @@ def test_control(elysium, mocker):
 # TODO: exceptions count!
 #
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
-def test_control_exceptions(elysium, mocker):
+def test_control_exceptions(elysium, semaphore, mocker):
     stop_side_effect = [True for _ in to_run_apps]
     stop_side_effect.append(False)
 
@@ -266,6 +279,7 @@ def test_control_exceptions(elysium, mocker):
                 set(), set(), set(run_apps.iterkeys()),
                 False,
                 set(), set(),
+                LockHolder(),
             )
         )
 
@@ -287,7 +301,7 @@ def test_control_exceptions(elysium, mocker):
         side_effect=make_mock_control_list_with(except_sequence)
     )
 
-    yield elysium.blessing_road()
+    yield elysium.blessing_road(semaphore)
 
     for apps_list in to_run_apps:
         for app, record in apps_list.iteritems():
@@ -308,7 +322,7 @@ def test_control_exceptions(elysium, mocker):
 
 # TODO: redactor
 @pytest.mark.gen_test(timeout=ASYNC_TESTS_TIMEOUT)
-def skipped_test_gapped_control(elysium, mocker):
+def skipped_test_gapped_control(elysium, semaphore, mocker):
     '''Test for malformed state and to_run list combination'''
     stop_side_effect = [True for _ in to_run_apps]
     stop_side_effect.append(False)
@@ -341,10 +355,11 @@ def skipped_test_gapped_control(elysium, mocker):
                 False,
                 set(),
                 set(),
+                LockHolder(),
             )
         )
 
-    yield elysium.blessing_road()
+    yield elysium.blessing_road(semaphore)
 
     for state in to_run_apps:
         for app, record in state.iteritems():

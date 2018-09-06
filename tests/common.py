@@ -1,10 +1,13 @@
 '''Service mock object
 Mostly copy-pasted from darkvoice/tests/common.py
 '''
+from collections import namedtuple
+
 import mock
 
 from tornado import gen
 from tornado.concurrent import Future
+
 
 ASYNC_TESTS_TIMEOUT = 10
 
@@ -71,3 +74,15 @@ class MockControlChannel(object):
         self.tx.write = mock.Mock(
             return_value=make_mock_channels_list_with(*values))
         self.tx.close = mock.Mock(return_value=make_future(0))
+
+
+class MockSemaphore(object):
+
+    @gen.coroutine
+    def try_to_acquire_lock(self, lock):
+        MockCh = namedtuple('MockCh', 'channel')
+        lock.lock = MockCh(channel=MockChannel())
+
+    @gen.coroutine
+    def release_lock_holder(self, lock):
+        lock.lock = None

@@ -55,7 +55,7 @@ class Defaults(object):
 
     API_TIMEOUT = 300
 
-    ON_AYNC_ERROR_TIMEOUT_SEC = 10
+    ON_ASYNC_ERROR_TIMEOUT_SEC = 10
 
     SHARDING_ENABLED = False
     FALLBACK_SHARDING_TAG = '_unspec'
@@ -65,6 +65,7 @@ class Defaults(object):
 
     SHARDING_FEEDBACK_SUBNODE = 'feedback'
     SHARDING_STATE_SUBNODE = 'state'
+    SHARDING_SEMAPHORE_SUBNODE = 'semaphore'
 
     # TODO: probably unused
     SHARDING_METRICS_SUBNODE = 'metrics'
@@ -79,3 +80,8 @@ class Defaults(object):
 
     NETLINK_SPEED_MBITS = 10000  # Megabits
     NETLINK_NAME = 'veth0'
+
+    SEMAPHORE_PATH = '/darkvoice/semaphore'
+    SEMAPHORE_LOCKS_COUNT = 6
+    SEMAPHORE_LOCK_NAME = 'lock'
+    SEMAPHORE_TRY_LOCK_SEC = 600

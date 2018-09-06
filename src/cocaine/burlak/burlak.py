@@ -35,6 +35,7 @@ from .logger import ConsoleLogger, VoidLogger
 from .loop_sentry import LoopSentry
 from .metrics import MetricsSource
 from .patricia.patricia import trie
+from .semaphore import LockHolder
 
 from .mixins import *
 
@@ -64,6 +65,7 @@ DispatchMessage = namedtuple('DispatchMessage', [
     'runtime_reborn',
     'workers_mismatch',
     'stop_again',
+    'run_lock',
 ])
 
 
@@ -825,7 +827,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             self.error('failed to dump feedback record {}', e)
 
     @gen.coroutine
-    def process_loop(self):
+    def process_loop(self, semaphore):
         running_apps = set()
         broken = BrokenRecord(set(), set())
 
@@ -836,6 +838,8 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
         last_uuid = None
         control_filter = yield self.get_filter_once()
         no_state_yet = True
+
+        run_lock = LockHolder()
 
         while self.should_run():
             self.status.mark_ok('listenning on incoming queue')
@@ -890,9 +894,14 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                     runtime_reborn = True
                     no_state_yet = True
 
+                    yield semaphore.release_lock_holder(run_lock)
+
                     self.reset_state(state, real_state)
                     self.info('reset state signal')
                 elif isinstance(msg, NoStateNodeMessage):
+
+                    yield semaphore.release_lock_holder(run_lock)
+
                     self.reset_state(state, real_state)
                     self.info('seems that there is no state node')
                 elif isinstance(msg, DumpCommittedState):
@@ -982,6 +991,28 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
             to_stop = running_apps - update_state_apps_set
             to_hard_stop = broken.broken
 
+            if to_run:
+                # If it is some apps to start.
+                if not run_lock.has_lock:  # not yet in `run_lock` state
+                    self.info('no run lock, trying to acquire')
+                    yield semaphore.try_to_acquire_lock(run_lock)
+                    if not run_lock.has_lock:
+                        self.info(
+                            'no free lock found, clearing to_run list {}',
+                            to_run
+                        )
+                        # No lock was acquired, skip to next iteration,
+                        # setting `to_run` to zero set for this iteration,
+                        # so no run task would be performed.
+                        to_run = set()
+                else:
+                    # We already in `run_lock` state, just proceed
+                    self.info('in run lock state')
+            else:
+                # No need to start any application, release the lock (if any),
+                # and leave `run_lock` state.
+                yield semaphore.release_lock_holder(run_lock)
+
             if is_state_updated:  # check for profiles change
                 #
                 # TODO(Profile update check): temporary disabled, should have
@@ -1021,6 +1052,7 @@ class StateAggregator(LoggerMixin, MetricsMixin, LoopSentry):
                         runtime_reborn,
                         workers_mismatch,
                         stop_again,
+                        run_lock,
                     )
                 )
 
@@ -1035,8 +1067,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
 
     TASK_NAME = 'tasks_dispatch'
 
-    def __init__(self, context, ci_state, node, control_queue, submitter,
-            **kwargs):
+    def __init__(
+            self, context, ci_state, node, control_queue, submitter, **kwargs):
         super(AppsElysium, self).__init__(context, **kwargs)
 
         self.context = context
@@ -1057,7 +1089,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         """Try to start application with specified profile."""
         try:
             ch = yield self.node_service.start_app(app, profile)
-            yield ch.rx.get(timeout=self.context.config.api_timeout)
+            yield ch.rx.get(timeout=self.context.config.api_timeout_by2)
         except Exception as e:
             self.metrics_cnt['errors_start_app'] += 1
             self.status.mark_warn('failed to start application')
@@ -1218,12 +1250,15 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
     def apply_filter(self, control_filter):
         self.info('applying control filter {}', control_filter.as_dict())
         if control_filter.white_list:
-            to_retain = \
-                filter_apps(self.channels_cache.apps(), control_filter.white_list)
+            to_retain = filter_apps(
+                self.channels_cache.apps(),
+                control_filter.white_list
+            )
             yield self.channels_cache.close_other(to_retain)
 
     @gen.coroutine
     def stop_hard(self, ch_cache, to_hard_stop, state_version):
+        """Stop applications by node server stop command."""
         tm = time.time()
         yield ch_cache.close_and_remove(to_hard_stop)
         yield [
@@ -1232,7 +1267,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
         self.metrics_cnt['stopped_hard'] = len(to_hard_stop)
 
     @gen.coroutine
-    def blessing_road(self):
+    def blessing_road(self, semaphore):
         """Scheduler control commands processing loop."""
         stopped_by_control = set()
 
@@ -1250,7 +1285,8 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 if isinstance(command, ControlFilterMessage):
                     # State is already pruned in dispatch in those case
                     control_filter = command.control_filter
-                    yield self.apply_filter(self.channels_cache, control_filter)
+                    yield self.apply_filter(control_filter)
+
                     continue
                 elif not isinstance(command, DispatchMessage):
                     error_message = 'wrong command type in control subsystem'
@@ -1360,6 +1396,16 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                         started)
                     for app in command.to_run if app in command.state
                 ]
+
+                if started:
+                    delta = time.time() - tm
+                    self.info(
+                        'applications started in {:.3f}s: {}', delta, started
+                    )
+
+                # Reset the run lock, if some app need to be (re)started,
+                # it will be lock acquire attempt on next round.
+                yield semaphore.release_lock_holder(command.run_lock)
 
                 failed_to_start = command.to_run - started
                 started = started | command.workers_mismatch

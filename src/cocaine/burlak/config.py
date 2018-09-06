@@ -68,6 +68,7 @@ def make_sharding_config(d):
         'state_subnode',
         'feedback_subnode',
         'metrics_subnode',
+        'semaphore_subnode',
     ])
 
     enabled = d.get('enabled', Defaults.SHARDING_ENABLED)
@@ -85,9 +86,12 @@ def make_sharding_config(d):
     metrics_subnode = d.get(
         'metrics_subnode', Defaults.SHARDING_METRICS_SUBNODE)
 
+    semaphore_subnode = d.get(
+        'semaphore_subnode', Defaults.SHARDING_SEMAPHORE_SUBNODE)
+
     return ShardingConfig(
         enabled, default_tag, common_prefix, tag_key,
-        state_subnode, feedback_subnode, metrics_subnode
+        state_subnode, feedback_subnode, metrics_subnode, semaphore_subnode
     )
 
 
@@ -107,11 +111,29 @@ def make_netlink_config(d):
     )
 
 
+def make_semaphore_config(d):
+    """Construct semaphore config."""
+    SemaphoreConfig = namedtuple('SemaphoreConfig', [
+        'locks_path',
+        'lock_name',
+        'locks_count',
+        'try_timeout_sec',
+    ])
+
+    return SemaphoreConfig(
+        locks_path=d.get('path', Defaults.SEMAPHORE_PATH),
+        lock_name=d.get('lock_name', Defaults.SEMAPHORE_LOCK_NAME),
+        locks_count=d.get('locks_count', Defaults.SEMAPHORE_LOCKS_COUNT),
+        try_timeout_sec=d.get(
+            'try_timeout_sec', Defaults.SEMAPHORE_TRY_LOCK_SEC),
+    )
+
+
 #
 # Should be compatible with tools secure section
 #
 class Config(object):
-
+    """App-wide config."""
     TASK_NAME = 'config'
 
     FILTER_SCHEMA = {
@@ -222,6 +244,11 @@ class Config(object):
                     'type': 'string',
                     'required': False,
                 },
+                'semaphore_subnode': {
+                    'type': 'string',
+                    'required': False,
+                },
+
             }
         },
         'metrics': {
@@ -344,6 +371,31 @@ class Config(object):
                     'required': False,
                 },
             },
+        },
+        'run.semaphore': {
+            'type': 'dict',
+            'required': False,
+            'schema': {
+                'locks_path': {
+                    'type': 'string',
+                    'required': False,
+                },
+                'lock_name': {
+                    'type': 'string',
+                    'required': False,
+                },
+                'locks_count': {
+                    'type': 'integer',
+                    'min': 0,
+                    'max': 8 * 1024,
+                },
+                'try_timeout_sec': {
+                    'type': 'integer',
+                    'min': 0,
+                    'max': 2**16,
+                    'required': False,
+                },
+            }
         },
         'control_filter_path': {
             'type': 'string',
@@ -487,7 +539,7 @@ class Config(object):
     @property
     def async_error_timeout_sec(self):
         return self._config.get(
-            'async_error_timeout_sec', Defaults.ON_AYNC_ERROR_TIMEOUT_SEC)
+            'async_error_timeout_sec', Defaults.ON_ASYNC_ERROR_TIMEOUT_SEC)
 
     @property
     def input_queue_size(self):
@@ -552,7 +604,11 @@ class Config(object):
 
     @property
     def api_timeout_by2(self):
-        return 2 * self._config.get('api_timeout_sec', Defaults.API_TIMEOUT)
+        return 2 * self.api_timeout
+
+    @property
+    def api_timeout_by4(self):
+        return 4 * self.api_timeout
 
     @property
     def procfs_stat_path(self):
@@ -578,6 +634,11 @@ class Config(object):
     def netlink(self):
         netlink = self._config.get('netlink', {})
         return make_netlink_config(netlink)
+
+    @property
+    def semaphore(self):
+        semaphore = self._config.get('run.semaphore', {})
+        return make_semaphore_config(semaphore)
 
     # TODO:
     #   refactor to single method?
