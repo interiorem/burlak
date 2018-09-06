@@ -1285,7 +1285,7 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                 if isinstance(command, ControlFilterMessage):
                     # State is already pruned in dispatch in those case
                     control_filter = command.control_filter
-                    yield self.apply_filter(self.channels_cache, control_filter)
+                    yield self.apply_filter(control_filter)
 
                     continue
                 elif not isinstance(command, DispatchMessage):
