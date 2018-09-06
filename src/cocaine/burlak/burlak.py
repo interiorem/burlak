@@ -1397,6 +1397,12 @@ class AppsElysium(LoggerMixin, MetricsMixin, LoopSentry):
                     for app in command.to_run if app in command.state
                 ]
 
+                if started:
+                    delta = time.time() - tm
+                    self.info(
+                        'applications started in {:.3f}s: {}', delta, started
+                    )
+
                 # Reset the run lock, if some app need to be (re)started,
                 # it will be lock acquire attempt on next round.
                 yield semaphore.release_lock_holder(command.run_lock)
