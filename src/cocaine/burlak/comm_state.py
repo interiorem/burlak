@@ -80,11 +80,12 @@ class CommittedState(object):
         return {app: rec._asdict() for app, rec in self.state.iteritems()}
 
     def as_named_dict_ext(self):
+        """Make structure with timestamp and version."""
         return dict(
-            state = self.as_named_dict(),
-            metrics = self.metrics,
-            timestamp = self.updated_at,
-            version = self.version,
+            state=self.as_named_dict(),
+            metrics=self.metrics,
+            timestamp=self.updated_at,
+            version=self.version,
         )
 
     def reset_output_state(self):
