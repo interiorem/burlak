@@ -2,6 +2,9 @@
 
 Links:
  - read `man 5 proc` for procfs stat files formats.
+
+TODO(procfs): some logs would be helpful.
+
 """
 import itertools
 import six
@@ -395,6 +398,13 @@ class Network(ProcfsMetric):
         results = {}
         for iface, net in six.iteritems(networks):
             self._fill_results(results, iface, net)
+
+        to_close = \
+            six.viewkeys(self._speed_files_cache) - six.viewkeys(networks)
+
+        for iface in to_close:
+            self._speed_files_cache[iface].close()
+            self._speed_files_cache.pop(iface, {})
 
         return results
 
