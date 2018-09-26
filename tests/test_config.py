@@ -1,5 +1,4 @@
 from cocaine.burlak import Config, ConsoleLogger
-from cocaine.burlak.control_filter import ControlFilter
 from cocaine.burlak.defaults import Defaults
 from cocaine.burlak.mokak.mokak import SharedStatus
 
@@ -201,50 +200,6 @@ def test_console_log_level_setter():
     cfg.console_log_level = console_level
 
     assert cfg.console_log_level == console_level
-
-
-@pytest.mark.parametrize(
-    'config,expected_filter',
-    [
-        ('tests/assets/conf1.yaml', ControlFilter(True, ['z', '42'])),
-        ('tests/assets/conf2.yaml', ControlFilter(False, [])),
-        ('tests/assets/conf3.yaml', ControlFilter(False, [])),
-    ]
-)
-def test_control_filter(config, expected_filter):
-    cfg = Config(shared_status)
-    cfg.update([config])
-
-    assert cfg.control_filter.as_dict() == expected_filter.as_dict()
-
-
-@pytest.mark.parametrize(
-    'expected_filter',
-    [
-        (ControlFilter(True, ['z', '42'])),
-        (ControlFilter(False, [])),
-        (ControlFilter(False, [])),
-    ]
-)
-def test_set_control_fitter(expected_filter):
-    cfg = Config(shared_status)
-    cfg.control_filter = expected_filter
-    assert cfg.control_filter.as_dict() == expected_filter.as_dict()
-
-
-@pytest.mark.parametrize(
-    'config,expected_filter_path',
-    [
-        ('tests/assets/conf1.yaml', 'some/path'),
-        ('tests/assets/conf2.yaml', Defaults.FILTER_PATH),
-        ('tests/assets/conf3.yaml', 'c:any\weird/string'),
-    ]
-)
-def test_control_filter_path(config, expected_filter_path):
-    cfg = Config(shared_status)
-    cfg.update([config])
-
-    assert cfg.control_filter_path == expected_filter_path
 
 
 @pytest.mark.parametrize(

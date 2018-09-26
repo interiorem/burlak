@@ -2,10 +2,4 @@
 locator:
     port: 10042
 
-control_filter_path: 'c:any\weird/string'
-
-control_filter:
-    apply_control: false
-    white_list: []
-
 api_timeout_sec: 42

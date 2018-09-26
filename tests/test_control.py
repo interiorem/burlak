@@ -106,7 +106,7 @@ def test_stop_by_control(elysium, mocker):
     for stop_apps in to_stop_apps:
         yield elysium.control_queue.put(
             burlak.DispatchMessage(
-                dict(), dict(),
+                dict(),
                 -1, False,
                 set(), set(stop_apps), set(),
                 False,
@@ -154,7 +154,7 @@ def test_stop_apps_disabled(elysium, mocker, log_pending_stop):
     for stop_apps in to_stop_apps:
         yield elysium.control_queue.put(
             burlak.DispatchMessage(
-                dict(), dict(),
+                dict(),
                 -1, False,
                 set(), set(stop_apps), set(),
                 False,
@@ -184,7 +184,6 @@ def test_run(elysium, mocker):
         yield elysium.control_queue.put(
             burlak.DispatchMessage(
                 run_apps,
-                dict(),
                 -1, False,
                 set(), set(), set(run_apps.iterkeys()),
                 False,
@@ -224,7 +223,6 @@ def test_control(elysium, semaphore, mocker):
         yield elysium.control_queue.put(
             burlak.DispatchMessage(
                 run_apps,
-                dict(),
                 -1, True,
                 set(), set(), set(run_apps.iterkeys()),
                 False,
@@ -274,7 +272,6 @@ def test_control_exceptions(elysium, semaphore, mocker):
         yield elysium.control_queue.put(
             burlak.DispatchMessage(
                 run_apps,
-                dict(),
                 -1, True,
                 set(), set(), set(run_apps.iterkeys()),
                 False,
@@ -349,7 +346,6 @@ def skipped_test_gapped_control(elysium, semaphore, mocker):
         yield elysium.control_queue.put(
             burlak.DispatchMessage(
                 gap_state,
-                dict(),
                 -1, True,
                 set(), set(), set(state.iterkeys()),
                 False,

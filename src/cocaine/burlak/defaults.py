@@ -51,7 +51,6 @@ class Defaults(object):
     CONTROL_WITH_ACK = False
 
     APPLY_CONTROL = False
-    FILTER_PATH = '/darkvoice/control_filter'
 
     API_TIMEOUT = 300
 

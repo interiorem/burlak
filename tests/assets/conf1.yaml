@@ -11,12 +11,6 @@ status_port: 10042
 
 apps_poll_interval_sec: 100500
 
-control_filter_path: 'some/path'
-
-control_filter:
-    apply_control: true
-    white_list: ['z', '42']
-
 feedback:
     unicorn_path: /foo/bar
     unicorn_feedback: true

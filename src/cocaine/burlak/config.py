@@ -7,7 +7,6 @@ from collections import namedtuple
 
 import yaml
 
-from .control_filter import ControlFilter
 from .defaults import Defaults
 
 
@@ -135,24 +134,6 @@ def make_semaphore_config(d):
 class Config(object):
     """App-wide config."""
     TASK_NAME = 'config'
-
-    FILTER_SCHEMA = {
-        'type': 'dict',
-        'required': False,
-        'schema': {
-            'apply_control': {
-                'type': 'boolean',
-                'required': False,
-            },
-            'white_list': {
-                'type': 'list',
-                'required': False,
-                'schema': {
-                    'type': 'string',
-                },
-            },
-        },
-    }
 
     # TODO: make schema work with tools config
     SCHEMA = {
@@ -396,12 +377,7 @@ class Config(object):
                     'required': False,
                 },
             }
-        },
-        'control_filter_path': {
-            'type': 'string',
-            'required': False,
-        },
-        'control_filter': FILTER_SCHEMA,
+        }
     }
 
     def __init__(self, shared_status, logger=None):
@@ -581,22 +557,6 @@ class Config(object):
     def sharding(self):
         sharding = self._config.get('sharding', {})
         return make_sharding_config(sharding)
-
-    @property
-    def control_filter_path(self):
-        return self._config.get('control_filter_path', Defaults.FILTER_PATH)
-
-    @property
-    def control_filter(self):
-        d = self._config.get('control_filter', dict())
-        return ControlFilter.from_dict(d)
-
-    @control_filter.setter
-    def control_filter(self, control_filter):
-        self._config['control_filter'] = dict(
-            apply_control=control_filter.apply_control,
-            white_list=control_filter.white_list
-        )
 
     @property
     def api_timeout(self):
