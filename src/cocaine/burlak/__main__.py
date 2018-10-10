@@ -70,13 +70,11 @@ def main(
     config.update()
 
     committed_state = CommittedState()
-    committed_state.control_filter = config.control_filter
 
     if console_log_level is not None:
         config.console_log_level = console_log_level
 
     input_queue = queues.Queue(config.input_queue_size)
-    filter_queue = queues.Queue()
     control_queue = queues.Queue()
 
     state_dumper_queue = queues.Queue()
@@ -107,10 +105,6 @@ def main(
 
     sharding_setup = ShardingSetup(context, uniresis)
 
-    control_filter = burlak.ControlFilterListener(
-        context, unicorn,
-        filter_queue, input_queue
-    )
 
     feedback_submitter = burlak.FeedbackSubmitter(
         context, committed_state, unicorn, sharding_setup.get_feedback_route)
@@ -121,7 +115,7 @@ def main(
         context,
         node,
         committed_state,
-        filter_queue, input_queue, control_queue,
+        input_queue, control_queue,
         feedback_submitter,
         apps_poll_interval,
         workers_distribution,
@@ -149,7 +143,6 @@ def main(
     io_loop = IOLoop.current()
 
     # Note that while dependency is avoided, sometime order matters!
-    io_loop.spawn_callback(control_filter.subscribe_to_control_filter)
     io_loop.spawn_callback(lambda: apps_elysium.blessing_road(semaphore))
     io_loop.spawn_callback(lambda: state_processor.process_loop(semaphore))
 

@@ -1,7 +1,6 @@
 
 import time
 from collections import namedtuple
-from .control_filter import ControlFilter
 
 
 class States(object):
@@ -58,7 +57,6 @@ class CommittedState(object):
     def __init__(self):
         self.in_state = CommittedState.IncomingState(dict(), -1, 0)
 
-        self.ctl_filter = ControlFilter.with_defaults()
         self.state = dict()
         self.last_state_version = Defaults.INIT_STATE_VERSION
 
@@ -241,14 +239,6 @@ class CommittedState(object):
         }
 
         self.in_state = CommittedState.IncomingState(state, version, int(ts))
-
-    @property
-    def control_filter(self):
-        return self.ctl_filter
-
-    @control_filter.setter
-    def control_filter(self, ctl_filter):
-        self.ctl_filter = ctl_filter
 
     @property
     def channels_cache_apps(self):

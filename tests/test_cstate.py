@@ -1,8 +1,6 @@
 from collections import OrderedDict
 
-from cocaine.burlak.burlak import StateRecord, update_fake_state
 from cocaine.burlak.comm_state import CommittedState, Defaults
-from cocaine.burlak.control_filter import ControlFilter
 
 
 import pytest
@@ -52,9 +50,6 @@ mixed_state = dict(
         'STOPPED', 0,
         Defaults.NA_PROFILE_LABEL, 3, Defaults.STOPPED_DESCRIPTION, 50),
 )
-
-
-test_cf = ControlFilter(False, ['x', 'y', 'z'])
 
 
 @pytest.fixture
@@ -163,65 +158,3 @@ def test_workers_count(init_state):
         for record in init_state.as_dict().itervalues()
         if record.state == 'STARTED'
     )
-
-
-def test_control_filter(init_state):
-    init_state.control_filter = test_cf
-    assert init_state.control_filter == test_cf
-
-
-@pytest.mark.parametrize(
-    'real_state,control_state',
-    [
-        (
-            dict(
-                app1=StateRecord(100500, 'prof1'),
-                app2=StateRecord(100501, 'prof2'),
-                app3=StateRecord(100502, 'prof3'),
-                app4=StateRecord(100503, 'prof4'),
-            ),
-            dict(
-                app3=1,
-                app1=1
-            ),
-        ),
-        (
-            dict(
-                app1=StateRecord(1, 'prof1'),
-                app2=StateRecord(2, 'prof2'),
-            ),
-            dict(app3=1, app1=1),
-        ),
-        (
-            dict(),
-            dict(app1=1, app2=1),
-        ),
-        (
-            dict(),
-            dict(),
-        ),
-        (
-            dict(
-                app1=StateRecord(1, 'prof1'),
-                app2=StateRecord(2, 'prof2'),
-            ),
-            dict(),
-        )
-    ]
-)
-def test_fake_state(init_state, real_state, control_state):
-
-    init_state.clear()
-
-    update_fake_state(
-        init_state, TEST_STATE_VERSION, real_state, control_state)
-
-    assert init_state.version == TEST_STATE_VERSION
-    running_set = \
-        {
-            k for k, v in init_state.as_dict().iteritems()
-            if v.state == 'STARTED'
-        }
-    marked_set = real_state.viewkeys() - control_state.viewkeys()
-
-    assert running_set == marked_set

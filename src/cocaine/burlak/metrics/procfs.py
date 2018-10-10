@@ -400,7 +400,7 @@ class Network(ProcfsMetric):
             self._fill_results(results, iface, net)
 
         to_close = \
-            six.viewkeys(self._speed_files_cache) - six.viewkeys(networks)
+            self._speed_files_cache.viewkeys() - networks.viewkeys()
 
         for iface in to_close:
             self._speed_files_cache[iface].close()

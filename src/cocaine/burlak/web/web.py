@@ -44,8 +44,6 @@ def make_web_app_v1(opts):
             dict(committed_state=opts.committed_state)),
         (make_url(opts.prefix, API_V1, r'failed'), FailedStateHandle,
             dict(committed_state=opts.committed_state)),
-        (make_url(opts.prefix, API_V1, r'filter'), ControlFilterHandle,
-            dict(committed_state=opts.committed_state)),
         (make_url(opts.prefix, API_V1, r'channels'), ChannelsHandle,
             dict(committed_state=opts.committed_state)),
         (make_url(opts.prefix, API_V1, r'distribution(/?[^/]*)'),
@@ -266,15 +264,6 @@ class WorkersDistribution(web.RequestHandler):
             }
 
         self.write(result)
-
-
-class ControlFilterHandle(web.RequestHandler):
-    def initialize(self, committed_state):
-        self.committed_state = committed_state
-
-    @gen.coroutine
-    def get(self):
-        self.write(self.committed_state.control_filter.as_dict())
 
 
 class ChannelsHandle(web.RequestHandler):
